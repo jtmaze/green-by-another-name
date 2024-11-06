@@ -1,4 +1,8 @@
-# %%
+import glob
+import rasterio as rio
+from rasterio.merge import merge
+
+#%%
 # 
 ls_data_dir = './data/landsat-images'
 ls_data = glob.glob(ls_data_dir + '/*.tif')
