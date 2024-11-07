@@ -30,6 +30,9 @@ reproject(
 common_mask = np.where((s2_mask_resampled == 1) | (ls_mask == 1), 1, 0)
 out_meta = ls_meta.copy()
 
+s2_boundary = gpd.read_file('./data/s2-boundary.shp')
+ls_boundary = gpd.read_file('./data/ls-boundary.shp')
+
 
 with rasterio.open('./data/common_mask.tif', 'w', **out_meta) as dst:
     dst.write(common_mask.astype(rasterio.uint8), 1)
