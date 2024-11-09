@@ -7,12 +7,12 @@ from rasterio.warp import reproject, Resampling
 
 # %% 1. Get extent for landsat image
 
-with rasterio.open('./data/landsat-masks/ls-masks-test.tif') as ls_src:
+with rasterio.open('./data/landsat-masks/ls-masks-test-v2.tif') as ls_src:
     ls_mask = ls_src.read(1)
     ls_meta = ls_src.meta
     
 
-with rasterio.open('./data/sentinel2-masks/s2-masks-merged.tif') as s2_src:
+with rasterio.open('./data/sentinel2-masks/sentinel2-masks-v2-merged.tif') as s2_src:
     s2_mask = s2_src.read(1)
     s2_meta = s2_src.meta
 
@@ -30,11 +30,8 @@ reproject(
 common_mask = np.where((s2_mask_resampled == 1) | (ls_mask == 1), 1, 0)
 out_meta = ls_meta.copy()
 
-s2_boundary = gpd.read_file('./data/s2-boundary.shp')
-ls_boundary = gpd.read_file('./data/ls-boundary.shp')
 
-
-with rasterio.open('./data/common_mask.tif', 'w', **out_meta) as dst:
+with rasterio.open('./data/common_mask_v2.tif', 'w', **out_meta) as dst:
     dst.write(common_mask.astype(rasterio.uint8), 1)
 
 
