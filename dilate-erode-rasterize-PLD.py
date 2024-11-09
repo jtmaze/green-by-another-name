@@ -78,7 +78,7 @@ def rasterize_buffers(gdf, band_name, common_mask_path, band_number, mode):
 
 # %% Rasterize the new shapes as bands
 
-buffers = [-60, -30, 0, 60]
+buffers = [-60, -30, 0, 60, 120]
 
 for i, buffer in enumerate(buffers):
     pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, boundary_utm)

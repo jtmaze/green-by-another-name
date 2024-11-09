@@ -38,7 +38,7 @@ with rio.open('./data/sentinel2-images/sentinel2-images-merged.tif') as s2_img_s
     print(s2_data.shape)
     print(ls_data.shape)
 
-with rio.open('./data/common_mask.tif') as cmask_src:
+with rio.open('./data/common_mask_v2.tif') as cmask_src:
     window_cmask = from_bounds(*intersection_bounds, cmask_src.transform)
     cmask = cmask_src.read(1, window=window_cmask)
     cmask_meta = cmask_src.meta
@@ -72,3 +72,5 @@ with rio.open(f'./data/masked_images/{band_color}-masked.tif', 'w', **out_meta) 
 
 
 
+
+# %%
