@@ -4,7 +4,6 @@ import pprint as pp
 import numpy as np
 import rasterio as rio
 from rasterio.windows import from_bounds
-import rioxarray as rxr
 import geopandas as gpd
 
 # %% 2. Use common cloud mask on the LandSat and Sentinel2 Images 
@@ -53,7 +52,7 @@ print(f'Negative Landsat pixels: {negative_ls_pix:.2f}%')
 #ls_data = np.where(ls_data < 0, 0, np.nan)
 
 # Save the masked images
-out_meta = s2_meta.copy()
+out_meta = ls_meta.copy()
 out_meta.update({
     'count': 2,
     'dtype': 'float64',
