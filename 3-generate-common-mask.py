@@ -4,6 +4,8 @@ import geopandas as gpd
 import numpy as np
 import rasterio
 from rasterio.warp import reproject, Resampling
+from rasterio.features import sieve
+from skimage.morphology import binary_dilation, remove_small_objects, disk
 
 # %% 1. Get extent for landsat image
 
@@ -30,14 +32,25 @@ reproject(
 common_mask = np.where((s2_mask_resampled == 1) | (ls_mask == 1), 1, 0)
 out_meta = ls_meta.copy()
 
-
 with rasterio.open('./data/common_mask_v2.tif', 'w', **out_meta) as dst:
     dst.write(common_mask.astype(rasterio.uint8), 1)
 
+# %% 2.0 Make a more conservative version of the mask
 
+with rasterio.open('./data/common_mask_v2.tif') as src:
+    common_mask = src.read(1)
+    out_meta = src.meta
 
+    common_mask_sieved = sieve(common_mask, size=100, connectivity=8)
+    sieved_mask_bool = common_mask_sieved.astype(bool)
 
+    dilation_size = 200
+    structuring = np.ones((dilation_size, dilation_size), dtype=bool)
 
+    mask_dilated = binary_dilation(common_mask_sieved, footprint=structuring)
+
+with rasterio.open('./data/common_mask_sieved_dilated.tif', 'w', **out_meta) as dst:
+    dst.write(mask_dilated, 1)
 
 
 # %%
