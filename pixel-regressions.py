@@ -486,8 +486,8 @@ with rio.open(pld_mask_path) as pld_src, rio.open(masked_nir_path) as nir_src:
     band_s2 = np.where(shoreline_mask == 1, band_s2, np.nan)
 
 
-    ls_high_threshold = 3500
-    s2_high_threshold = 3500
+    ls_high_threshold = 2700
+    s2_high_threshold = 2700
     threshold_histogram_pixels(band_ls, ls_high_threshold, 'NIR', 'Landsat', observation_area)
     threshold_histogram_pixels(band_s2, s2_high_threshold, 'NIR', 'Sentinel-2', observation_area)
 
@@ -504,7 +504,7 @@ with rio.open(pld_mask_path) as pld_src, rio.open(masked_nir_path) as nir_src:
 
     print(model_shoreline)
 
-# %% Compare shoreline NDWI across satellites
+# %% Compare Shoreline NDWI across satellites
 
 with rio.open(pld_mask_path) as pld_src, rio.open(masked_green_path) as green_src, rio.open(masked_nir_path) as nir_src:
 
@@ -544,6 +544,67 @@ with rio.open(pld_mask_path) as pld_src, rio.open(masked_green_path) as green_sr
 
     green_band_s2 = np.where(shoreline_mask == 1, green_band_s2, np.nan)
     nir_band_s2 = np.where(shoreline_mask == 1, nir_band_s2, np.nan)
+
+    ndwi_ls = (green_band_ls - nir_band_ls) / (green_band_ls + nir_band_ls)
+    ndwi_s2 = (green_band_s2 - nir_band_s2) / (green_band_s2 + nir_band_s2)
+
+    ls_high_threshold = 1
+    s2_high_threshold = 1
+    ls_low_threshold = -1
+    s2_low_threshold = -1
+
+    histogram_ndwi_pixels(ndwi_ls, ls_high_threshold, ls_low_threshold, 'Landsat', observation_area, 0.1)
+    histogram_ndwi_pixels(ndwi_s2, s2_high_threshold, s2_low_threshold, 'Sentinel-2', observation_area, 0.1)
+
+    model_shoreline = downsample_regress_ndwi(
+        ndwi_ls,
+        ndwi_s2,
+        ls_high_threshold,
+        s2_high_threshold,
+        ls_low_threshold,
+        s2_low_threshold,
+        1_000_000,
+        observation_area,
+        point_alpha=0.1
+    )
+
+    print(model_shoreline)
+
+# %% Compare Water NDWI across satellites
+
+with rio.open(pld_mask_path) as pld_src, rio.open(masked_green_path) as green_src, rio.open(masked_nir_path) as nir_src:
+
+    observation_area = 'Inside of PLD 30m buffered (Water Pixels)'
+    img_bounds = green_src.bounds
+    window_img = from_bounds(*img_bounds, pld_src.transform)
+
+    # Read two PLD masks to make inner and outer shorelines
+    pld_mask = pld_src.read(4, window=window_img)
+    pld_meta = pld_src.meta
+
+    green_band_count = green_src.count
+    for band_idx in range(1, green_band_count + 1):
+        description = green_src.descriptions[band_idx - 1]
+        print(f'Band #{band_idx} is {description}')
+
+    nir_band_count = nir_src.count
+    for band_idx in range(1, nir_band_count + 1):
+        description = nir_src.descriptions[band_idx - 1]
+        print(f'Band #{band_idx} is {description}')
+
+    green_band_ls = green_src.read(1)
+    green_band_s2 = green_src.read(2)
+    nir_band_ls = nir_src.read(1)
+    nir_band_s2 = nir_src.read(2)
+    
+
+    green_band_ls = np.where(pld_mask == 1, green_band_ls, np.nan)
+    green_band_ls = green_band_ls * 10000
+    nir_band_ls = np.where(pld_mask == 1,nir_band_ls, np.nan)
+    nir_band_ls = nir_band_ls * 10000
+
+    green_band_s2 = np.where(pld_mask == 1, green_band_s2, np.nan)
+    nir_band_s2 = np.where(pld_mask == 1, nir_band_s2, np.nan)
 
     ndwi_ls = (green_band_ls - nir_band_ls) / (green_band_ls + nir_band_ls)
     ndwi_s2 = (green_band_s2 - nir_band_s2) / (green_band_s2 + nir_band_s2)
