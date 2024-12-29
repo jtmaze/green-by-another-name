@@ -8,7 +8,7 @@ from rasterio.features import rasterize
 # %% 2.0 
 
 pld = gpd.read_file('./data/pld_shapes/YKflats_pld_clipped.shp')
-boundary = gpd.read_file('./data/roi_and_img_bounds/ls-boundary.shp')
+boundary = gpd.read_file('./data/roi_and_img_bounds/s2-boundary.shp')
 est_utm = pld.estimate_utm_crs()
 est_utm_boudary = boundary.estimate_utm_crs()
 
@@ -78,11 +78,11 @@ def rasterize_buffers(gdf, band_name, common_mask_path, band_number, mode):
 
 # %% Rasterize the new shapes as bands
 
-buffers = [-60, -30, 0, 30, 60, 120]
+buffers = [60]
 
 for i, buffer in enumerate(buffers):
     pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, boundary_utm)
     mode = 'w' if i == 0 else 'r+'
-    rasterize_buffers(pld_buffered, band_name, './data/common_mask_v2.tif', i+1, mode)
+    rasterize_buffers(pld_buffered, band_name, 'D:/agu_map_data/roi_YKflats_timeframe_full_month_early_dataset_gswo_buffer60.tif', i+1, mode)
 
 # %%
