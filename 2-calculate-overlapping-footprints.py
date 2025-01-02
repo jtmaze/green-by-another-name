@@ -66,12 +66,15 @@ for r in unique_rois:
 
     # Select the dates with best coverage in the roi
     top_dates = merged.sort_values(by='int_sqkm', 
-                                   ascending=False
-                                   ).head(10)
+                                   ascending=False)
+    
     top_dates.drop(columns=['geometry_ls8', 'geometry_s2'], inplace=True)
     top_dates['per_cover'] = (top_dates['int_sqkm'] / roi_area * 100).round(0)
+    top_dates = top_dates[top_dates['per_cover'] > 25]
+    top_dates['date'] = top_dates['date'].astype(str)
+    top_dates['date'] = pd.to_datetime(top_dates['date']).dt.date
 
-    top_dates.to_crs('EPSG: 4326')
+    top_dates.to_crs('EPSG: 4326', inplace=True)
     top_dates.to_file(f'./data/overlap_dates_for_roi/{r}_overlap_dates.shp')
 
 
