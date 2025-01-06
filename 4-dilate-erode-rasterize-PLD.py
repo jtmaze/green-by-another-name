@@ -1,29 +1,36 @@
-# %% 1.0 Libraries
+# %% 1.0 Libraries and directories
 import pprint as pp
 
 import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-# %% 2.0 
+roi_name = 'YKF_sub1'
+out_dir = 'pld_rasterized'
+roi_prefix = roi_name.split('_')[0]
 
-pld = gpd.read_file('./data/pld_shapes/YKflats_pld_clipped.shp')
-boundary = gpd.read_file('./data/roi_and_img_bounds/s2-boundary.shp')
+pld = gpd.read_file(f'./data/pld_shapes/{roi_prefix}_pld_clipped.shp')
+roi = gpd.read_file(f'./data/roi_shapes/{roi_name}_shape.shp')
 est_utm = pld.estimate_utm_crs()
-est_utm_boudary = boundary.estimate_utm_crs()
+est_utm_roi = roi.estimate_utm_crs()
 
 """
 !!! Worth adding check to ensure est_utm is same for lakes and boundary
 """
-print(est_utm, est_utm_boudary)
+print(est_utm, est_utm_roi)
 
 pld_utm = pld.to_crs(est_utm)
-boundary_utm = boundary.to_crs(est_utm) 
+roi_utm = roi.to_crs(est_utm) 
 
 # %% 3.0 Define functions
 
-def pld_buffer_img_clip(gdf_utm, buffer_size, clip_bounds):
-    """Returns a tupple of new lakes and a band name for writing to raster"""
+def pld_buffer_img_clip(gdf_utm: gpd.GeoDataFrame, 
+                        buffer_size: int, 
+                        clip_bounds: gpd.GeoDataFrame):
+    """
+    Clips the PLD lakes to the roi boudary
+    Returns a tupple of new lakes and a band name for writing to raster
+    """
     # Clip the lakes to the common image boundary
     out_gdf = gdf_utm.copy()
     out_gdf = gpd.clip(out_gdf, clip_bounds)
@@ -31,7 +38,7 @@ def pld_buffer_img_clip(gdf_utm, buffer_size, clip_bounds):
     # Buffer the lakes
     out_gdf = out_gdf.buffer(buffer_size)
 
-    # Calculate number of lakes removed by errosion
+    # Calculate number of small lakes removed by errosion opperation
     total_lakes = len(out_gdf)
     out_gdf = out_gdf[~out_gdf.is_empty]
     out_lakes = len(out_gdf)
@@ -42,19 +49,23 @@ def pld_buffer_img_clip(gdf_utm, buffer_size, clip_bounds):
     return (out_gdf, band_name)
 
 
-def rasterize_buffers(gdf, band_name, common_mask_path, band_number, mode):
+def rasterize_buffers(gdf, band_name: str, img_path: str, band_number: int):
     """
-    Rasterize the dilated/eroded shapes and write them to disk
+    Rasterize the dilated/eroded lake shapes and write them to disk
     """
 
-    with rio.open(common_mask_path) as cmask_src:
-        cmask_meta = cmask_src.meta
+    with rio.open(img_path) as img_src:
+        img_meta = img_src.meta
 
-    out_meta = cmask_meta.copy()
-    if mode == 'w':
+    out_meta = img_meta.copy()
+    # 
+    if band_number == 1:
+        mode = 'w'
         out_meta.update({
-            'count': len(buffers)  # Ensure all bands are accounted for
+            'count': len(buffers)
         })
+    else:
+        mode = 'r+'
 
     # Convert the lakes the common mask crs (EPSG:4326)
     gdf = gdf.to_crs(cmask_meta['crs'])
@@ -78,11 +89,10 @@ def rasterize_buffers(gdf, band_name, common_mask_path, band_number, mode):
 
 # %% Rasterize the new shapes as bands
 
-buffers = [60]
+buffers = [-60, -30, 0, 30, 60, 120]
 
 for i, buffer in enumerate(buffers):
     pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, boundary_utm)
-    mode = 'w' if i == 0 else 'r+'
-    rasterize_buffers(pld_buffered, band_name, 'D:/agu_map_data/roi_YKflats_timeframe_full_month_early_dataset_gswo_buffer60.tif', i+1, mode)
+    rasterize_buffers(pld_buffered, band_name, 'D:/agu_map_data/roi_YKflats_timeframe_full_month_early_dataset_gswo_buffer60.tif', i+1)
 
 # %%
