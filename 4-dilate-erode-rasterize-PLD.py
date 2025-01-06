@@ -49,17 +49,21 @@ def pld_buffer_img_clip(gdf_utm: gpd.GeoDataFrame,
     return (out_gdf, band_name)
 
 
-def rasterize_buffers(gdf, band_name: str, img_path: str, band_number: int):
+def rasterize_buffers(gdf: gpd.GeoDataFrame, 
+                      band_name: str, 
+                      img_path: str,
+                      out_path: str,
+                      band_idx: int):
     """
     Rasterize the dilated/eroded lake shapes and write them to disk
     """
-
-    with rio.open(img_path) as img_src:
-        img_meta = img_src.meta
-
+    # Get meta data data from rivers mask
+    with rio.open(img_path) as src_img:
+        img_meta = src_img.meta
     out_meta = img_meta.copy()
-    # 
-    if band_number == 1:
+
+    # For first band, mode is write
+    if band_idx == 1:
         mode = 'w'
         out_meta.update({
             'count': len(buffers)
@@ -68,21 +72,20 @@ def rasterize_buffers(gdf, band_name: str, img_path: str, band_number: int):
         mode = 'r+'
 
     # Convert the lakes the common mask crs (EPSG:4326)
-    gdf = gdf.to_crs(cmask_meta['crs'])
-
+    gdf = gdf.to_crs(img_meta['crs'])
     lake_raster = rasterize(
         shapes=[(geom, 1) for geom in gdf.geometry],
-        out_shape=(cmask_meta['height'], cmask_meta['width']),
-        transform=cmask_meta['transform'],
+        out_shape=(img_meta['height'], img_meta['width']),
+        transform=img_meta['transform'],
         all_touched=True,
         fill=0,
         default_value=1,
         dtype=rio.uint8 
     )
-
-    with rio.open(f'./data/pld_shapes/pld_masks.tif', mode, **out_meta) as dst:
-        dst.write(lake_raster, band_number)
-        dst.set_band_description(band_number, band_name)
+    # Write the output
+    with rio.open(out_path, mode, **out_meta) as dst:
+        dst.write(lake_raster, band_idx)
+        dst.set_band_description(band_idx, band_name)
 
     print(f'{band_name} rasterized')
     
@@ -90,9 +93,11 @@ def rasterize_buffers(gdf, band_name: str, img_path: str, band_number: int):
 # %% Rasterize the new shapes as bands
 
 buffers = [-60, -30, 0, 30, 60, 120]
+img_path = f'./data/river_files/YKF_sub1_binary_rivers_dilated150.tif'
+out_path = f'./data/pld_rasterized/{roi_name}_lake_masks.tif'
 
 for i, buffer in enumerate(buffers):
-    pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, boundary_utm)
-    rasterize_buffers(pld_buffered, band_name, 'D:/agu_map_data/roi_YKflats_timeframe_full_month_early_dataset_gswo_buffer60.tif', i+1)
+    pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, roi_utm)
+    rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
 
 # %%

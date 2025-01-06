@@ -5,7 +5,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import reproject, Resampling
 from rasterio.features import sieve
-from skimage.morphology import binary_dilation, remove_small_objects, disk
+from skimage.morphology import binary_dilation, remove_small_objects
 
 # %% 1. Get extent for landsat image
 
