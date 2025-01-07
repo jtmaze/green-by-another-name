@@ -32,7 +32,10 @@ def match_img_bands(ls_path: str, s2_path: str, band_name: str):
 
     return ls_array, s2_array
 
-def apply_river_mask(dataset)
+def apply_river_mask(dataset: np.array, roi_name: str):
+    """
+    Masks the rivers out of a dataset before performing an analysis
+    """
 
     
 
