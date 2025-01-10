@@ -5,7 +5,7 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'YKF_sub1'
+roi_name = 'AKCP_sub1'
 out_dir = 'pld_rasterized'
 roi_prefix = roi_name.split('_')[0]
 
@@ -15,7 +15,7 @@ est_utm = pld.estimate_utm_crs()
 est_utm_roi = roi.estimate_utm_crs()
 
 """
-!!! Worth adding check to ensure est_utm is same for lakes and boundary
+!!! Worth adding check to ensure est_utm is same for lakes and boundary?
 """
 print(est_utm, est_utm_roi)
 
@@ -61,6 +61,7 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
     with rio.open(img_path) as src_img:
         img_meta = src_img.meta
     out_meta = img_meta.copy()
+    print(out_meta['crs'])
 
     # For first band, mode is write
     if band_idx == 1:
@@ -93,7 +94,7 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
 # %% Rasterize the new shapes as bands
 
 buffers = [-60, -30, 0, 30, 60, 120]
-img_path = f'./data/river_files/YKF_sub1_binary_rivers_dilated150.tif'
+img_path = f'./data/river_files/{roi_name}_binary_rivers_dilated150_UTMretest.tif'
 out_path = f'./data/pld_rasterized/{roi_name}_lake_masks.tif'
 
 for i, buffer in enumerate(buffers):

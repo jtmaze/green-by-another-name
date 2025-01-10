@@ -1,18 +1,42 @@
 # %% 1.0 Libraries and directories
-
-
 import glob
-import rasterio as rio
 import numpy as np
+import geopandas as gpd
+import rasterio as rio
 from rasterio.windows import from_bounds
+from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 out_dir = './data/image_downloads_masked/'
 img_dir = './data/image_downloads/*.tif'
 img_list = glob.glob(img_dir)
+roi_name = 'YKF_sub1'
+roi_path = f'./data/roi_shapes/{roi_name}_shape.shp'
+roi = gpd.read_file(roi_path)
+est_utm = roi.estimate_utm_crs()
+print(est_utm)
 
-river_path = './data/river_files/YKF_sub1_binary_rivers_dilated150.tif'
+river_path = f'./data/river_files/{roi_name}_binary_rivers_dilated150_UTMretest.tif'
 
 # %% 2.0 Function to mask rivers from images
+
+def reproj_img_to_utm(src: rio.DatasetReader, utm_crs: str):
+    transform, width, height = calculate_default_transform(
+        src.crs,
+        utm_crs,
+        src.width,
+        src.height,
+        *src.bounds
+    )
+    out_array = np.empty((src.count, height, width), dtype=src.dtype)
+    reproject(
+        source=src.read(),
+        destination=out_array,
+        src_transform=src.transform,
+        src_crs=src.crs,
+        dst_transform=transform,
+        dst_crs=utm_crs,
+        resampling=Resampling.nearest
+    )
 
 def apply_river_mask(img_path: str, river_path: str, out_dir: str):
     """

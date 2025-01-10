@@ -30,7 +30,7 @@ unique_rois = extract_unique(footprint_file_list, roi_pattern)
 # %% 2.0 Find overlap as % of roi for each image date. 
 
 for r in unique_rois:
-    # Read footprints and rename the column
+    # Read footprints and rename the date column
     ls8_path = [f for f in footprint_file_list if re.search(fr'footprints_ls8_roi_{r}.*\.shp$', f)][0]
     s2_path = [f for f in footprint_file_list if re.search(fr'footprints_s2_roi_{r}.*\.shp$', f)][0]
     ls8_footprints = gpd.read_file(ls8_path).rename(
@@ -45,7 +45,8 @@ for r in unique_rois:
     roi_est_crs = roi_shape.estimate_utm_crs()
     roi_shape = roi_shape.to_crs(roi_est_crs)
     roi_area = (roi_shape.geometry.iloc[0].area / 1_000_000)
-    print(f'{roi_area} in square meters')
+    print(f'{roi_area} in square kilometers')
+    print(f'{r} utm is {roi_est_crs}')
 
     # Convert to local UTM for area opperations
     ls8_footprints = ls8_footprints.to_crs(roi_est_crs)
@@ -55,14 +56,14 @@ for r in unique_rois:
                                   suffixes=('_ls8', '_s2'))
     
     # Merge the satellite footprints for calculations
-    merged['int'] = merged.apply(
+    merged['inter'] = merged.apply(
         lambda row: row['geometry_ls8'].intersection(row['geometry_s2']),
         axis=1
     )
-    merged = merged.set_geometry('int')
+    merged = merged.set_geometry('inter')
     merged.crs = roi_est_crs
     
-    merged['int_sqkm'] = (merged['int'].area / 1_000_000).round(2)
+    merged['int_sqkm'] = (merged['inter'].area / 1_000_000).round(2)
 
     # Select the dates with best coverage in the roi
     top_dates = merged.sort_values(by='int_sqkm', 
@@ -75,6 +76,8 @@ for r in unique_rois:
     top_dates['date'] = pd.to_datetime(top_dates['date']).dt.date
 
     top_dates.to_crs('EPSG: 4326', inplace=True)
+    # A few of the intersections yield LINESTRING geoms, filter these out for writing
+    top_dates = top_dates[top_dates.geometry.type == 'Polygon']
     top_dates.to_file(f'./data/overlap_dates_for_roi/{r}_overlap_dates.shp')
 
 
