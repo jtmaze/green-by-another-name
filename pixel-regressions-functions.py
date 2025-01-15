@@ -17,12 +17,6 @@ def match_img_bands(ls_path: str, s2_path: str, band_name: str):
     """
     Returns two numpy arrays for corresponding Sentinel-2 and Landsat8 bands
     """
-    if band_name == 'Green':
-        s2_band_idx = 1 and ls_band_idx = 1
-    elif band_name == 'NIR':
-        s2_band_idx = 1 and ls_band_idx = 2
-    else:
-        print('Make a better data structure for band names')
 
     with rio.open(ls_path) as src_ls, rio.open(s2_path) as src_s2:
         ls_meta = src_ls.meta
@@ -32,7 +26,10 @@ def match_img_bands(ls_path: str, s2_path: str, band_name: str):
 
     return ls_array, s2_array
 
-def apply_river_mask(dataset)
+def apply_river_mask(dataset: np.array, roi_name: str):
+    """
+    Masks the rivers out of a dataset before performing an analysis
+    """
 
     
 

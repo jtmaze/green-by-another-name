@@ -1,4 +1,8 @@
+"""
+This script dilates and erodes the PLD lakes and writes them to a raster file
+"""
 # %% 1.0 Libraries and directories
+
 import pprint as pp
 
 import geopandas as gpd
@@ -6,7 +10,8 @@ import rasterio as rio
 from rasterio.features import rasterize
 
 roi_name = 'YKF_sub1'
-out_dir = 'pld_rasterized'
+buffers = [-60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
+out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]
 
 pld = gpd.read_file(f'./data/pld_shapes/{roi_prefix}_pld_clipped.shp')
@@ -15,21 +20,21 @@ est_utm = pld.estimate_utm_crs()
 est_utm_roi = roi.estimate_utm_crs()
 
 """
-!!! Worth adding check to ensure est_utm is same for lakes and boundary
+!!! Worth adding check to ensure est_utm is same for lakes and boundary?
 """
 print(est_utm, est_utm_roi)
 
 pld_utm = pld.to_crs(est_utm)
 roi_utm = roi.to_crs(est_utm) 
 
-# %% 3.0 Define functions
+# %% 2.0 Define functions
 
 def pld_buffer_img_clip(gdf_utm: gpd.GeoDataFrame, 
                         buffer_size: int, 
                         clip_bounds: gpd.GeoDataFrame):
     """
     Clips the PLD lakes to the roi boudary
-    Returns a tupple of new lakes and a band name for writing to raster
+    Returns a tupple of dilated/eroded lakes and a band name for writing to raster
     """
     # Clip the lakes to the common image boundary
     out_gdf = gdf_utm.copy()
@@ -61,18 +66,22 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
     with rio.open(img_path) as src_img:
         img_meta = src_img.meta
     out_meta = img_meta.copy()
+    print(out_meta['crs'])
 
-    # For first band, mode is write
+    # For first band (i.e, no file yet), mode is write
     if band_idx == 1:
         mode = 'w'
         out_meta.update({
             'count': len(buffers)
         })
+    # For subsequent bands, r+ mode on existing file
     else:
         mode = 'r+'
 
-    # Convert the lakes the common mask crs (EPSG:4326)
+    # Convert the lakes the local UTM from the image
     gdf = gdf.to_crs(img_meta['crs'])
+    # Rasterize the the lake shapes to a binary raster
+    # The image path to rivers raster, bc satellite images have variable footprints by date.
     lake_raster = rasterize(
         shapes=[(geom, 1) for geom in gdf.geometry],
         out_shape=(img_meta['height'], img_meta['width']),
@@ -92,9 +101,8 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
 
 # %% Rasterize the new shapes as bands
 
-buffers = [-60, -30, 0, 30, 60, 120]
-img_path = f'./data/river_files/YKF_sub1_binary_rivers_dilated150.tif'
-out_path = f'./data/pld_rasterized/{roi_name}_lake_masks.tif'
+img_path = f'./data/river_files/{roi_name}_binary_rivers_dilated150_UTMretest.tif'
+out_path = f'{out_dir}/{roi_name}_lake_masks.tif'
 
 for i, buffer in enumerate(buffers):
     pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, roi_utm)
