@@ -13,7 +13,13 @@ random.seed(20)
 
 # %% 2.0 
 
-def match_img_bands(ls_path: str, s2_path: str, band_name: str):
+###############################################
+### Helper Functions
+###############################################
+
+def read_band_by_description():
+
+def roi_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     """
     Returns two numpy arrays for corresponding Sentinel-2 and Landsat8 bands
     """
