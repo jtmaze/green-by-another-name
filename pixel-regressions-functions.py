@@ -13,7 +13,20 @@ random.seed(20)
 
 # %% 2.0 
 
-def match_img_bands(ls_path: str, s2_path: str, band_name: str):
+###############################################
+### Helper Functions
+###############################################
+
+def read_band_by_description(raster_path: str, description: str):
+    with rio.open(raster_path) as src:
+        desc_list = src.descriptions
+
+    for idx, desc in enumerate(desc_list, start=1):
+        if desc == description:
+            return src.read(idx)
+
+
+def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     """
     Returns two numpy arrays for corresponding Sentinel-2 and Landsat8 bands
     """
