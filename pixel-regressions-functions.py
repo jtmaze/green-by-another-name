@@ -37,13 +37,18 @@ def read_band_by_description(raster_path: str, description: str, image_window_pa
                 data = src.read(idx)
                 return data
             elif desc == description and image_window_params is not None:
+                
                 window = from_bounds(*image_window_params['bounds'], 
-                                     image_window_params['transform']
+                                     transform=src.transform
                         )
-                data = src.read(idx,
-                                window=window, 
-                                out_shape=image_window_params['shape'],
-                                resampling=Resampling.nearest)
+                data = src.read(
+                    idx,
+                    window=window, 
+                    out_shape=image_window_params['shape'],
+                    boundless=True, # Assigns no data to pixels outside the raster's extent.
+                    resampling=Resampling.nearest
+                )
+                
                 return data
      
         if data is None:
@@ -73,9 +78,13 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
 
     # Get the data's (LandSat's) bounds and transform as a window for the PLD mask
     with rio.open(ls_path) as src: 
+        meta = src.meta
         ls_bounds = src.bounds
         ls_transform = src.transform
         ls_shape = src.shape
+
+        print(ls_bounds)
+        print(ls_transform)
 
     image_window_params = {
         'bounds': ls_bounds,
@@ -87,7 +96,7 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     if ls_data.shape != s2_data.shape:
         print('The Sentinel-2 and Landsat8 data shapes are different, cannot compare')
 
-    return ls_data, s2_data, image_window_params
+    return ls_data, s2_data, image_window_params, meta
     
 
 def make_measure_mask(pld_path: str, 
@@ -124,34 +133,65 @@ def filter_measured_pixels(ls_data: np.array,
                            s2_data: np.array,
                            measure_mask: np.array,
                            filter_low: float,
-                           filter_high: float,):
+                           filter_high: float,
+                           out_meta: dict):
     """
     Opperations:
     1) Selects shoreline, lake, or land pixels within measure mask
     2) Filters pixel values between thresholds for both image arrays
     3) Ensures both images have common set of nans after filtering. 
     """
+    if out_meta is None: 
+        ls_masked = apply_measure_mask(ls_data, measure_mask)
+        s2_masked = apply_measure_mask(s2_data, measure_mask)
+        ls_filtered = np.where(
+            (ls_masked > filter_low) & (ls_masked < filter_high), 
+            ls_masked, 
+            np.nan
+        )
+        valid_ls_mask = ~np.isnan(ls_filtered)
+        s2_filtered = np.where(
+            (s2_masked > filter_low) & (s2_masked < filter_high),
+            s2_masked,
+            np.nan
+        )
+        valid_s2_mask = ~np.isnan(s2_filtered)
+
+        # Make the same nan values from filtering common to each dataset
+        ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
+        s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
+
+        return ls_data_out, s2_data_out
     
-    ls_masked = apply_measure_mask(ls_data, measure_mask)
-    s2_masked = apply_measure_mask(s2_data, measure_mask)
-    ls_filtered = np.where(
-        (ls_masked > filter_low) & (ls_masked < filter_high), 
-        ls_masked, 
-        np.nan
-    )
-    valid_ls_mask = ~np.isnan(ls_filtered)
-    s2_filtered = np.where(
-        (s2_masked > filter_low) & (s2_masked < filter_high),
-        s2_masked,
-        np.nan
-    )
-    valid_s2_mask = ~np.isnan(s2_filtered)
+    if out_meta is not None:
+        out_path1 = './data/testLS.tiff'
+        out_path2 = './data/testS2.tiff'
+        ls_masked = apply_measure_mask(ls_data, measure_mask)
+        s2_masked = apply_measure_mask(s2_data, measure_mask)
+        ls_filtered = np.where(
+            (ls_masked > filter_low) & (ls_masked < filter_high), 
+            ls_masked, 
+            np.nan
+        )
+        valid_ls_mask = ~np.isnan(ls_filtered)
+        s2_filtered = np.where(
+            (s2_masked > filter_low) & (s2_masked < filter_high),
+            s2_masked,
+            np.nan
+        )
+        valid_s2_mask = ~np.isnan(s2_filtered)
 
-    # Make the same nan values from filtering common to each dataset
-    ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
-    s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
+        # Make the same nan values from filtering common to each dataset
+        ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
+        s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
 
-    return ls_data_out, s2_data_out
+        with rio.open(out_path1, 'w', **out_meta) as dst1:
+            dst1.write(ls_data_out, 1)
+
+        with rio.open(out_path2, 'w', **out_meta) as dst2:
+            dst2.write(s2_data_out, 1)
+
+        return ls_data_out, s2_data_out
 
 def downsample_image_arrays(ls_pixels: np.array,
                             s2_pixels: np.array,
@@ -259,14 +299,14 @@ test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2019-05-16_roi_YKF_sub1_resampl
 test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
 pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
 
-ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
+ls_data, s2_data, image_window_params, meta = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
 measure_mask = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
                                  buffer_delim=60, 
                                  buffer_delim_outer=None)
 
-ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999)
+ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999, out_meta=meta)
 
 
 print(ls_pixels.size, s2_pixels.size)
@@ -283,8 +323,8 @@ green_ls_sample, green_s2_sample = get_pixel_samples(
     pld_path=pld_path,
     band_name='Green',
     sample_size=10_000,
-    zone='land',
-    buffer_delim=30,
+    zone='lake',
+    buffer_delim=0,
     buffer_delim_outer=None,
     filter_low=0.00001,
     filter_high=0.99999,
@@ -296,8 +336,8 @@ nir_ls_sample, nir_s2_sample = get_pixel_samples(
     pld_path=pld_path,
     band_name='NIR',
     sample_size=10_000,
-    zone='land',
-    buffer_delim=30,
+    zone='lake',
+    buffer_delim=0,
     buffer_delim_outer=None,
     filter_low=0.00001,
     filter_high=0.99999,
