@@ -123,8 +123,8 @@ def make_measure_mask(pld_path: str,
 def filter_measured_pixels(ls_data: np.array,
                            s2_data: np.array,
                            measure_mask: np.array,
-                           filter_low: int,
-                           filter_high: int,):
+                           filter_low: float,
+                           filter_high: float,):
     """
     Opperations:
     1) Selects shoreline, lake, or land pixels within measure mask
@@ -146,7 +146,6 @@ def filter_measured_pixels(ls_data: np.array,
         np.nan
     )
     valid_s2_mask = ~np.isnan(s2_filtered)
-    # TODO: Check the shape of the filtered data??
 
     # Make the same nan values from filtering common to each dataset
     ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
@@ -182,6 +181,8 @@ def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
         s2_sample: np.array): # 1D array
     
+    print(ls_sample.mean())
+    print(s2_sample.mean())
     model = stats.linregress(ls_sample, s2_sample)
     slope = model[0]
     intercept = model[1]
@@ -215,23 +216,109 @@ def regress_reflectance(
     
     return model
 
+def get_pixel_samples(ls8_path: str,
+                      s2_path: str,
+                      pld_path: str,
+                      band_name: str,
+                      sample_size: int,
+                      zone: str,
+                      buffer_delim: int,
+                      buffer_delim_outer: int,
+                      filter_low: float,
+                      filter_high: float):
+    
+    ls_data, s2_data, image_window_params = rio_get_data_arrays(
+        ls8_path, s2_path, band_name
+    )
+    measure_mask = make_measure_mask(
+        pld_path,
+        image_window_params,
+        zone,
+        buffer_delim,
+        buffer_delim_outer,
+    )
+    ls_pixels, s2_pixels = filter_measured_pixels(
+        ls_data, 
+        s2_data, 
+        measure_mask, 
+        filter_low,
+        filter_high
+    )
+    ls_sample, s2_sample = downsample_image_arrays(
+        ls_pixels, 
+        s2_pixels, 
+        sample_size
+    )
+
+    return ls_sample, s2_sample
+
 
 # %% 
 
-test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
-test_fp_ls8 = './data/sr_images/LandSat8-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
 pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
 
-ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='NIR')
+ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
 measure_mask = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
-                                 buffer_delim=-60, 
+                                 buffer_delim=60, 
                                  buffer_delim_outer=None)
 
-ls_pixels, s2_pixels =filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.000001, filter_high=0.999999)
+ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999)
 
-sample_size = 100_000
+
+print(ls_pixels.size, s2_pixels.size)
+print()
+sample_size = 100
 ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size) 
 rsq = regress_reflectance(ls_sample, s2_sample)
+
+# %%
+
+green_ls_sample, green_s2_sample = get_pixel_samples(
+    ls8_path=test_fp_ls8,
+    s2_path=test_fp_s2,
+    pld_path=pld_path,
+    band_name='Green',
+    sample_size=10_000,
+    zone='land',
+    buffer_delim=30,
+    buffer_delim_outer=None,
+    filter_low=0.00001,
+    filter_high=0.99999,
+)
+
+nir_ls_sample, nir_s2_sample = get_pixel_samples(
+    ls8_path=test_fp_ls8,
+    s2_path=test_fp_s2,
+    pld_path=pld_path,
+    band_name='NIR',
+    sample_size=10_000,
+    zone='land',
+    buffer_delim=30,
+    buffer_delim_outer=None,
+    filter_low=0.00001,
+    filter_high=0.99999,
+)
+
+# %%
+ndwi_ls_sample = np.divide(
+    (green_ls_sample - nir_ls_sample),
+    (green_ls_sample + nir_ls_sample),
+    out=np.zeros_like(green_ls_sample),
+    where=(green_ls_sample + nir_ls_sample) != 0
+)
+
+ndwi_s2_sample = np.divide(
+    (green_s2_sample - nir_s2_sample),
+    (green_s2_sample + nir_s2_sample),
+    out=np.zeros_like(green_s2_sample),
+    where=(green_s2_sample + nir_s2_sample) != 0
+)
+
+rsq = regress_reflectance(ndwi_ls_sample, ndwi_s2_sample)
+
+
 # %%

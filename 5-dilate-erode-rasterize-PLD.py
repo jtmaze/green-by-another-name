@@ -10,7 +10,7 @@ import rasterio as rio
 from rasterio.features import rasterize
 
 roi_name = 'YKF_sub1'
-buffers = [-60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
+buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]
 
