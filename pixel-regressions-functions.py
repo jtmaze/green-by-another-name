@@ -186,18 +186,42 @@ def downsample_image_arrays(ls_pixels: np.array,
 
 def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
-        s2_sample: np.array): # 1D array
+        s2_sample: np.array, # 1D array
+        regression_domain: tuple # (Lower, Upper)
+    ): 
     
-    model = stats.linregress(ls_sample, s2_sample)
+    lower, upper = regression_domain
+    # Remove samples outside the modeling domain
+    sample_size = ls_sample.size
+    ls_sample = np.where(
+        (ls_sample > lower) & (ls_sample < upper), 
+        ls_sample, 
+        np.nan
+    )
+    s2_sample = np.where(
+        (s2_sample > lower) & (s2_sample < upper),
+         s2_sample,
+         np.nan
+    )
+    # Make a binary mask of both (LS8 & S2) array values in model domain
+    in_domain = ~np.isnan(ls_sample) & ~np.isnan(s2_sample)
+    sample_count = np.count_nonzero(in_domain)
+    excluded_count = sample_size - sample_count
+
+    ls_modeled = np.where(in_domain, ls_sample, np.nan)
+    s2_modeled = np.where(in_domain, s2_sample, np.nan)
+    
+    model = stats.linregress(ls_modeled, s2_modeled)
     slope = model[0]
     intercept = model[1]
-    r_squared = model[2] ** 2 #r_squared is the 3rd value in model tupple
+    r_squared = model[2] ** 2 #r_squared is the 3rd value in model tuple
+
     # Make a fit-line from the model
     # Becuase Landsat is x-axis use it to make the domain
-    xmin_val = np.min(ls_sample)
-    xmax_val = np.max(ls_sample)
-    ymin_val = np.min(s2_sample)
-    ymax_val = np.max(s2_sample)
+    xmin_val = np.nanmin(ls_modeled)
+    xmax_val = np.nanmax(ls_modeled)
+    ymin_val = np.nanmin(s2_modeled)
+    ymax_val = np.nanmax(s2_modeled)
     min_modeled = slope * xmin_val + intercept
     max_modeled = slope * xmax_val + intercept
 
@@ -219,7 +243,7 @@ def regress_reflectance(
     plt.legend(loc='lower right')
     plt.show()
     
-    return model
+    return model, excluded_count
 
 def get_pixel_samples(ls8_path: str,
                       s2_path: str,
@@ -273,22 +297,11 @@ test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2021-07-01_roi_YKF_sub1_resampl
 test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
 pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
 
-ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
-measure_mask = make_measure_mask(pld_path, 
-                                 image_window_params, 
-                                 zone='lake', 
-                                 buffer_delim=-60, 
-                                 buffer_delim_outer=None)
-
-ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999)
-
-sample_size = 10_000
-ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size) 
-rsq = regress_reflectance(ls_sample, s2_sample)
 
 # %%
 
-green_ls_sample, green_s2_sample = get_pixel_samples(
+
+ls_sample, s2_sample = get_pixel_samples(
     ls8_path=test_fp_ls8,
     s2_path=test_fp_s2,
     pld_path=pld_path,
@@ -301,18 +314,9 @@ green_ls_sample, green_s2_sample = get_pixel_samples(
     filter_high=0.99999,
 )
 
-nir_ls_sample, nir_s2_sample = get_pixel_samples(
-    ls8_path=test_fp_ls8,
-    s2_path=test_fp_s2,
-    pld_path=pld_path,
-    band_name='NIR',
-    sample_size=10_000,
-    zone='lake',
-    buffer_delim=0,
-    buffer_delim_outer=None,
-    filter_low=0.00001,
-    filter_high=0.99999,
-)
+model_domain = (0, 0.05)
+m, f = regress_reflectance(ls_sample, s2_sample, model_domain)
+
 
 # %%
 ndwi_ls_sample = np.divide(
@@ -329,7 +333,7 @@ ndwi_s2_sample = np.divide(
     where=(green_s2_sample + nir_s2_sample) != 0
 )
 
-rsq = regress_reflectance(ndwi_ls_sample, ndwi_s2_sample)
+rsq = regress_reflectance(ndwi_ls_sample, ndwi_s2_sample, regression_domain=())
 
 
 # %%
