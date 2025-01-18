@@ -76,6 +76,9 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     ls_data = read_band_by_description(ls_path, band_name, image_window_params=None)
     s2_data = read_band_by_description(s2_path, band_name, image_window_params=None)
 
+    ls_data = np.where(ls_data > 0, ls_data, np.nan)
+    s2_data = np.where(s2_data > 0, s2_data, np.nan)
+
     # Get the data's (LandSat's) bounds and transform as a window for the PLD mask
     with rio.open(ls_path) as src: 
         meta = src.meta
@@ -126,36 +129,23 @@ def make_measure_mask(pld_path: str,
 
     return measure_mask
 
-def filter_measured_pixels(ls_data: np.array,
+def find_measured_pixels(ls_data: np.array,
                            s2_data: np.array,
-                           measure_mask: np.array,
-                           filter_low: float,
-                           filter_high: float):
+                           measure_mask: np.array):
     """
     Opperations:
     1) Selects shoreline, lake, or land pixels within measure mask
-    2) Filters pixel values between thresholds for both image arrays
-    3) Ensures both images have common set of nans after filtering. 
+    3) Ensures both images have common set of nans
     """
 
     ls_masked = apply_measure_mask(ls_data, measure_mask)
     s2_masked = apply_measure_mask(s2_data, measure_mask)
-    ls_filtered = np.where(
-        (ls_masked > filter_low) & (ls_masked < filter_high), 
-        ls_masked, 
-        np.nan
-    )
-    valid_ls_mask = ~np.isnan(ls_filtered)
-    s2_filtered = np.where(
-        (s2_masked > filter_low) & (s2_masked < filter_high),
-        s2_masked,
-        np.nan
-    )
-    valid_s2_mask = ~np.isnan(s2_filtered)
+    valid_ls_mask = ~np.isnan(ls_masked)
+    valid_s2_mask = ~np.isnan(s2_masked)
 
     # Make the same nan values from filtering common to each dataset
-    ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
-    s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
+    ls_data_out = np.where(valid_s2_mask, ls_masked, np.nan)
+    s2_data_out = np.where(valid_ls_mask, s2_masked, np.nan)
 
     return ls_data_out, s2_data_out
     
@@ -189,27 +179,17 @@ def regress_reflectance(
         s2_sample: np.array, # 1D array
         regression_domain: tuple # (Lower, Upper)
     ): 
-    
-    lower, upper = regression_domain
-    # Remove samples outside the modeling domain
     sample_size = ls_sample.size
-    ls_sample = np.where(
-        (ls_sample > lower) & (ls_sample < upper), 
-        ls_sample, 
-        np.nan
-    )
-    s2_sample = np.where(
-        (s2_sample > lower) & (s2_sample < upper),
-         s2_sample,
-         np.nan
-    )
-    # Make a binary mask of both (LS8 & S2) array values in model domain
-    in_domain = ~np.isnan(ls_sample) & ~np.isnan(s2_sample)
-    sample_count = np.count_nonzero(in_domain)
-    excluded_count = sample_size - sample_count
-
-    ls_modeled = np.where(in_domain, ls_sample, np.nan)
-    s2_modeled = np.where(in_domain, s2_sample, np.nan)
+    # Remove samples outside the modeling domain
+    lower, upper = regression_domain
+    domain_mask = (ls_sample > lower) & (ls_sample < upper) & (s2_sample > lower) & (s2_sample < upper)
+    
+    # Filter both arrays using same mask
+    ls_modeled = ls_sample[domain_mask]
+    s2_modeled = s2_sample[domain_mask]
+    
+    # Count excluded samples
+    excluded_frac = ((sample_size - len(ls_modeled)) / sample_size) * 100
     
     model = stats.linregress(ls_modeled, s2_modeled)
     slope = model[0]
@@ -226,7 +206,7 @@ def regress_reflectance(
     max_modeled = slope * xmax_val + intercept
 
     plt.figure(figsize=(8,6))
-    plt.scatter(ls_sample, s2_sample, s=1, marker='.')
+    plt.scatter(ls_modeled, s2_modeled, s=1, marker='.')
     plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='OLS Fit')
     # Add a 45 degree line for comparison
     plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
@@ -242,8 +222,11 @@ def regress_reflectance(
     plt.ylabel('Sentinel-2 Reflectance')
     plt.legend(loc='lower right')
     plt.show()
+
+    if excluded_frac > 10:
+        print(f'Warning fraction of pixels excluded from the model domain is high ({excluded_frac}%)')
     
-    return model, excluded_count
+    return model, excluded_frac
 
 def get_pixel_samples(ls8_path: str,
                       s2_path: str,
@@ -252,9 +235,7 @@ def get_pixel_samples(ls8_path: str,
                       sample_size: int,
                       zone: str,
                       buffer_delim: int,
-                      buffer_delim_outer: int,
-                      filter_low: float,
-                      filter_high: float):
+                      buffer_delim_outer: int):
     
     """
     Takes file paths and returns two downsampled 1-D arrays of matched pixels
@@ -275,12 +256,10 @@ def get_pixel_samples(ls8_path: str,
         buffer_delim,
         buffer_delim_outer,
     )
-    ls_pixels, s2_pixels = filter_measured_pixels(
+    ls_pixels, s2_pixels = find_measured_pixels(
         ls_data, 
         s2_data, 
-        measure_mask, 
-        filter_low,
-        filter_high
+        measure_mask
     )
     ls_sample, s2_sample = downsample_image_arrays(
         ls_pixels, 
@@ -290,32 +269,83 @@ def get_pixel_samples(ls8_path: str,
 
     return ls_sample, s2_sample
 
+def regress_image_pairs(image_info: dict,
+                        mask_params: dict,
+                        regression_params: dict
+    ):
+    
+    """
+    Makes a regression plot and returns
+    """
+    # Image params
+    level = image_info['level']
+    date = image_info['date']
+    roi = image_info['roi']
+    band_name = image_info['band_name']
+    zone = mask_params['zone']
+    buffer_delim = mask_params['buffer_delim']
+    buffer_delim_outer = mask_params['buffer_delim_outer']
+    sample_size = regression_params['sample_size']
+    model_domain = regression_params['model_domain']
+    
+    # Make file paths
+    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
+
+    ls_sample, s2_sample = get_pixel_samples(
+        ls8_fp,
+        s2_fp,
+        pld_fp,
+        band_name,
+        sample_size,
+        zone,
+        buffer_delim, 
+        buffer_delim_outer
+    )
+
+    model, excluded_frac = regress_reflectance(
+        ls_sample, s2_sample, model_domain
+    )
+
+    summary = {
+        'level': level,
+        'date': roi,
+        'model': model,
+        'band_name': band_name,
+        'zone': zone,
+        'buffer_delim': buffer_delim,
+        'buffer_delim_outer': buffer_delim_outer,
+        'sample_size': sample_size,
+        'model_domain': model_domain,
+        'model': model,
+        'excluded_frac': excluded_frac
+    }
+    
+    return summary
 
 # %% 
+image_info = {
+    'level': 'sr',
+    'date': '2019-05-16',
+    'roi': 'YKF_sub1',
+    'band_name': 'NIR'
+}
+mask_params = {
+    'zone': 'lake',
+    'buffer_delim': -30,
+    'buffer_delim_outer': None,
+}
+regression_params = {
+    'sample_size': 10_000,
+    'model_domain': (0, 0.05) 
+}
 
-test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
-test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
-pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
-
-
-# %%
-
-
-ls_sample, s2_sample = get_pixel_samples(
-    ls8_path=test_fp_ls8,
-    s2_path=test_fp_s2,
-    pld_path=pld_path,
-    band_name='Green',
-    sample_size=10_000,
-    zone='lake',
-    buffer_delim=0,
-    buffer_delim_outer=None,
-    filter_low=0.00001,
-    filter_high=0.99999,
+summary = regress_image_pairs(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params
 )
-
-model_domain = (0, 0.05)
-m, f = regress_reflectance(ls_sample, s2_sample, model_domain)
 
 
 # %%
