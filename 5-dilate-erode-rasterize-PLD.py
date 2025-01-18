@@ -101,7 +101,7 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
 
 # %% Rasterize the new shapes as bands
 
-img_path = f'./data/river_files/{roi_name}_binary_rivers_dilated150_UTMretest.tif'
+img_path = f'./data/river_files/{roi_name}_binary_rivers_dilated180.tif'
 out_path = f'{out_dir}/{roi_name}_lake_masks.tif'
 
 for i, buffer in enumerate(buffers):

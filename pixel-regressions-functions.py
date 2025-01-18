@@ -83,9 +83,6 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
         ls_transform = src.transform
         ls_shape = src.shape
 
-        print(ls_bounds)
-        print(ls_transform)
-
     image_window_params = {
         'bounds': ls_bounds,
         'transform': ls_transform,
@@ -96,7 +93,7 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     if ls_data.shape != s2_data.shape:
         print('The Sentinel-2 and Landsat8 data shapes are different, cannot compare')
 
-    return ls_data, s2_data, image_window_params, meta
+    return ls_data, s2_data, image_window_params
     
 
 def make_measure_mask(pld_path: str, 
@@ -133,65 +130,35 @@ def filter_measured_pixels(ls_data: np.array,
                            s2_data: np.array,
                            measure_mask: np.array,
                            filter_low: float,
-                           filter_high: float,
-                           out_meta: dict):
+                           filter_high: float):
     """
     Opperations:
     1) Selects shoreline, lake, or land pixels within measure mask
     2) Filters pixel values between thresholds for both image arrays
     3) Ensures both images have common set of nans after filtering. 
     """
-    if out_meta is None: 
-        ls_masked = apply_measure_mask(ls_data, measure_mask)
-        s2_masked = apply_measure_mask(s2_data, measure_mask)
-        ls_filtered = np.where(
-            (ls_masked > filter_low) & (ls_masked < filter_high), 
-            ls_masked, 
-            np.nan
-        )
-        valid_ls_mask = ~np.isnan(ls_filtered)
-        s2_filtered = np.where(
-            (s2_masked > filter_low) & (s2_masked < filter_high),
-            s2_masked,
-            np.nan
-        )
-        valid_s2_mask = ~np.isnan(s2_filtered)
 
-        # Make the same nan values from filtering common to each dataset
-        ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
-        s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
+    ls_masked = apply_measure_mask(ls_data, measure_mask)
+    s2_masked = apply_measure_mask(s2_data, measure_mask)
+    ls_filtered = np.where(
+        (ls_masked > filter_low) & (ls_masked < filter_high), 
+        ls_masked, 
+        np.nan
+    )
+    valid_ls_mask = ~np.isnan(ls_filtered)
+    s2_filtered = np.where(
+        (s2_masked > filter_low) & (s2_masked < filter_high),
+        s2_masked,
+        np.nan
+    )
+    valid_s2_mask = ~np.isnan(s2_filtered)
 
-        return ls_data_out, s2_data_out
+    # Make the same nan values from filtering common to each dataset
+    ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
+    s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
+
+    return ls_data_out, s2_data_out
     
-    if out_meta is not None:
-        out_path1 = './data/testLS.tiff'
-        out_path2 = './data/testS2.tiff'
-        ls_masked = apply_measure_mask(ls_data, measure_mask)
-        s2_masked = apply_measure_mask(s2_data, measure_mask)
-        ls_filtered = np.where(
-            (ls_masked > filter_low) & (ls_masked < filter_high), 
-            ls_masked, 
-            np.nan
-        )
-        valid_ls_mask = ~np.isnan(ls_filtered)
-        s2_filtered = np.where(
-            (s2_masked > filter_low) & (s2_masked < filter_high),
-            s2_masked,
-            np.nan
-        )
-        valid_s2_mask = ~np.isnan(s2_filtered)
-
-        # Make the same nan values from filtering common to each dataset
-        ls_data_out = np.where(valid_s2_mask, ls_filtered, np.nan)
-        s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
-
-        with rio.open(out_path1, 'w', **out_meta) as dst1:
-            dst1.write(ls_data_out, 1)
-
-        with rio.open(out_path2, 'w', **out_meta) as dst2:
-            dst2.write(s2_data_out, 1)
-
-        return ls_data_out, s2_data_out
 
 def downsample_image_arrays(ls_pixels: np.array,
                             s2_pixels: np.array,
@@ -221,8 +188,6 @@ def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
         s2_sample: np.array): # 1D array
     
-    print(ls_sample.mean())
-    print(s2_sample.mean())
     model = stats.linregress(ls_sample, s2_sample)
     slope = model[0]
     intercept = model[1]
@@ -267,6 +232,15 @@ def get_pixel_samples(ls8_path: str,
                       filter_low: float,
                       filter_high: float):
     
+    """
+    Takes file paths and returns two downsampled 1-D arrays of matched pixels
+    Order of opperations:
+    1) Read a specific LandSat8 and Sentinel-2 band as matching numpy arrays
+    2) Generate a measurement mask from PLD with dilation and errosion specified
+    3) Filter both image's array data by the mask and low/high thresholds
+    4) Resample the arrays for regression based on a pre-defined sample size
+    """
+    
     ls_data, s2_data, image_window_params = rio_get_data_arrays(
         ls8_path, s2_path, band_name
     )
@@ -295,23 +269,20 @@ def get_pixel_samples(ls8_path: str,
 
 # %% 
 
-test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
-test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
 pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
 
-ls_data, s2_data, image_window_params, meta = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
+ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
 measure_mask = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
-                                 buffer_delim=60, 
+                                 buffer_delim=-60, 
                                  buffer_delim_outer=None)
 
-ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999, out_meta=meta)
+ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999)
 
-
-print(ls_pixels.size, s2_pixels.size)
-print()
-sample_size = 100
+sample_size = 10_000
 ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size) 
 rsq = regress_reflectance(ls_sample, s2_sample)
 
