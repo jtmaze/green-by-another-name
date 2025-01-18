@@ -37,13 +37,18 @@ def read_band_by_description(raster_path: str, description: str, image_window_pa
                 data = src.read(idx)
                 return data
             elif desc == description and image_window_params is not None:
+                
                 window = from_bounds(*image_window_params['bounds'], 
-                                     image_window_params['transform']
+                                     transform=src.transform
                         )
-                data = src.read(idx,
-                                window=window, 
-                                out_shape=image_window_params['shape'],
-                                resampling=Resampling.nearest)
+                data = src.read(
+                    idx,
+                    window=window, 
+                    out_shape=image_window_params['shape'],
+                    boundless=True, # Assigns no data to pixels outside the raster's extent.
+                    resampling=Resampling.nearest
+                )
+                
                 return data
      
         if data is None:
@@ -73,6 +78,7 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
 
     # Get the data's (LandSat's) bounds and transform as a window for the PLD mask
     with rio.open(ls_path) as src: 
+        meta = src.meta
         ls_bounds = src.bounds
         ls_transform = src.transform
         ls_shape = src.shape
@@ -124,14 +130,14 @@ def filter_measured_pixels(ls_data: np.array,
                            s2_data: np.array,
                            measure_mask: np.array,
                            filter_low: float,
-                           filter_high: float,):
+                           filter_high: float):
     """
     Opperations:
     1) Selects shoreline, lake, or land pixels within measure mask
     2) Filters pixel values between thresholds for both image arrays
     3) Ensures both images have common set of nans after filtering. 
     """
-    
+
     ls_masked = apply_measure_mask(ls_data, measure_mask)
     s2_masked = apply_measure_mask(s2_data, measure_mask)
     ls_filtered = np.where(
@@ -152,6 +158,7 @@ def filter_measured_pixels(ls_data: np.array,
     s2_data_out = np.where(valid_ls_mask, s2_filtered, np.nan)
 
     return ls_data_out, s2_data_out
+    
 
 def downsample_image_arrays(ls_pixels: np.array,
                             s2_pixels: np.array,
@@ -181,8 +188,6 @@ def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
         s2_sample: np.array): # 1D array
     
-    print(ls_sample.mean())
-    print(s2_sample.mean())
     model = stats.linregress(ls_sample, s2_sample)
     slope = model[0]
     intercept = model[1]
@@ -227,6 +232,15 @@ def get_pixel_samples(ls8_path: str,
                       filter_low: float,
                       filter_high: float):
     
+    """
+    Takes file paths and returns two downsampled 1-D arrays of matched pixels
+    Order of opperations:
+    1) Read a specific LandSat8 and Sentinel-2 band as matching numpy arrays
+    2) Generate a measurement mask from PLD with dilation and errosion specified
+    3) Filter both image's array data by the mask and low/high thresholds
+    4) Resample the arrays for regression based on a pre-defined sample size
+    """
+    
     ls_data, s2_data, image_window_params = rio_get_data_arrays(
         ls8_path, s2_path, band_name
     )
@@ -255,23 +269,20 @@ def get_pixel_samples(ls8_path: str,
 
 # %% 
 
-test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
-test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2019-05-16_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_s2 = './data/sr_images/Sentinel2-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
+test_fp_ls8 = './data/sr_images/Landsat8-sr_date_2021-07-01_roi_YKF_sub1_resampled_bilinear30.tif'
 pld_path = './data/pld_rasterized/YKF_sub1_lake_masks.tif'
 
 ls_data, s2_data, image_window_params = rio_get_data_arrays(test_fp_ls8, test_fp_s2, band_name='Green')
 measure_mask = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
-                                 buffer_delim=60, 
+                                 buffer_delim=-60, 
                                  buffer_delim_outer=None)
 
 ls_pixels, s2_pixels = filter_measured_pixels(ls_data, s2_data, measure_mask, filter_low=0.0000001, filter_high=0.999999)
 
-
-print(ls_pixels.size, s2_pixels.size)
-print()
-sample_size = 100
+sample_size = 10_000
 ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size) 
 rsq = regress_reflectance(ls_sample, s2_sample)
 
@@ -283,8 +294,8 @@ green_ls_sample, green_s2_sample = get_pixel_samples(
     pld_path=pld_path,
     band_name='Green',
     sample_size=10_000,
-    zone='land',
-    buffer_delim=30,
+    zone='lake',
+    buffer_delim=0,
     buffer_delim_outer=None,
     filter_low=0.00001,
     filter_high=0.99999,
@@ -296,8 +307,8 @@ nir_ls_sample, nir_s2_sample = get_pixel_samples(
     pld_path=pld_path,
     band_name='NIR',
     sample_size=10_000,
-    zone='land',
-    buffer_delim=30,
+    zone='lake',
+    buffer_delim=0,
     buffer_delim_outer=None,
     filter_low=0.00001,
     filter_high=0.99999,

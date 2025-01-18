@@ -14,7 +14,7 @@ from skimage.morphology import binary_dilation
 
 roi_name = 'YKF_sub1'
 out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
-buffer_dist = 150 # The distance in meters to dilate/buffer the rivers
+buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 
 roi_prefix = roi_name.split('_')[0]
 rivers_dir = f'./data/river_files/{roi_prefix}_river.shp'

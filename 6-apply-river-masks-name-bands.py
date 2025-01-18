@@ -7,7 +7,7 @@ import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
-level = 'sr' #level should be 'sr' or 'toa'
+level = 'toa' #level should be 'sr' or 'toa'
 roi_name = 'YKF_sub1'
 # Dictionary to add description to bands based on the
 band_desc = {
@@ -19,10 +19,10 @@ band_desc = {
 
 out_dir = f'./data/{level}_images/'
 river_dir = './data/river_files/'
-img_download_dir = './data/sr_image_downloads/*.tif'
+img_download_dir = f'./data/{level}_image_downloads/*.tif'
 img_list = glob.glob(img_download_dir)
 
-river_mask_path = f'{river_dir}/{roi_name}_binary_rivers_dilated150_UTMretest.tif'
+river_mask_path = f'{river_dir}/{roi_name}_binary_rivers_dilated180.tif'
 
 
 # %% 2.0 Function to mask rivers from images
@@ -35,7 +35,6 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
     # Only selects the file name ignores rest of path with directory
     file_name = os.path.basename(img_path)
     out_path = os.path.join(out_dir, file_name)
-    print(out_path)
 
     with rio.open(img_path) as src, rio.open(river_path) as mask:
 
@@ -62,6 +61,7 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
             'height': height
         })
 
+        # Determine the bounds of image in UTM coordinates
         src_bounds_utm = transform_bounds(
             src.crs,
             mask.crs,
@@ -77,14 +77,12 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
         top = min(src_bounds_utm[3], mask.bounds.top)
         bottom = max(src_bounds_utm[1], mask.bounds.bottom)
         intersection_bounds = (left, bottom, right, top)
-        print(intersection_bounds)
         # Read the image and mask data
         #window_img = from_bounds(*intersection_bounds, src.transform)
         window_mask = from_bounds(*intersection_bounds, mask.transform)
 
         # Apply the mask to each band
         band_count = img_meta['count']
-        print(band_count)
         for i in range(1, band_count + 1):
             # np.array for the reprojected out image. 
             reproj_img = np.empty(
@@ -121,4 +119,6 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
 # %% 3.0 Apply the river masking function
 for img in img_list:
     apply_river_mask(img, river_mask_path, out_dir, band_desc)
+
+
 # %%
