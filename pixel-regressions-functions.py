@@ -324,12 +324,68 @@ def regress_image_pairs(image_info: dict,
     
     return summary
 
+def calc_ndwi(
+        green_array: np.array, 
+        nir_array: np.array
+    ):
+    """
+    Given the Green and NIR data arrays, the function calculates NDWI for each value
+    """
+    # Remove negative values
+    green_array[green_array < 0] = 0
+    nir_array[nir_array < 0] = 0
+    # Calculate NDWI
+    ndwi_array = np.divide((green_array - nir_array),
+                           (green_array + nir_array),
+                           out=np.empty_like(green_array), # Make the out array nan if division won't happen (i.e. zero values)
+                           where=(green_array + nir_array) != 0 # Boolean mask for pixels to perform division
+    )
+
+    return ndwi_array
+
+def make_ndwi_images(
+        image_info: dict
+        ):
+    
+    """
+    Takes the file paths for two coincident images
+    Returns two NDWI images as numpy arrays. 
+    """
+    
+    level = image_info['level']
+    date = image_info['date']
+    roi = image_info['roi']
+    
+    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    
+    # Read the raster data necessary to calculate NDWI
+    ls_green, s2_green, window_params = rio_get_data_arrays(
+        ls8_fp, s2_fp, 'Green'
+    )
+    ls_nir, s2_nir, image_window_params = rio_get_data_arrays(
+        ls8_fp, s2_fp, 'NIF'
+    )
+    # Calculate NDWI
+    ls_ndwi = calc_ndwi(ls_green, ls_nir)
+    s2_ndwi = calc_ndwi(s2_nir, s2_nir)
+    
+    return ls_ndwi, s2_ndwi
+
+def otsu_threshold_ndwi(ndwi: np.array):
+    """Calculates the otsu threshold given an NDWI image"""
+
+    otsu_threshold = None
+
+    return otsu_threshold
+
+
 # %% 
 image_info = {
     'level': 'sr',
     'date': '2019-05-16',
     'roi': 'YKF_sub1',
-    'band_name': 'NIR'
+    'band_name': 'Green'
 }
 mask_params = {
     'zone': 'lake',
@@ -349,21 +405,10 @@ summary = regress_image_pairs(
 
 
 # %%
-ndwi_ls_sample = np.divide(
-    (green_ls_sample - nir_ls_sample),
-    (green_ls_sample + nir_ls_sample),
-    out=np.zeros_like(green_ls_sample),
-    where=(green_ls_sample + nir_ls_sample) != 0
-)
 
-ndwi_s2_sample = np.divide(
-    (green_s2_sample - nir_s2_sample),
-    (green_s2_sample + nir_s2_sample),
-    out=np.zeros_like(green_s2_sample),
-    where=(green_s2_sample + nir_s2_sample) != 0
-)
-
-rsq = regress_reflectance(ndwi_ls_sample, ndwi_s2_sample, regression_domain=())
-
+ls8_ndwi, s2_ndwi = make_ndwi_images(image_info)
 
 # %%
+plt.imshow(ls8_ndwi, cmap='viridis')
+plt.colorbar()
+plt.show()

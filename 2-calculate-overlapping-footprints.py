@@ -6,12 +6,8 @@ use this script to calculate the overlapping footprint area for each date.
 
 import pandas as pd
 import geopandas as gpd
-import os
 import glob
 import re
-
-proj_dir = '/Users/jtmaz/Documents/projects/green-by-another-name'
-os.chdir(proj_dir)
 
 footprint_file_list = glob.glob('./data/image_footprints/*.shp')
 
