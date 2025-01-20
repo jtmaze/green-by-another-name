@@ -1,3 +1,9 @@
+# Random Folders
+.DS_Store/
+.vscode/
+.virtual_documents/
+.ipynb_checkpoints/
+
 # Data and qgis projects
 /data/
 *.qgz
