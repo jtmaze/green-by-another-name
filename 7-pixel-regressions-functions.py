@@ -76,8 +76,11 @@ def rio_get_data_arrays(ls_path: str, s2_path: str, band_name: str):
     ls_data = read_band_by_description(ls_path, band_name, image_window_params=None)
     s2_data = read_band_by_description(s2_path, band_name, image_window_params=None)
 
-    ls_data = np.where(ls_data > 0, ls_data, np.nan)
-    s2_data = np.where(s2_data > 0, s2_data, np.nan)
+    ls_data = ls_data.copy()
+    s2_data = s2_data.copy()
+
+    ls_data = np.where(ls_data >= 0.001, ls_data, np.nan)
+    s2_data = np.where(s2_data >= 0.001, s2_data, np.nan)
 
     # Get the data's (LandSat's) bounds and transform as a window for the PLD mask
     with rio.open(ls_path) as src: 
@@ -331,16 +334,32 @@ def calc_ndwi(
     """
     Given the Green and NIR data arrays, the function calculates NDWI for each value
     """
-    # Remove negative values
-    green_array[green_array < 0] = np.nan
-    nir_array[nir_array < 0] = np.nan
+    green_array_calc = np.where(green_array <= 0, np.nan, green_array)
+    nir_array_calc = np.where(nir_array <= 0, np.nan, nir_array)
+    
+    # # Extract valid Green values for plotting
+    # valid_green = green_array_calc[~np.isnan(green_array_calc)]
+    # plt.hist(valid_green, bins=100, edgecolor='black')
+    # plt.xlabel('Green values')
+    # plt.ylabel('Frequency')
+    # plt.title('Histogram of Valid Green Values')
+    # plt.show()
+    
+    # # Extract valid NIR values for plotting
+    # valid_nir = nir_array_calc[~np.isnan(nir_array_calc)]
+    # plt.hist(valid_nir, bins=100, edgecolor='black')
+    # plt.xlabel('NIR values')
+    # plt.ylabel('Frequency')
+    # plt.title('Histogram of Valid NIR Values')
+    # plt.show()
+
     # Calculate NDWI
-    ndwi_array = np.divide((green_array - nir_array),
-                           (green_array + nir_array),
-                           out=np.full_like(green_array, np.nan), 
-                           where=(green_array + nir_array) != 0 # Boolean mask for pixels to perform division
+    ndwi_array = np.divide(
+        (green_array_calc - nir_array_calc),
+        (green_array_calc + nir_array_calc),
+        out=np.full_like(green_array_calc, np.nan, dtype=float), 
+        where=(green_array_calc + nir_array_calc) != 0  # Boolean mask for pixels to perform division
     )
-    # 
 
 
     return ndwi_array
@@ -368,8 +387,7 @@ def make_ndwi_images(
     ls_nir, s2_nir, image_window_params = rio_get_data_arrays(
         ls8_fp, s2_fp, 'NIR'
     )
-    if np.may_share_memory(ls_green, ls_nir):
-        print("Warning! ls_green and ls_nir might share memory.")
+
     # Calculate NDWI
     ls_ndwi = calc_ndwi(ls_green, ls_nir)
     s2_ndwi = calc_ndwi(s2_green, s2_nir)
@@ -396,7 +414,7 @@ def mask_ndwi_images(
     pld_plus = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
-                                 buffer_delim=60, 
+                                 buffer_delim=30, 
                                  buffer_delim_outer=None
     )
 
@@ -515,21 +533,31 @@ regression_params = {
 
 # %%
 
-summary = regress_image_pairs(
-    image_info=image_info,
-    mask_params=mask_params,
-    regression_params=regression_params
-)
-
-# %%
-
-# ls8_ndwi, s2_ndwi = make_ndwi_images(image_info)
-
-# %%
-
+rois = ['AKCP_sub1', 'YKF_sub1']
 image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
-summaries = []
+bands = ['Green', 'NIR']
 
+
+rois = ['YKF_sub1']
+
+
+for roi in rois:
+        for band in bands:
+            for dt in image_dates:
+
+                image_info['roi'] = roi
+                image_info['band_name'] = band
+                image_info['date'] = dt
+
+                summary = regress_image_pairs(
+                    image_info=image_info,
+                    mask_params=mask_params,
+                    regression_params=regression_params
+                )
+
+# %%
+
+area_summaries = []
 
 for dt in image_dates:
     image_info['date'] = dt
@@ -546,12 +574,12 @@ for dt in image_dates:
         'ls_s2_percent_diff': ls_s2_percent_diff
     }
 
-    summaries.append(summary)
+    area_summaries.append(summary)
 
 # %%
 
-df_summary = pd.DataFrame(summaries)
-print(df_summary)
+df_area_summary = pd.DataFrame(area_summaries)
+print(df_area_summary)
 
 
 # %%
