@@ -12,7 +12,7 @@ from rasterio.transform import from_bounds
 import skimage as ski
 from skimage.morphology import binary_dilation
 
-roi_name = 'YKF_sub1'
+roi_name = 'AKCP_sub1'
 out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
 buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 

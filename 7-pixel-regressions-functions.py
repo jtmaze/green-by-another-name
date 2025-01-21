@@ -290,8 +290,8 @@ def regress_image_pairs(image_info: dict,
     model_domain = regression_params['model_domain']
     
     # Make file paths
-    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    s2_fp = f'./data/{level}_images_safe/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images_safe/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
 
     ls_sample, s2_sample = get_pixel_samples(
@@ -357,23 +357,30 @@ def make_ndwi_images(
     date = image_info['date']
     roi = image_info['roi']
     
-    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    s2_fp = f'./data/{level}_images_safe/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images_safe/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     
     # Read the raster data necessary to calculate NDWI
     ls_green, s2_green, window_params = rio_get_data_arrays(
         ls8_fp, s2_fp, 'Green'
     )
     ls_nir, s2_nir, image_window_params = rio_get_data_arrays(
-        ls8_fp, s2_fp, 'NIF'
+        ls8_fp, s2_fp, 'NIR'
     )
     # Calculate NDWI
     ls_ndwi = calc_ndwi(ls_green, ls_nir)
-    s2_ndwi = calc_ndwi(s2_nir, s2_nir)
+    s2_ndwi = calc_ndwi(s2_green, s2_nir)
+
+    plt.imshow(ls_ndwi, cmap='viridis')
+    plt.title('Landsat NDWI')
+    plt.show()
     
     return ls_ndwi, s2_ndwi
 
-def find_otsu_threshold(ndwi: np.array):
+def find_otsu_threshold(
+        ndwi: np.array, 
+        show_hist: bool
+    ):
     """
     Input: NDWI array [-1,1]
     Process: 
@@ -383,41 +390,88 @@ def find_otsu_threshold(ndwi: np.array):
        - Water (high NDWI) = 255/1
        - Land (low NDWI) = 0
     """
+    
+    ndwi_rescaled = (ndwi + 1) * 127.5
+    flat_ndwi = ndwi_rescaled.flatten()
+    valid_mask = ~np.isnan(flat_ndwi)
+    valid_data = flat_ndwi[valid_mask]
+    valid_data = np.clip(valid_data, 0, 255)
 
-    # Convert to uint8 for cv2.threshold
-    scaled_ndwi = ((ndwi + 1) * 127.5).astype('uint8')  # Scale [-1,1] to [0,255]
+    n_bins = 256
+    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(0, 255))
+    total_pixels = hist.sum()
+    pdf = hist / total_pixels
+    cumulative_prob = np.cumsum(pdf)               
+    cumulative_intensity = np.cumsum(pdf * np.arange(n_bins))
+    best_threshold = 0
+    best_variance = 0.0
+
+    for t in range(n_bins):
+        w0 = cumulative_prob[t]
+        w1 = 1.0 - w0
+        if w0 == 0 or w1 == 0:
+            # This means all data is on one side of the threshold => skip
+            continue
+
+        m0 = cumulative_intensity[t] / w0
+        m1 = (cumulative_intensity[-1] - cumulative_intensity[t]) / w1
+
+        # Between-class variance
+        var_between = w0 * w1 * (m0 - m1) ** 2
+
+        if var_between > best_variance:
+            best_variance = var_between
+            best_threshold = t
+
+    threshold = 0.5 * (bin_edges[best_threshold] + bin_edges[best_threshold + 1])
+
+    threshold_ndwi = (threshold / 127.5) -1 
+
+    if show_hist == True:
+        plt.hist(valid_data, bins=50, edgecolor='black')
+        plt.axvline(x=threshold, color='red', label=f'Threshold = {threshold}')
+        plt.xlabel('Rescaled 0-255 NDWI values')
+        plt.legend()
+        plt.show()
     
-    ret, thresh = cv2.threshold(
-        scaled_ndwi, 
-        0,  # Initial threshold (ignored for Otsu)
-        255,  # Max value
-        cv2.THRESH_BINARY + cv2.THRESH_OTSU
-    )
-    
-    # Convert threshold back to NDWI scale
-    ndwi_threshold = (ret/127.5) - 1
-    
-    return ret, ndwi_threshold
+    return threshold_ndwi
 
 def otsu_image_wtr_area(
-        image_info: dict
+        image_info: dict,
+        write_mask: bool,
     ):
 
     ls_ndwi, s2_ndwi = make_ndwi_images(image_info)
-    ls_bin_water, ls_threshold = find_otsu_threshold(ls_ndwi)
-    s2_bin_water, s2_threshold = find_otsu_threshold(s2_ndwi)
+    print("----- LandSat Histogram --------------")
+    ls_threshold = find_otsu_threshold(ls_ndwi, show_hist=True)
+    print("----- Sentinel-2 Histogram --------------")
+    s2_threshold = find_otsu_threshold(s2_ndwi, show_hist=True)
 
-    ls_water_frac = np.sum(ls_bin_water == 255) / np.sum(~np.isnan(ls_ndwi))
-    s2_water_frac = np.sum(s2_bin_water == 255) / np.sum(~np.isnan(s2_ndwi))
+    ls_water = (ls_ndwi > ls_threshold).astype(int)
+    s2_water = (s2_ndwi > s2_threshold).astype(int)
+
+    def calc_wtr_frac(water_mask, ndwi):
+
+        water_pixels = np.sum(water_mask == 1)
+        valid_pixels = np.sum(~np.isnan(ndwi))
+        water_frac = water_pixels / valid_pixels * 100
+
+        return water_frac
+    
+    ls_water_frac = calc_wtr_frac(ls_water, ls_ndwi)
+    s2_water_frac = calc_wtr_frac(s2_water, s2_ndwi)
+
+    if write_mask == True:
+        print("Possibly write code to export the water masks")
 
     return ls_threshold, ls_water_frac, s2_threshold, s2_water_frac
 
 # %% 
 image_info = {
     'level': 'sr',
-    'date': '2019-05-16',
+    'date': '2021-09-12',
     'roi': 'YKF_sub1',
-    'band_name': 'Green'
+    'band_name': 'NIR'
 }
 mask_params = {
     'zone': 'lake',
@@ -426,7 +480,7 @@ mask_params = {
 }
 regression_params = {
     'sample_size': 10_000,
-    'model_domain': (0, 0.05) 
+    'model_domain': (0, 0.08) 
 }
 
 summary = regress_image_pairs(
@@ -435,13 +489,37 @@ summary = regress_image_pairs(
     regression_params=regression_params
 )
 
+# %%
+
+# ls8_ndwi, s2_ndwi = make_ndwi_images(image_info)
 
 # %%
 
-ls8_ndwi, s2_ndwi = make_ndwi_images(image_info)
-ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info)
+image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
+summaries = []
+
+
+for dt in image_dates:
+    image_info['date'] = dt
+    ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
+
+    ls_s2_percent_diff = (ls_water_frac - s2_water_frac) * 100
+
+    summary = {
+        'date': dt,
+        'ls_threshold': ls_threshold,
+        's2_threshold': s2_threshold,
+        'ls_water_frac': ls_water_frac,
+        's2_water_frac': s2_water_frac,
+        'ls_s2_percent_diff': ls_s2_percent_diff
+    }
+
+    summaries.append(summary)
 
 # %%
-plt.imshow(ls8_ndwi, cmap='viridis')
-plt.colorbar()
-plt.show()
+
+df_summary = pd.DataFrame(summaries)
+print(df_summary)
+
+
+# %%
