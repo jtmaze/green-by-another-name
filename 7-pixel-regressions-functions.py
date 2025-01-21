@@ -7,7 +7,6 @@ import pprint as pp
 import numpy as np
 import pandas as pd
 from scipy import stats
-import cv2
 import matplotlib.pyplot as plt
 
 import rasterio as rio
@@ -333,14 +332,16 @@ def calc_ndwi(
     Given the Green and NIR data arrays, the function calculates NDWI for each value
     """
     # Remove negative values
-    green_array[green_array < 0] = 0
-    nir_array[nir_array < 0] = 0
+    green_array[green_array < 0] = np.nan
+    nir_array[nir_array < 0] = np.nan
     # Calculate NDWI
     ndwi_array = np.divide((green_array - nir_array),
                            (green_array + nir_array),
-                           out=np.empty_like(green_array), # Make the out array nan if division won't happen (i.e. zero values)
+                           out=np.full_like(green_array, np.nan), 
                            where=(green_array + nir_array) != 0 # Boolean mask for pixels to perform division
     )
+    # 
+
 
     return ndwi_array
 
@@ -361,21 +362,48 @@ def make_ndwi_images(
     ls8_fp = f'./data/{level}_images_safe/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     
     # Read the raster data necessary to calculate NDWI
-    ls_green, s2_green, window_params = rio_get_data_arrays(
+    ls_green, s2_green, image_window_params = rio_get_data_arrays(
         ls8_fp, s2_fp, 'Green'
     )
     ls_nir, s2_nir, image_window_params = rio_get_data_arrays(
         ls8_fp, s2_fp, 'NIR'
     )
+    if np.may_share_memory(ls_green, ls_nir):
+        print("Warning! ls_green and ls_nir might share memory.")
     # Calculate NDWI
     ls_ndwi = calc_ndwi(ls_green, ls_nir)
     s2_ndwi = calc_ndwi(s2_green, s2_nir)
 
     plt.imshow(ls_ndwi, cmap='viridis')
     plt.title('Landsat NDWI')
+    plt.colorbar()
+    plt.show()
+
+    plt.imshow(s2_ndwi, cmap='viridis')
+    plt.title('Sentinel-2 NDWI')
+    plt.colorbar()
     plt.show()
     
-    return ls_ndwi, s2_ndwi
+    return ls_ndwi, s2_ndwi, image_window_params
+
+def mask_ndwi_images(
+    ndwi: np.array,
+    image_window_params: dict,
+    roi: str
+):
+
+    pld_path = f'./data/pld_rasterized/{roi}_lake_masks.tif'
+    pld_plus = make_measure_mask(pld_path, 
+                                 image_window_params, 
+                                 zone='lake', 
+                                 buffer_delim=60, 
+                                 buffer_delim_outer=None
+    )
+
+    ndwi_masked = ndwi[pld_plus == 1]
+
+    return ndwi_masked
+
 
 def find_otsu_threshold(
         ndwi: np.array, 
@@ -391,14 +419,13 @@ def find_otsu_threshold(
        - Land (low NDWI) = 0
     """
     
-    ndwi_rescaled = (ndwi + 1) * 127.5
-    flat_ndwi = ndwi_rescaled.flatten()
+    flat_ndwi = ndwi.flatten()
     valid_mask = ~np.isnan(flat_ndwi)
     valid_data = flat_ndwi[valid_mask]
-    valid_data = np.clip(valid_data, 0, 255)
+    valid_data = np.clip(valid_data, -1, 1)
 
-    n_bins = 256
-    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(0, 255))
+    n_bins = 500
+    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(-1, 1))
     total_pixels = hist.sum()
     pdf = hist / total_pixels
     cumulative_prob = np.cumsum(pdf)               
@@ -425,27 +452,30 @@ def find_otsu_threshold(
 
     threshold = 0.5 * (bin_edges[best_threshold] + bin_edges[best_threshold + 1])
 
-    threshold_ndwi = (threshold / 127.5) -1 
-
     if show_hist == True:
         plt.hist(valid_data, bins=50, edgecolor='black')
         plt.axvline(x=threshold, color='red', label=f'Threshold = {threshold}')
-        plt.xlabel('Rescaled 0-255 NDWI values')
+        plt.xlabel('NDWI values')
         plt.legend()
         plt.show()
     
-    return threshold_ndwi
+    return threshold
 
 def otsu_image_wtr_area(
         image_info: dict,
         write_mask: bool,
     ):
 
-    ls_ndwi, s2_ndwi = make_ndwi_images(image_info)
+    
+    ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
+    roi = image_info['roi']
+    ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi)
+    s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi)
+
     print("----- LandSat Histogram --------------")
-    ls_threshold = find_otsu_threshold(ls_ndwi, show_hist=True)
+    ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
     print("----- Sentinel-2 Histogram --------------")
-    s2_threshold = find_otsu_threshold(s2_ndwi, show_hist=True)
+    s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
 
     ls_water = (ls_ndwi > ls_threshold).astype(int)
     s2_water = (s2_ndwi > s2_threshold).astype(int)
@@ -482,6 +512,8 @@ regression_params = {
     'sample_size': 10_000,
     'model_domain': (0, 0.08) 
 }
+
+# %%
 
 summary = regress_image_pairs(
     image_info=image_info,
