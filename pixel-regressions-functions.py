@@ -7,6 +7,7 @@ import pprint as pp
 import numpy as np
 import pandas as pd
 from scipy import stats
+import cv2
 import matplotlib.pyplot as plt
 
 import rasterio as rio
@@ -372,13 +373,44 @@ def make_ndwi_images(
     
     return ls_ndwi, s2_ndwi
 
-def otsu_threshold_ndwi(ndwi: np.array):
-    """Calculates the otsu threshold given an NDWI image"""
+def find_otsu_threshold(ndwi: np.array):
+    """
+    Input: NDWI array [-1,1]
+    Process: 
+    1. Scale NDWI to [0,255]
+    2. Apply Otsu
+    3. Output binary where:
+       - Water (high NDWI) = 255/1
+       - Land (low NDWI) = 0
+    """
 
-    otsu_threshold = None
+    # Convert to uint8 for cv2.threshold
+    scaled_ndwi = ((ndwi + 1) * 127.5).astype('uint8')  # Scale [-1,1] to [0,255]
+    
+    ret, thresh = cv2.threshold(
+        scaled_ndwi, 
+        0,  # Initial threshold (ignored for Otsu)
+        255,  # Max value
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    
+    # Convert threshold back to NDWI scale
+    ndwi_threshold = (ret/127.5) - 1
+    
+    return ret, ndwi_threshold
 
-    return otsu_threshold
+def otsu_image_wtr_area(
+        image_info: dict
+    ):
 
+    ls_ndwi, s2_ndwi = make_ndwi_images(image_info)
+    ls_bin_water, ls_threshold = find_otsu_threshold(ls_ndwi)
+    s2_bin_water, s2_threshold = find_otsu_threshold(s2_ndwi)
+
+    ls_water_frac = np.sum(ls_bin_water == 255) / np.sum(~np.isnan(ls_ndwi))
+    s2_water_frac = np.sum(s2_bin_water == 255) / np.sum(~np.isnan(s2_ndwi))
+
+    return ls_threshold, ls_water_frac, s2_threshold, s2_water_frac
 
 # %% 
 image_info = {
@@ -407,6 +439,7 @@ summary = regress_image_pairs(
 # %%
 
 ls8_ndwi, s2_ndwi = make_ndwi_images(image_info)
+ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info)
 
 # %%
 plt.imshow(ls8_ndwi, cmap='viridis')
