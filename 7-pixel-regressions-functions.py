@@ -272,6 +272,21 @@ def get_pixel_samples(ls8_path: str,
 
     return ls_sample, s2_sample
 
+def get_ndwi_samples(image_info: dict,
+                     pld_fp: str,
+                     zone: str,
+                     buffer_delim: int,
+                     buffer_delim_outer: int,
+                     sample_size: int
+    ):
+
+    ls_ndwi, s2_ndwi, img_window_params = make_ndwi_images(image_info)
+    measure_mask = make_measure_mask(pld_fp, img_window_params, zone, buffer_delim, buffer_delim_outer)
+    ls_pixels, s2_pixels = find_measured_pixels(ls_ndwi, s2_ndwi, measure_mask)
+    ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size)
+
+    return ls_sample, s2_sample
+
 def regress_image_pairs(image_info: dict,
                         mask_params: dict,
                         regression_params: dict
@@ -296,16 +311,28 @@ def regress_image_pairs(image_info: dict,
     ls8_fp = f'./data/{level}_images_safe/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
 
-    ls_sample, s2_sample = get_pixel_samples(
-        ls8_fp,
-        s2_fp,
-        pld_fp,
-        band_name,
-        sample_size,
-        zone,
-        buffer_delim, 
-        buffer_delim_outer
-    )
+    # Need different pixel sampling for NDWI
+    if band_name == "NDWI":
+        ls_sample, s2_sample = get_ndwi_samples(
+            image_info,
+            pld_fp,
+            zone,
+            buffer_delim,
+            buffer_delim_outer,
+            sample_size
+        )
+
+    else:
+        ls_sample, s2_sample = get_pixel_samples(
+            ls8_fp,
+            s2_fp,
+            pld_fp,
+            band_name,
+            sample_size,
+            zone,
+            buffer_delim, 
+            buffer_delim_outer
+        )
 
     model, excluded_frac = regress_reflectance(
         ls_sample, s2_sample, model_domain
@@ -517,9 +544,9 @@ def otsu_image_wtr_area(
 # %% 
 image_info = {
     'level': 'sr',
-    'date': '2021-09-12',
+    'date': '2019-05-16',
     'roi': 'YKF_sub1',
-    'band_name': 'NIR'
+    'band_name': 'NDWI'
 }
 mask_params = {
     'zone': 'lake',
@@ -528,17 +555,23 @@ mask_params = {
 }
 regression_params = {
     'sample_size': 10_000,
-    'model_domain': (0, 0.08) 
+    'model_domain': (-1, 1) 
 }
+
+summary = regress_image_pairs(
+                    image_info=image_info,
+                    mask_params=mask_params,
+                    regression_params=regression_params
+                )
 
 # %%
 
 rois = ['AKCP_sub1', 'YKF_sub1']
-image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
+image_dates = ['2023-05-21', '2019-06-20', '2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
 bands = ['Green', 'NIR']
+#rois = ['YKF_sub1']
 
 
-rois = ['YKF_sub1']
 
 
 for roi in rois:
