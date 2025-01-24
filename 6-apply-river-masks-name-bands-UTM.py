@@ -1,6 +1,7 @@
 # %% 1.0 Libraries and directories
 import glob
 import os
+import re
 import numpy as np
 import geopandas as gpd
 import rasterio as rio
@@ -19,8 +20,9 @@ band_desc = {
 
 out_dir = f'./data/{level}_images/'
 river_dir = './data/river_files/'
-img_download_dir = f'./data/{level}_image_downloads/*.tif'
+img_download_dir = f'./data/{level}_image_downloads_utm/*.tif'
 img_list = glob.glob(img_download_dir)
+roi_img_list = [img for img in img_list if re.search(roi_name, img)]
 
 river_mask_path = f'{river_dir}/{roi_name}_binary_rivers_dilated180.tif'
 
@@ -38,43 +40,55 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
 
     with rio.open(img_path) as src, rio.open(river_path) as mask:
 
-        print(src.crs)
-        print(mask.crs)
-
         img_meta = src.meta
         mask_meta = mask.meta
         out_meta = img_meta.copy()
+
+        # Find the common intersecting bounds for mask and image
+        img_bounds = src.bounds
+        mask_bounds = mask.bounds
+        left = max(img_bounds.left, mask_bounds.left)
+        right = min(img_bounds.right, mask_bounds.right)
+        top = min(img_bounds.top, mask_bounds.top)
+        bottom = max(img_bounds.bottom, mask_bounds.bottom)
+        intersection_bounds = (left, bottom, right, top) 
 
         # Set no data value to -1 instead of None
         if out_meta['nodata'] is None:
             out_meta['nodata'] = -1
 
-        # Find the common intersecting bounds for mask and image
-        left = max(src.bounds.left, mask.bounds.left)
-        right = min(src.bounds.right, mask.bounds.right)
-        top = min(src.bounds.top, mask.bounds.top)
-        bottom = max(src.bounds.bottom, mask.bounds.bottom)
-        intersection_bounds = (left, bottom, right, top)
-        # Read the image and mask data
         window_img = from_bounds(*intersection_bounds, src.transform)
         window_mask = from_bounds(*intersection_bounds, mask.transform)
-
+        
         # Apply the mask to each band
         band_count = img_meta['count']
         for i in range(1, band_count + 1):
-   
-            img = src.read(i)
+            img_data = src.read(i, window=window_img)
+            
             # Without resampling, there's a slight mismatch between the image and mask dimensions. 
             mask_data = mask.read(
-                1, 
+                1,
                 window=window_mask,
-                out_shape=img.shape,
+                out_shape=img_data.shape,
                 resampling=Resampling.nearest
             )
 
-            out_img = np.where(mask_data == 1, out_meta['nodata'], img)
             # For first band mode should be write
-            mode = 'w' if i == 1 else 'r+'
+            if i == 1:
+                mode = 'w'
+                out_meta.update({
+                    'height': img_data.shape[0],
+                    'width': img_data.shape[1],
+                    'transform': src.window_transform(window_img)
+                })
+            # Use the same file for subsequent bands
+            else:
+                mode = 'r+'
+
+            # Apply the river mask to the data
+            out_img = np.where(mask_data == 1, out_meta['nodata'], img_data)
+
+            # Write the output
             with rio.open(out_path, mode, **out_meta) as dst:
                 dst.write(out_img, i)
                 dst.set_band_description(i, f'{band_descript[i]}')
@@ -82,7 +96,10 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
         print(f'Processed {out_path}')
 
 # %% 3.0 Apply the river masking function
-for img in img_list:
+
+roi_img_list = roi_img_list[0:3]
+
+for img in roi_img_list:
     apply_river_mask(img, river_mask_path, out_dir, band_desc)
 
 
