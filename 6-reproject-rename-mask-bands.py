@@ -1,8 +1,3 @@
-"""
-!!!!!!!!!!
-THIS SCRIPT IS NOT WORKING. STILL NEED TO FIGURE OUT WHY :(
-!!!!!!!!!!
-"""
 # %% 1.0 Libraries and directories
 import glob
 import os
@@ -14,7 +9,8 @@ from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
 level = 'sr' #level should be 'sr' or 'toa'
-roi_name = 'YKF_sub1'
+roi_name = 'AKCP_sub1'
+utm_epsg = '32605'
 # Dictionary to add description to bands based on the
 band_desc = {
     1: 'Blue',
@@ -35,7 +31,7 @@ print(roi_img_list)
 
 # %% 2.0 Function to mask rivers from images
 
-def reproject_img(img_path: str):
+def reproject_img(img_path: str, utm_epsg: str):
     """
     Applies the river mask to all the bands in the images.
     Any pixel where the mask is 1 will become nodata in the output.
@@ -43,7 +39,7 @@ def reproject_img(img_path: str):
     # Only selects the file name ignores rest of path with directory
     file_name = os.path.basename(img_path)
     out_path = os.path.join('./data/temp/', file_name)
-    dst_crs = 'EPSG:32606'
+    dst_crs = utm_epsg
 
     with rio.open(img_path) as src:
         out_meta = src.meta.copy()
@@ -136,17 +132,14 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
                 dst.set_band_description(i, f'{band_descript[i]}')
 
         print(f'Processed {out_path}')
+        # Delete the temp file
+        os.remove(in_path)
 
 
 # %% 3.0 Apply the river masking function
 
-
-
 for img in roi_img_list:
-    reproject_img(img)
-
-# %% 
-for img in roi_img_list:
+    reproject_img(img, utm_epsg)
     apply_river_mask(img, river_mask_path, out_dir, band_desc)
 
 
