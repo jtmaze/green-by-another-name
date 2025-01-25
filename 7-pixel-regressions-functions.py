@@ -1,9 +1,7 @@
 # %% 1.0
-
-# TODO: Implement error handling for missing file paths
-
 import random
 from typing import Optional
+import os
 import pprint as pp
 
 import numpy as np
@@ -23,6 +21,24 @@ random.seed(20)
 ###############################################
 ### Helper Functions
 ###############################################
+def check_match_imgs(ls_fp: str, s2_fp: str, image_info: dict):
+
+    """
+    Checks to ensure both images exist in directory
+    Then, specifies if one file is missing or there's no data for img params
+    """
+    if os.path.exists(s2_fp) and os.path.exists(ls_fp):
+        return True
+    elif not os.path.exists(s2_fp) and not os.path.exists(ls_fp):
+        print(f'No data for {image_info}')
+        return False
+    elif not os.path.exists(s2_fp) and os.path.exists(ls_fp):
+        print(f'Missing file {s2_fp}')
+        return False
+    else:
+        print(f'Missing file {ls_fp}')
+        return False
+
 def read_band_by_description(raster_path: str, description: str, image_window_params: Optional[dict]):
     """
     Returns an array from the band description (not index) in a raster file. 
@@ -292,58 +308,67 @@ def get_ndwi_samples(image_info: dict,
 def regress_image_pairs(image_info: dict,
                         mask_params: dict,
                         regression_params: dict
-    ):
+    ) -> dict:
     
     """
-    Makes a regression plot and returns
+    Perform regression analysis between Landsat8 and Sentinel2 image pairs.
+    
+    Args:
+        image_info: Dict containing level, date, roi, and band_name
+        mask_params: Dict containing zone and buffer parameters
+        regression_params: Dict containing sample_size and model_domain
+    
+    Returns:
+        dict: Summary of regression results including model and excluded fraction of pixels
     """
     # Image params
-    level = image_info['level']
-    date = image_info['date']
-    roi = image_info['roi']
-    band_name = image_info['band_name']
-    zone = mask_params['zone']
-    buffer_delim = mask_params['buffer_delim']
-    buffer_delim_outer = mask_params['buffer_delim_outer']
-    sample_size = regression_params['sample_size']
-    model_domain = regression_params['model_domain']
+    # Extract parameters
+    level, date, roi, band_name = (
+        image_info['level'], 
+        image_info['date'], 
+        image_info['roi'],
+        image_info['band_name']
+    )
+    
+    zone, buffer_delim, buffer_delim_outer = (
+        mask_params['zone'],
+        mask_params['buffer_delim'],
+        mask_params['buffer_delim_outer']
+    )
+    
+    sample_size, model_domain = (
+        regression_params['sample_size'],
+        regression_params['model_domain']
+    )
     
     # Make file paths
     s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
 
-    # Need different pixel sampling for NDWI
-    if band_name == "NDWI":
-        ls_sample, s2_sample = get_ndwi_samples(
-            image_info,
-            pld_fp,
-            zone,
-            buffer_delim,
-            buffer_delim_outer,
-            sample_size
-        )
+    if check_match_imgs(ls8_fp, s2_fp, image_info):
+        sample_params = {
+            'zone': zone,
+            'buffer_delim': buffer_delim,
+            'buffer_delim_outer': buffer_delim_outer,
+            'sample_size': sample_size
+        }
+        # Get the NDWI or single band pixel samples
+        if band_name == "NDWI":
+            ls_sample, s2_sample = get_ndwi_samples(image_info, **sample_params)
+        else:
+            ls_sample, s2_sample = get_pixel_samples(
+                ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
+            )
+        # Run regression function
+        print(f'{level} regression for {band_name} in the {roi} region with PLD {zone} {buffer_delim}m')
+        model, excluded_frac = regress_reflectance(ls_sample, s2_sample, model_domain)
+    else: # Return no image data if matching images not found
+        model = excluded_frac = "No Image Data"
 
-    else:
-        ls_sample, s2_sample = get_pixel_samples(
-            ls8_fp,
-            s2_fp,
-            pld_fp,
-            band_name,
-            sample_size,
-            zone,
-            buffer_delim, 
-            buffer_delim_outer
-        )
-
-    model, excluded_frac = regress_reflectance(
-        ls_sample, s2_sample, model_domain
-    )
-
-    summary = {
+    return {
         'level': level,
         'date': roi,
-        'model': model,
         'band_name': band_name,
         'zone': zone,
         'buffer_delim': buffer_delim,
@@ -353,8 +378,6 @@ def regress_image_pairs(image_info: dict,
         'model': model,
         'excluded_frac': excluded_frac
     }
-    
-    return summary
 
 def calc_ndwi(
         green_array: np.array, 
@@ -513,41 +536,60 @@ def otsu_image_wtr_area(
         write_mask: bool,
     ):
 
+    level, date, roi, band_name = (
+        image_info['level'], 
+        image_info['date'], 
+        image_info['roi'],
+        image_info['band_name']
+    )
+    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+
+    if check_match_imgs(ls_fp, s2_fp, image_info):
     
-    ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
-    roi = image_info['roi']
-    ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi)
-    s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi)
+        ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
+        ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi)
+        s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi)
 
-    print("----- LandSat Histogram --------------")
-    ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
-    print("----- Sentinel-2 Histogram --------------")
-    s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
+        print("----- LandSat Histogram --------------")
+        ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
+        print("----- Sentinel-2 Histogram --------------")
+        s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
 
-    ls_water = (ls_ndwi > ls_threshold).astype(int)
-    s2_water = (s2_ndwi > s2_threshold).astype(int)
+        ls_water = (ls_ndwi > ls_threshold).astype(int)
+        s2_water = (s2_ndwi > s2_threshold).astype(int)
 
-    def calc_wtr_frac(water_mask, ndwi):
+        def calc_wtr_frac(water_mask, ndwi):
 
-        water_pixels = np.sum(water_mask == 1)
-        valid_pixels = np.sum(~np.isnan(ndwi))
-        water_frac = water_pixels / valid_pixels * 100
+            water_pixels = np.sum(water_mask == 1)
+            valid_pixels = np.sum(~np.isnan(ndwi))
+            water_frac = water_pixels / valid_pixels * 100
 
-        return water_frac
-    
-    ls_water_frac = calc_wtr_frac(ls_water, ls_ndwi)
-    s2_water_frac = calc_wtr_frac(s2_water, s2_ndwi)
+            return water_frac
+        
+        ls_water_frac = calc_wtr_frac(ls_water, ls_ndwi)
+        s2_water_frac = calc_wtr_frac(s2_water, s2_ndwi)
 
-    if write_mask == True:
-        print("Possibly write code to export the water masks")
+        if write_mask == True:
+            print("No code to export the water masks, yet...")
 
+    else:
+        ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = 'No Image Data'
     return ls_threshold, ls_water_frac, s2_threshold, s2_water_frac
 
-# %% 
+# %% Run the functions:
+"""
+####################################
+------------------------------------
+Make dictionaries to hold parameters
+------------------------------------
+####################################
+"""
+
 image_info = {
     'level': 'toa',
-    'date': '2021-07-01',
-    'roi': 'YKF_sub1',
+    'date': '2021-07-01', # Dates will be itterated through
+    'roi': 'YKF_sub1', # ROIs will be itterated through
     'band_name': 'Green'
 }
 mask_params = {
@@ -560,44 +602,32 @@ regression_params = {
     'model_domain': (-1, 1) 
 }
 
-summary = regress_image_pairs(
-                    image_info=image_info,
-                    mask_params=mask_params,
-                    regression_params=regression_params
-                )
-
 # %%
 
-rois = ['YKF_sub1']
-image_dates = ['2019-05-16', '2020-05-18', '2021-07-01', '2021-08-02', '2021-09-12']
+rois = ['YKF_sub1', 'test']
+image_dates = ['2019-05-16', '2020-05-18', '2021-07-01', '2021-08-02', '2021-09-12', '2017-09-08', '2018-07-07']
 bands = ['Green', 'NIR']
 #rois = ['YKF_sub1']
 
 # %%
-rois = ['AKCP_sub1']
-image_dates = ['2021-08-19', '2021-07-20']
-# %%
 regression_summaries = []
 
 for roi in rois:
-        for band in bands:
-            for dt in image_dates:
+        for dt in image_dates:
 
-                image_info['roi'] = roi
-                image_info['band_name'] = band
-                image_info['date'] = dt
+            image_info['roi'] = roi
+            image_info['date'] = dt
 
-                summary = regress_image_pairs(
-                    image_info=image_info,
-                    mask_params=mask_params,
-                    regression_params=regression_params
-                )
+            summary = regress_image_pairs(
+                image_info=image_info,
+                mask_params=mask_params,
+                regression_params=regression_params
+            )
 
-                regression_summaries.append(summary)
+            regression_summaries.append(summary)
 
 print("Done making regression summaries")
 
-# %%
 df_regression_summary = pd.DataFrame(regression_summaries)
 print(df_regression_summary)
 
@@ -611,8 +641,10 @@ for dt in image_dates:
         image_info['roi'] = roi
 
         ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
-
-        ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
+        if ls_threshold == 'No Image Data':
+            ls_s2_percent_diff = 'No Image Data'
+        else:
+            ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
 
         summary = {
             'date': dt,
@@ -630,7 +662,8 @@ print("Done calculating water area")
 # %%
 
 df_area_summary = pd.DataFrame(area_summaries)
-print(df_area_summary)
+df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
+print(df_area_clean)
 
 
 # %%

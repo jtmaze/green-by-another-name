@@ -9,7 +9,7 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'YKF_sub1'
+roi_name = 'YKD_sub1'
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]
@@ -96,7 +96,7 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
         dst.write(lake_raster, band_idx)
         dst.set_band_description(band_idx, band_name)
 
-    print(f'{band_name} rasterized')
+    print(f'{band_name} rasterized to {img_meta['crs']}')
     
 
 # %% Rasterize the new shapes as bands

@@ -15,10 +15,13 @@ from rasterio.warp import calculate_default_transform, reproject, transform_boun
 level = 'toa' #level should be 'sr' or 'toa'
 roi_name = 'YKF_sub1'
 utm_epsg = 'EPSG:32606' 
+
 """
 EPSG Codes for Sites:
 YKF_sub1: EPSG:32606
-AKCP_sub1 EPSG:32605
+AKCP_sub1: EPSG:32605
+YKD_sub1: EPSG:32603
+MRD_sub1: EPSG: 32608
 """
 # Dictionary to add description to bands based on the
 band_desc = {
@@ -42,8 +45,9 @@ print(roi_img_list)
 
 def reproject_img(img_path: str, utm_epsg: str):
     """
-    Applies the river mask to all the bands in the images.
-    Any pixel where the mask is 1 will become nodata in the output.
+    Reprojects the google drive downloads from EPSG 4326 into local UTM
+    This matches to the image to river mask
+    Reprojected images are written to 'temp' folder, and deleted after masking
     """
     # Only selects the file name ignores rest of path with directory
     file_name = os.path.basename(img_path)
@@ -83,7 +87,11 @@ def reproject_img(img_path: str, utm_epsg: str):
         print(f"Reprojected {file_name} to UTM")
 
 def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript: dict):
-
+    """
+    Reads the image data and mask with a common intersecting window.
+    This common window ensures identical shapes for numpy.where()
+    band_descript adds band descriptions (e.g. "NIR") to match the band index. 
+    """
     file_name = os.path.basename(img_path)
     in_path = os.path.join('./data/temp/', file_name)
     out_path = os.path.join(out_dir, file_name)
@@ -143,7 +151,10 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
         print(f'Processed {out_path}')
 
 def clean_temp_folder(img):
-        
+        """
+        Once the masked image is written, clean out the temp folder
+        Prevents storage from getting bogged down
+        """
         file_name = os.path.basename(img)
         temp_path = os.path.join('./data/temp/', file_name)
         print(f"Deleting temporary file {temp_path}")
