@@ -1,5 +1,7 @@
 # %% 1.0
 
+# TODO: Implement error handling for missing file paths
+
 import random
 from typing import Optional
 import pprint as pp
@@ -307,8 +309,8 @@ def regress_image_pairs(image_info: dict,
     model_domain = regression_params['model_domain']
     
     # Make file paths
-    s2_fp = f'./data/{level}_images_safe/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images_safe/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
 
     # Need different pixel sampling for NDWI
@@ -404,8 +406,8 @@ def make_ndwi_images(
     date = image_info['date']
     roi = image_info['roi']
     
-    s2_fp = f'./data/{level}_images_safe/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images_safe/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    ls8_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     
     # Read the raster data necessary to calculate NDWI
     ls_green, s2_green, image_window_params = rio_get_data_arrays(
@@ -543,10 +545,10 @@ def otsu_image_wtr_area(
 
 # %% 
 image_info = {
-    'level': 'sr',
-    'date': '2019-05-16',
+    'level': 'toa',
+    'date': '2021-07-01',
     'roi': 'YKF_sub1',
-    'band_name': 'NDWI'
+    'band_name': 'Green'
 }
 mask_params = {
     'zone': 'lake',
@@ -566,13 +568,16 @@ summary = regress_image_pairs(
 
 # %%
 
-rois = ['AKCP_sub1', 'YKF_sub1']
-image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
+rois = ['YKF_sub1']
+image_dates = ['2019-05-16', '2020-05-18', '2021-07-01', '2021-08-02', '2021-09-12']
 bands = ['Green', 'NIR']
 #rois = ['YKF_sub1']
 
-
-
+# %%
+rois = ['AKCP_sub1']
+image_dates = ['2021-08-19', '2021-07-20']
+# %%
+regression_summaries = []
 
 for roi in rois:
         for band in bands:
@@ -588,26 +593,39 @@ for roi in rois:
                     regression_params=regression_params
                 )
 
+                regression_summaries.append(summary)
+
+print("Done making regression summaries")
+
 # %%
-image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
+df_regression_summary = pd.DataFrame(regression_summaries)
+print(df_regression_summary)
+
+# %%
+
 area_summaries = []
 
 for dt in image_dates:
-    image_info['date'] = dt
-    ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
+    for roi in rois:
+        image_info['date'] = dt
+        image_info['roi'] = roi
 
-    ls_s2_percent_diff = (ls_water_frac - s2_water_frac) * 100
+        ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
 
-    summary = {
-        'date': dt,
-        'ls_threshold': ls_threshold,
-        's2_threshold': s2_threshold,
-        'ls_water_frac': ls_water_frac,
-        's2_water_frac': s2_water_frac,
-        'ls_s2_percent_diff': ls_s2_percent_diff
-    }
+        ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
 
-    area_summaries.append(summary)
+        summary = {
+            'date': dt,
+            'ls_threshold': ls_threshold,
+            's2_threshold': s2_threshold,
+            'ls_water_frac': ls_water_frac,
+            's2_water_frac': s2_water_frac,
+            'ls_s2_percent_diff': ls_s2_percent_diff
+        }
+
+        area_summaries.append(summary)
+
+print("Done calculating water area")
 
 # %%
 

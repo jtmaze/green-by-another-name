@@ -1,4 +1,8 @@
 # %% 1.0 Libraries and directories
+
+# TODO: Some images are entirely nan 
+# (issue with ee cloud masks). Don't write these images
+
 import glob
 import os
 import re
@@ -8,9 +12,14 @@ import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
-level = 'sr' #level should be 'sr' or 'toa'
-roi_name = 'AKCP_sub1'
-utm_epsg = '32605'
+level = 'toa' #level should be 'sr' or 'toa'
+roi_name = 'YKF_sub1'
+utm_epsg = 'EPSG:32606' 
+"""
+EPSG Codes for Sites:
+YKF_sub1: EPSG:32606
+AKCP_sub1 EPSG:32605
+"""
 # Dictionary to add description to bands based on the
 band_desc = {
     1: 'Blue',
@@ -19,9 +28,9 @@ band_desc = {
     4: 'NIR'
 }
 
-out_dir = f'./data/{level}_images_gcs/'
+out_dir = f'./data/{level}_images/'
 river_dir = './data/river_files/'
-img_download_dir = f'./data/{level}_image_downloads_gcs/*.tif'
+img_download_dir = f'./data/{level}_image_downloads/*.tif'
 img_list = glob.glob(img_download_dir)
 roi_img_list = [img for img in img_list if re.search(roi_name, img)]
 
@@ -132,8 +141,13 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
                 dst.set_band_description(i, f'{band_descript[i]}')
 
         print(f'Processed {out_path}')
-        # Delete the temp file
-        os.remove(in_path)
+
+def clean_temp_folder(img):
+        
+        file_name = os.path.basename(img)
+        temp_path = os.path.join('./data/temp/', file_name)
+        print(f"Deleting temporary file {temp_path}")
+        os.remove(temp_path)
 
 
 # %% 3.0 Apply the river masking function
@@ -141,6 +155,7 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
 for img in roi_img_list:
     reproject_img(img, utm_epsg)
     apply_river_mask(img, river_mask_path, out_dir, band_desc)
+    clean_temp_folder(img)
 
 
 # %%
