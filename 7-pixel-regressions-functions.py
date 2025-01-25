@@ -567,7 +567,7 @@ summary = regress_image_pairs(
 # %%
 
 rois = ['AKCP_sub1', 'YKF_sub1']
-image_dates = ['2023-05-21', '2019-06-20', '2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
+image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
 bands = ['Green', 'NIR']
 #rois = ['YKF_sub1']
 
@@ -589,7 +589,7 @@ for roi in rois:
                 )
 
 # %%
-
+image_dates = ['2019-05-16', '2021-07-01', '2021-08-02', '2021-09-12']
 area_summaries = []
 
 for dt in image_dates:

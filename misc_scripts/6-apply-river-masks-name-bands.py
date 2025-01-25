@@ -23,9 +23,9 @@ band_desc = {
     4: 'NIR'
 }
 
-out_dir = f'./data/{level}_images/'
+out_dir = f'./data/{level}_images_gcs/'
 river_dir = './data/river_files/'
-img_download_dir = f'./data/{level}_image_downloads/*.tif'
+img_download_dir = f'./data/{level}_image_downloads_gcs/*.tif'
 img_list = glob.glob(img_download_dir)
 roi_img_list = [img for img in img_list if re.search(roi_name, img)]
 
@@ -57,8 +57,8 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
         dst_transform, width, height = calculate_default_transform(
             src.crs, #src_crs
             mask.crs, #dst_crs
-            src.width, #width
-            src.height, #height
+            mask.width, #width
+            mask.height, #height
             *src.bounds # left, bottom, right, and top bounds
         )
 
@@ -86,7 +86,7 @@ def apply_river_mask(img_path: str, river_path: str, out_dir: str, band_descript
         bottom = max(src_bounds_utm[1], mask.bounds.bottom)
         intersection_bounds = (left, bottom, right, top)
 
-        window_mask = from_bounds(*src_bounds_utm, dst_transform)
+        window_mask = from_bounds(*intersection_bounds, mask.transform)
         # window_img = from_bounds(*intersection_bounds, src.transform)
 
         # Apply the mask to each band
