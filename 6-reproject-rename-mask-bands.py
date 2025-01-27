@@ -13,8 +13,8 @@ from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
 level = 'toa' #level should be 'sr' or 'toa'
-roi_name = 'YKF_sub1'
-utm_epsg = 'EPSG:32606' 
+roi_name = 'MRD_sub1'
+utm_epsg = 'EPSG:32608' 
 
 """
 EPSG Codes for Sites:

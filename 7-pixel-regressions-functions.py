@@ -2,6 +2,8 @@
 import random
 from typing import Optional
 import os
+import re
+import glob
 import pprint as pp
 
 import numpy as np
@@ -18,9 +20,15 @@ random.seed(20)
 
 # %% 
 
-###############################################
-### Helper Functions
-###############################################
+"""
+####################################
+------------------------------------
+Processing functions
+------------------------------------
+####################################
+"""
+
+
 def check_match_imgs(ls_fp: str, s2_fp: str, image_info: dict):
 
     """
@@ -30,7 +38,7 @@ def check_match_imgs(ls_fp: str, s2_fp: str, image_info: dict):
     if os.path.exists(s2_fp) and os.path.exists(ls_fp):
         return True
     elif not os.path.exists(s2_fp) and not os.path.exists(ls_fp):
-        print(f'No data for {image_info}')
+        #print(f'No data for {image_info}')
         return False
     elif not os.path.exists(s2_fp) and os.path.exists(ls_fp):
         print(f'Missing file {s2_fp}')
@@ -208,44 +216,50 @@ def regress_reflectance(
     # Filter both arrays using same mask
     ls_modeled = ls_sample[domain_mask]
     s2_modeled = s2_sample[domain_mask]
-    
-    # Count excluded samples
-    excluded_frac = ((sample_size - len(ls_modeled)) / sample_size) * 100
-    
-    model = stats.linregress(ls_modeled, s2_modeled)
-    slope = model[0]
-    intercept = model[1]
-    r_squared = model[2] ** 2 #r_squared is the 3rd value in model tuple
 
-    # Make a fit-line from the model
-    # Becuase Landsat is x-axis use it to make the domain
-    xmin_val = np.nanmin(ls_modeled)
-    xmax_val = np.nanmax(ls_modeled)
-    ymin_val = np.nanmin(s2_modeled)
-    ymax_val = np.nanmax(s2_modeled)
-    min_modeled = slope * xmin_val + intercept
-    max_modeled = slope * xmax_val + intercept
+    if sample_size < 1_000:
+        print(f'Error: Insuffcient quality pixels given parameter (less than 1000)')
+        model = 'Poor Quality Data'
+        excluded_frac = 'Poor Quality Image Data'
 
-    plt.figure(figsize=(8,6))
-    plt.scatter(ls_modeled, s2_modeled, s=1, marker='.')
-    plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='OLS Fit')
-    # Add a 45 degree line for comparison
-    plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
-             [min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
-             color='blue', 
-             linestyle='--', 
-             label='1:1 Line')
-    textstr = f'$R^2 = {r_squared:.4f}$\nSlope = {slope:.4f}'
-    box_props = dict(boxstyle='round', facecolor='white', alpha=0.5)
-    plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
-             verticalalignment='top', bbox=box_props)
-    plt.xlabel('Landsat Reflectance')
-    plt.ylabel('Sentinel-2 Reflectance')
-    plt.legend(loc='lower right')
-    plt.show()
+    else: 
+        # Count excluded samples
+        excluded_frac = ((sample_size - len(ls_modeled)) / sample_size) * 100
+        
+        model = stats.linregress(ls_modeled, s2_modeled)
+        slope = model[0]
+        intercept = model[1]
+        r_squared = model[2] ** 2 #r_squared is the 3rd value in model tuple
 
-    if excluded_frac > 10:
-        print(f'Warning fraction of pixels excluded from the model domain is high ({excluded_frac}%)')
+        # Make a fit-line from the model
+        # Becuase Landsat is x-axis use it to make the domain
+        xmin_val = np.nanmin(ls_modeled)
+        xmax_val = np.nanmax(ls_modeled)
+        ymin_val = np.nanmin(s2_modeled)
+        ymax_val = np.nanmax(s2_modeled)
+        min_modeled = slope * xmin_val + intercept
+        max_modeled = slope * xmax_val + intercept
+
+        plt.figure(figsize=(8,6))
+        plt.scatter(ls_modeled, s2_modeled, s=1, marker='.')
+        plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='OLS Fit')
+        # Add a 45 degree line for comparison
+        plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
+                [min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
+                color='blue', 
+                linestyle='--', 
+                label='1:1 Line')
+        textstr = f'$R^2 = {r_squared:.4f}$\nSlope = {slope:.4f}'
+        box_props = dict(boxstyle='round', facecolor='white', alpha=0.5)
+        plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
+                verticalalignment='top', bbox=box_props)
+        plt.xlabel('Landsat Reflectance')
+        plt.ylabel('Sentinel-2 Reflectance')
+        plt.legend(loc='lower right')
+        plt.show()
+
+        if excluded_frac > 10:
+            print(f'Warning fraction of pixels excluded from the model domain is high ({excluded_frac}%)')
     
     return model, excluded_frac
 
@@ -368,7 +382,8 @@ def regress_image_pairs(image_info: dict,
 
     return {
         'level': level,
-        'date': roi,
+        'date': date,
+        'roi': roi,
         'band_name': band_name,
         'zone': zone,
         'buffer_delim': buffer_delim,
@@ -546,32 +561,38 @@ def otsu_image_wtr_area(
     ls_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
 
     if check_match_imgs(ls_fp, s2_fp, image_info):
-    
+        print(f"Working {level} for {date} over the {roi} region")
         ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
         ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi)
         s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi)
 
-        print("----- LandSat Histogram --------------")
-        ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
-        print("----- Sentinel-2 Histogram --------------")
-        s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
+        # Ensure there's enough quality lake pixels in the image.
+        if np.sum(~np.isnan(ls_ndwi_lakes)) < 25_000 or np.sum(~np.isnan(s2_ndwi_lakes)) < 25_000:
+            print('ERROR: Skipping water area calculations -- Bad Image')
+            ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = 'Poor Quality Image'
 
-        ls_water = (ls_ndwi > ls_threshold).astype(int)
-        s2_water = (s2_ndwi > s2_threshold).astype(int)
+        else:
+            print("----- LandSat Histogram --------------")
+            ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
+            print("----- Sentinel-2 Histogram --------------")
+            s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
 
-        def calc_wtr_frac(water_mask, ndwi):
+            ls_water = (ls_ndwi > ls_threshold).astype(int)
+            s2_water = (s2_ndwi > s2_threshold).astype(int)
 
-            water_pixels = np.sum(water_mask == 1)
-            valid_pixels = np.sum(~np.isnan(ndwi))
-            water_frac = water_pixels / valid_pixels * 100
+            def calc_wtr_frac(water_mask, ndwi):
 
-            return water_frac
-        
-        ls_water_frac = calc_wtr_frac(ls_water, ls_ndwi)
-        s2_water_frac = calc_wtr_frac(s2_water, s2_ndwi)
+                water_pixels = np.sum(water_mask == 1)
+                valid_pixels = np.sum(~np.isnan(ndwi))
+                water_frac = water_pixels / valid_pixels * 100
 
-        if write_mask == True:
-            print("No code to export the water masks, yet...")
+                return water_frac
+            
+            ls_water_frac = calc_wtr_frac(ls_water, ls_ndwi)
+            s2_water_frac = calc_wtr_frac(s2_water, s2_ndwi)
+
+            if write_mask == True:
+                print("No code to export the water masks, yet...")
 
     else:
         ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = 'No Image Data'
@@ -604,58 +625,176 @@ regression_params = {
 
 # %%
 
-rois = ['YKF_sub1', 'test']
-image_dates = ['2019-05-16', '2020-05-18', '2021-07-01', '2021-08-02', '2021-09-12', '2017-09-08', '2018-07-07']
-bands = ['Green', 'NIR']
-#rois = ['YKF_sub1']
+"""
+####################################
+------------------------------------
+Gather all the combinations of rois and dates
+------------------------------------
+####################################
+"""
+
+toa_files = glob.glob('./data/toa_images/*tif')
+sr_files = glob.glob('./data/sr_images/*.tif')
+full_files = toa_files + sr_files
+
+date_pattern = r'_date_(.*?)_roi'
+roi_pattern = r'_roi_(.*?)_resampled'
+
+def extract_unique(files: list, pattern: re.Pattern[str]):
+    unique_items = set()
+    for f in files:
+        match = re.search(pattern, f)
+        if match:
+            unique_items.add(match.group(1))
+    return list(unique_items)
+
+image_dates = extract_unique(full_files, date_pattern)
+rois = extract_unique(full_files, roi_pattern)
+levels = ['sr', 'toa']
 
 # %%
+
+"""
+####################################
+------------------------------------
+Make Green Band Regression Models
+------------------------------------
+####################################
+"""
+
+image_info['band_name'] = 'Green'
 regression_summaries = []
 
-for roi in rois:
-        for dt in image_dates:
+for level in levels:
+    for roi in rois:
+            for dt in image_dates:
 
-            image_info['roi'] = roi
-            image_info['date'] = dt
+                image_info['level'] = level
+                image_info['roi'] = roi
+                image_info['date'] = dt
 
-            summary = regress_image_pairs(
-                image_info=image_info,
-                mask_params=mask_params,
-                regression_params=regression_params
-            )
+                regression_params['model_domain'] = (0, 0.1)
 
-            regression_summaries.append(summary)
+                summary = regress_image_pairs(
+                    image_info=image_info,
+                    mask_params=mask_params,
+                    regression_params=regression_params
+                )
+
+                regression_summaries.append(summary)
 
 print("Done making regression summaries")
 
-df_regression_summary = pd.DataFrame(regression_summaries)
-print(df_regression_summary)
+# %% 
+
+"""
+####################################
+------------------------------------
+Make NIR Band Regression Models
+------------------------------------
+####################################
+"""
+
+image_info['band_name'] = 'NIR'
+regression_summaries = []
+
+for level in levels:
+    for roi in rois:
+            for dt in image_dates:
+
+                image_info['level'] = level
+                image_info['roi'] = roi
+                image_info['date'] = dt
+
+                regression_params['model_domain'] = (0, 0.1)
+
+                summary = regress_image_pairs(
+                    image_info=image_info,
+                    mask_params=mask_params,
+                    regression_params=regression_params
+                )
+
+                regression_summaries.append(summary)
+
+print("Done making regression summaries")
 
 # %%
 
+"""
+####################################
+------------------------------------
+Make NDWI Regression Models
+------------------------------------
+####################################
+"""
+
+image_info['band_name'] = 'NDWI'
+regression_summaries = []
+
+for level in levels:
+    for roi in rois:
+            for dt in image_dates:
+
+                image_info['level'] = level
+                image_info['roi'] = roi
+                image_info['date'] = dt
+
+                regression_params['model_domain'] = (0, 0.1)
+
+                summary = regress_image_pairs(
+                    image_info=image_info,
+                    mask_params=mask_params,
+                    regression_params=regression_params
+                )
+
+                regression_summaries.append(summary)
+
+print("Done making regression summaries")
+
+
+# %%
+df_regression_summary = pd.DataFrame(regression_summaries)
+df_regression_summary.to_csv('./data/regression_results.csv')
+regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
+print(regression_summary_clean)
+
+# %%
+
+"""
+####################################
+------------------------------------
+Calculate water area for different images
+------------------------------------
+####################################
+"""
+
 area_summaries = []
 
-for dt in image_dates:
+for level in levels:
     for roi in rois:
-        image_info['date'] = dt
-        image_info['roi'] = roi
+        for dt in image_dates:
+            image_info['date'] = dt
+            image_info['roi'] = roi
+            image_info['level'] = level
 
-        ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
-        if ls_threshold == 'No Image Data':
-            ls_s2_percent_diff = 'No Image Data'
-        else:
-            ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
+            ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
+            if ls_threshold == 'No Image Data' or ls_threshold == 'Poor Quality Image':
+                ls_s2_percent_diff = 'No Image Data'
+            else:
+                ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
 
-        summary = {
-            'date': dt,
-            'ls_threshold': ls_threshold,
-            's2_threshold': s2_threshold,
-            'ls_water_frac': ls_water_frac,
-            's2_water_frac': s2_water_frac,
-            'ls_s2_percent_diff': ls_s2_percent_diff
-        }
+            summary = {
+                'date': dt,
+                'roi': roi,
+                'level': level,
+                'ls_threshold': ls_threshold,
+                's2_threshold': s2_threshold,
+                'ls_water_frac': ls_water_frac,
+                's2_water_frac': s2_water_frac,
+                'ls_s2_percent_diff': ls_s2_percent_diff
+            }
 
-        area_summaries.append(summary)
+            area_summaries.append(summary)
 
 print("Done calculating water area")
 
@@ -664,6 +803,8 @@ print("Done calculating water area")
 df_area_summary = pd.DataFrame(area_summaries)
 df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 print(df_area_clean)
+
+df_area_summary.to_csv('./data/area_results.csv')
 
 
 # %%
