@@ -207,19 +207,37 @@ def downsample_image_arrays(ls_pixels: np.array,
 def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
         s2_sample: np.array, # 1D array
-        regression_domain: tuple # (Lower, Upper)
+        outlier_frac: float # The fraction of outliers to remove
     ): 
     sample_size = ls_sample.size
-    # Remove samples outside the modeling domain
-    lower, upper = regression_domain
+    
+    def outlier_filter(sample_data: np.array, outlier_frac: float):
+        """
+        Returns 
+        """
+        # size of data
+        omit_count = round(sample_data.size * outlier_frac)
+        # sort the data from high to low
+        sorted = np.sort(sample_data)[::-1] #[::-1] reverses the list (descending)
+        filtered = sorted[omit_count: ]
+
+        domain = (min(filtered), max(filtered))
+
+        return filtered, domain
+
+    ls_domain = outlier_filter(ls_sample, outlier_frac)
+    s2_domain = outlier_filter(s2_sample, outlier_frac)
+    lower = min(ls_domain[0], s2_domain[0])
+    upper = max(ls_domain[1], s2_domain[1])
+    
     domain_mask = (ls_sample > lower) & (ls_sample < upper) & (s2_sample > lower) & (s2_sample < upper)
     
     # Filter both arrays using same mask
     ls_modeled = ls_sample[domain_mask]
     s2_modeled = s2_sample[domain_mask]
 
-    if sample_size < 5_000:
-        print(f'Error: Insuffcient quality pixels given parameter (less than 1000)')
+    if sample_size < 10_000:
+        print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
         model = 'Poor Quality Data'
         excluded_frac = 'Poor Quality Image Data'
 
