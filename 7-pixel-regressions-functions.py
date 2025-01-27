@@ -192,15 +192,16 @@ def downsample_image_arrays(ls_pixels: np.array,
     ls_flat = ls_pixels.flatten()
     ls_flat = ls_flat[~np.isnan(ls_flat)]
 
-    if ls_flat.size < sample_size:
-        print(f"Not downsampling the number of measured pixels {ls_flat.size} < {sample_size}")
-        return ls_flat, s2_flat
+    valid_pix_cnt = ls_flat.size # ls_flat.size and s2_flat.size will be the same
+    if valid_pix_cnt < sample_size:
+        print(f"Not downsampling the number of measured pixels {valid_pix_cnt} < {sample_size}")
+        return ls_flat, s2_flat, valid_pix_cnt
     else:
         sample_idx = np.random.choice(ls_flat.size, sample_size, replace=False)
         # Applies sample_idx to pixels_flat
         ls_sampled = ls_flat[sample_idx]
         s2_sampled = s2_flat[sample_idx]
-        return ls_sampled, s2_sampled
+        return ls_sampled, s2_sampled, valid_pix_cnt
     
 
 def regress_reflectance(
@@ -217,7 +218,7 @@ def regress_reflectance(
     ls_modeled = ls_sample[domain_mask]
     s2_modeled = s2_sample[domain_mask]
 
-    if sample_size < 1_000:
+    if sample_size < 5_000:
         print(f'Error: Insuffcient quality pixels given parameter (less than 1000)')
         model = 'Poor Quality Data'
         excluded_frac = 'Poor Quality Image Data'
@@ -296,13 +297,13 @@ def get_pixel_samples(ls8_path: str,
         s2_data, 
         measure_mask
     )
-    ls_sample, s2_sample = downsample_image_arrays(
+    ls_sample, s2_sample, valid_pix_cnt = downsample_image_arrays(
         ls_pixels, 
         s2_pixels, 
         sample_size
     )
 
-    return ls_sample, s2_sample
+    return ls_sample, s2_sample, valid_pix_cnt
 
 def get_ndwi_samples(image_info: dict,
                      pld_fp: str,
@@ -315,9 +316,9 @@ def get_ndwi_samples(image_info: dict,
     ls_ndwi, s2_ndwi, img_window_params = make_ndwi_images(image_info)
     measure_mask = make_measure_mask(pld_fp, img_window_params, zone, buffer_delim, buffer_delim_outer)
     ls_pixels, s2_pixels = find_measured_pixels(ls_ndwi, s2_ndwi, measure_mask)
-    ls_sample, s2_sample = downsample_image_arrays(ls_pixels, s2_pixels, sample_size)
+    ls_sample, s2_sample, valid_pix_cnt = downsample_image_arrays(ls_pixels, s2_pixels, sample_size)
 
-    return ls_sample, s2_sample
+    return ls_sample, s2_sample, valid_pix_cnt
 
 def regress_image_pairs(image_info: dict,
                         mask_params: dict,
@@ -369,16 +370,16 @@ def regress_image_pairs(image_info: dict,
         }
         # Get the NDWI or single band pixel samples
         if band_name == "NDWI":
-            ls_sample, s2_sample = get_ndwi_samples(image_info, pld_fp, **sample_params)
+            ls_sample, s2_sample, valid_pix_cnt = get_ndwi_samples(image_info, pld_fp, **sample_params)
         else:
-            ls_sample, s2_sample = get_pixel_samples(
+            ls_sample, s2_sample, valid_pix_cnt = get_pixel_samples(
                 ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
             )
         # Run regression function
-        print(f'{level} regression for {band_name} in the {roi} region with PLD {zone} {buffer_delim}m')
+        print(f'{level} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
         model, excluded_frac = regress_reflectance(ls_sample, s2_sample, model_domain)
     else: # Return no image data if matching images not found
-        model = excluded_frac = "No Image Data"
+        model = excluded_frac = valid_pix_cnt = "No Image Data"
 
     return {
         'level': level,
@@ -391,7 +392,8 @@ def regress_image_pairs(image_info: dict,
         'sample_size': sample_size,
         'model_domain': model_domain,
         'model': model,
-        'excluded_frac': excluded_frac
+        'excluded_frac': excluded_frac,
+        'valid_pix_cnt': valid_pix_cnt
     }
 
 def calc_ndwi(
@@ -481,7 +483,7 @@ def mask_ndwi_images(
     pld_plus = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
-                                 buffer_delim=30, 
+                                 buffer_delim=60, #TODO: What's the most appropriate value for this??
                                  buffer_delim_outer=None
     )
 
@@ -614,9 +616,9 @@ image_info = {
     'band_name': 'Green'
 }
 mask_params = {
-    'zone': 'lake',
-    'buffer_delim': -30,
-    'buffer_delim_outer': None,
+    'zone': 'shoreline',
+    'buffer_delim': -60,
+    'buffer_delim_outer': 60,
 }
 regression_params = {
     'sample_size': 10_000,
@@ -673,7 +675,7 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (0, 0.1)
+                regression_params['model_domain'] = (0, 0.7)
 
                 summary = regress_image_pairs(
                     image_info=image_info,
@@ -706,7 +708,7 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (0, 0.1)
+                regression_params['model_domain'] = (0, 0.7)
 
                 summary = regress_image_pairs(
                     image_info=image_info,
@@ -755,8 +757,8 @@ print("Done making regression summaries")
 # %%
 
 df_regression_summary = pd.DataFrame(regression_summaries)
-df_regression_summary.to_csv('./data/regression_results_better.csv')
-regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
+df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
+#regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
 
 # %%
 
@@ -804,7 +806,7 @@ df_area_summary = pd.DataFrame(area_summaries)
 df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 print(df_area_clean)
 
-df_area_summary.to_csv('./data/area_results_better.csv')
+df_area_summary.to_csv('./data/area_results.csv', index=False)
 
 # %%
 plt.figure(figsize=(8, 6))
