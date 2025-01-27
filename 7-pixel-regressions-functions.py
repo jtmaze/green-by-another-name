@@ -369,7 +369,7 @@ def regress_image_pairs(image_info: dict,
         }
         # Get the NDWI or single band pixel samples
         if band_name == "NDWI":
-            ls_sample, s2_sample = get_ndwi_samples(image_info, **sample_params)
+            ls_sample, s2_sample = get_ndwi_samples(image_info, pld_fp, **sample_params)
         else:
             ls_sample, s2_sample = get_pixel_samples(
                 ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
@@ -739,7 +739,7 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (0, 0.1)
+                regression_params['model_domain'] = (-1, 1)
 
                 summary = regress_image_pairs(
                     image_info=image_info,
@@ -753,10 +753,10 @@ print("Done making regression summaries")
 
 
 # %%
+
 df_regression_summary = pd.DataFrame(regression_summaries)
-df_regression_summary.to_csv('./data/regression_results.csv')
+df_regression_summary.to_csv('./data/regression_results_better.csv')
 regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
-print(regression_summary_clean)
 
 # %%
 
@@ -804,7 +804,9 @@ df_area_summary = pd.DataFrame(area_summaries)
 df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 print(df_area_clean)
 
-df_area_summary.to_csv('./data/area_results.csv')
+df_area_summary.to_csv('./data/area_results_better.csv')
 
-
+# %%
+plt.figure(figsize=(8, 6))
+df_area_clean.boxplot(column='ls_s2_percent_diff', by='level')
 # %%
