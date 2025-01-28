@@ -494,16 +494,11 @@ def mask_ndwi_images(
 
 def find_otsu_threshold(
         ndwi: np.array, 
-        show_hist: bool
+        show_hist: bool,
     ):
     """
     Input: NDWI array [-1,1]
-    Process: 
-    1. Scale NDWI to [0,255]
-    2. Apply Otsu
-    3. Output binary where:
-       - Water (high NDWI) = 255/1
-       - Land (low NDWI) = 0
+    Output: Otsu Threshold, and possibly the data
     """
     
     flat_ndwi = ndwi.flatten()
@@ -551,7 +546,19 @@ def find_otsu_threshold(
 def otsu_image_wtr_area(
         image_info: dict,
         write_mask: bool,
+        data_return: bool, 
     ):
+    """
+    Returns a dictionary with the otsu threshold, and water fraction from each image
+    """
+
+    # Initialize all variables at the start
+    ls_threshold = None
+    ls_water_frac = None 
+    s2_threshold = None
+    s2_water_frac = None
+    ls_data = None
+    s2_data = None
 
     level, date, roi, band_name = (
         image_info['level'], 
@@ -575,9 +582,9 @@ def otsu_image_wtr_area(
 
         else:
             print("----- LandSat Histogram --------------")
-            ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=True)
+            ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
             print("----- Sentinel-2 Histogram --------------")
-            s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=True)
+            s2_threshold = find_otsu_threshold(s2_ndwi_lakes, show_hist=False)
 
             ls_water = (ls_ndwi > ls_threshold).astype(int)
             s2_water = (s2_ndwi > s2_threshold).astype(int)
@@ -596,9 +603,28 @@ def otsu_image_wtr_area(
             if write_mask == True:
                 print("No code to export the water masks, yet...")
 
+            if data_return == True:
+                ls_flat = ls_ndwi.flatten()
+                valid_ls = ~np.isnan(ls_flat)
+                ls_data = ls_flat[valid_ls]
+                ls_data = np.clip(ls_data, -1, 1)
+
+                s2_flat = s2_ndwi.flatten()
+                valid_s2 = ~np.isnan(s2_flat)
+                s2_data = s2_flat[valid_s2]
+                s2_data = np.clip(s2_data, -1, 1)
+            else:
+                s2_data = ls_data = None
+
     else:
-        ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = 'No Image Data'
-    return ls_threshold, ls_water_frac, s2_threshold, s2_water_frac
+        ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = ls_data = s2_data = 'No Image Data'
+
+    return {'ls_threshold': ls_threshold, 
+            'ls_water_frac': ls_water_frac, 
+            's2_threshold': s2_threshold, 
+            's2_water_frac': s2_water_frac, 
+            'ls_data': ls_data, 
+            's2_data': s2_data}
 
 # %% Run the functions:
 """
@@ -761,6 +787,18 @@ df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv',
 #regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
 
 # %%
+image_info = {
+    'level': 'toa',
+    'date': '2021-07-01', # Dates will be itterated through
+    'roi': 'YKF_sub1', # ROIs will be itterated through
+    'band_name': 'Green'
+}
+
+rois = extract_unique(full_files, roi_pattern)
+levels = ['sr', 'toa']
+image_dates = ['2021-09-09', '2021-08-02', '2020-07-15', '2024-06-15']
+
+# %%
 
 """
 ####################################
@@ -779,20 +817,22 @@ for level in levels:
             image_info['roi'] = roi
             image_info['level'] = level
 
-            ls_threshold, ls_water_frac, s2_threshold, s2_water_frac = otsu_image_wtr_area(image_info, write_mask=False)
-            if ls_threshold == 'No Image Data' or ls_threshold == 'Poor Quality Image':
+
+
+            otsu_items = otsu_image_wtr_area(image_info, write_mask=False, data_return=True)
+            if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
                 ls_s2_percent_diff = 'No Image Data'
             else:
-                ls_s2_percent_diff = ((ls_water_frac - s2_water_frac) / ls_water_frac) * 100
+                ls_s2_percent_diff = (
+                    (otsu_items['ls_water_frac'] - otsu_items['s2_water_frac']) 
+                    / otsu_items['ls_water_frac']
+                ) * 100
 
             summary = {
                 'date': dt,
                 'roi': roi,
                 'level': level,
-                'ls_threshold': ls_threshold,
-                's2_threshold': s2_threshold,
-                'ls_water_frac': ls_water_frac,
-                's2_water_frac': s2_water_frac,
+                'otsu_items': otsu_items,
                 'ls_s2_percent_diff': ls_s2_percent_diff
             }
 
@@ -801,14 +841,79 @@ for level in levels:
 print("Done calculating water area")
 
 # %%
+df_area_summary = pd.DataFrame(area_summaries)
+df_area = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
+df_area.head(20)
+
+# %% 
+   
+def overlay_sr_toa_cdf(summary_data: pd.DataFrame, roi: str, date: str):
+    
+    sr = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'sr')
+    ]
+
+    toa = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'toa')
+    ]
+
+    if sr.empty or toa.empty:
+        print('Error: a level is missing')
+        return None
+    
+    # Access dictionary elements using iloc[0] and key names
+    sr_threshold = sr['otsu_items'].iloc[0]['ls_threshold']
+    sr_data = sr['otsu_items'].iloc[0]['ls_data'] 
+    toa_threshold = toa['otsu_items'].iloc[0]['ls_threshold']
+    toa_data = toa['otsu_items'].iloc[0]['ls_data']
+
+    def plot_cdfs(sr_data, toa_data, sr_threshold, toa_threshold):
+    # Calculate CDFs
+        sr_sorted = np.sort(sr_data)
+        toa_sorted = np.sort(toa_data[~np.isnan(toa_data)])
+        
+        # Create points for CDF
+        sr_p = np.linspace(0, 1, len(sr_sorted))
+        toa_p = np.linspace(0, 1, len(toa_sorted))
+        
+        # Create plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Plot CDFs
+        ax.plot(sr_sorted, sr_p, 'b-', label='SR')
+        ax.plot(toa_sorted, toa_p, 'r-', label='TOA')
+        
+        # Add threshold lines
+        ax.axvline(x=sr_threshold, color='b', linestyle='--', label='SR Threshold')
+        ax.axvline(x=toa_threshold, color='r', linestyle='--', label='TOA Threshold')
+        
+        # Customize plot
+        ax.set_xlabel('NDWI Value')
+        ax.set_ylabel('Cumulative')
+        ax.set_title('CDF of NDWI Values')
+        ax.legend(loc='lower left')
+        
+        plt.grid(True)
+        plt.show()
+
+    plot_cdfs(sr_data, toa_data, sr_threshold, toa_threshold)
+
+    return None
+
+
+# %%
+
+overlay_sr_toa_cdf(summary_data=df_area_summary, roi='AKCP_sub1', date='2020-07-15')
+
+
+# %% 
 
 df_area_summary = pd.DataFrame(area_summaries)
 df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 print(df_area_clean)
 
-df_area_summary.to_csv('./data/area_results.csv', index=False)
-
-# %%
-plt.figure(figsize=(8, 6))
-df_area_clean.boxplot(column='ls_s2_percent_diff', by='level')
-# %%
+#df_area_summary.to_csv('./data/area_results.csv', index=False)
