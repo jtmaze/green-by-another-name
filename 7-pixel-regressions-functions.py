@@ -212,34 +212,31 @@ def regress_reflectance(
     ): 
 
     sample_size = ls_sample.size
-    if sample_size < 10_000:
-        print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
+    if sample_size < 50_000:
+        print(f'Error: Insuffcient quality pixels given parameter (less than 50,000)')
         model = 'Poor Quality Image Data'
         model_domain = 'Poor Quality Image Data'
         ls_histogram = s2_histogram = 'Poor Quality Image Data'
 
     else:
-        def outlier_filter(sample_data: np.array, outlier_frac: float):
+        def outlier_filter(sample_data1: np.array, sample_data2, outlier_frac: float):
             """
             Returns the domain to model given X% of outliers removed from low and high
             """
+            sample_data = np.concatenate((sample_data1, sample_data2))
             # size of data
             omit_count = round(sample_data.size * outlier_frac)
             # sort the data from high to low
             asc_sorted = np.sort(sample_data)
             trimmed = asc_sorted[omit_count: -omit_count]
-            domain = (trimmed[0], trimmed[-1])
+            domain = (trimmed[0] - 0.0001, trimmed[-1] + 0.0001)
 
             return domain
 
-        ls_domain = outlier_filter(ls_sample, outlier_frac)
-        s2_domain = outlier_filter(s2_sample, outlier_frac)
-
-        lower = max(ls_domain[0], s2_domain[0])
-        upper = min(ls_domain[1], s2_domain[1])
-        model_domain = (upper, lower)
+        model_domain = outlier_filter(ls_sample, s2_sample, outlier_frac)
+        lower, upper = model_domain
         
-        domain_mask = (ls_sample > lower) & (ls_sample < upper) & (s2_sample > lower) & (s2_sample < upper)
+        domain_mask = (ls_sample >= lower) & (ls_sample <= upper) & (s2_sample >= lower) & (s2_sample <= upper)
         
         # Filter both arrays using same mask
         ls_modeled = ls_sample[domain_mask]
@@ -255,16 +252,20 @@ def regress_reflectance(
             yx_ols = stats.linregress(y, x)
             
             xy_slope = xy_ols.slope
+            #xy_intercept = xy_ols.intercept
             yx_slope = 1 / yx_ols.slope # Need to invert the second slope so they're in y = mx + b form
-            slope = np.sign(xy_slope) * np.sqrt(xy_slope * yx_slope)
+            #yx_intercept = - yx_ols.intercept / yx_ols.slope
+
             # Check that slopes have the same sign
             if np.sign(xy_slope) != np.sign(yx_slope):
                 print('Warning: Slopes have different signs')
                 return None
+            
+            slope = np.sign(xy_slope) * (np.std(y) / np.std(x))
             intercept = np.mean(y) - slope * np.mean(x) 
 
             # Calculate R-squared
-            r = np.sign(slope) * np.sqrt(xy_slope / yx_slope)
+            r, _ = stats.pearsonr(x, y)
             r_squared = r ** 2
            
             return {'slope': slope, 'intercept': intercept, 'r_squared': r_squared}
@@ -277,11 +278,12 @@ def regress_reflectance(
         xmax_val = np.nanmax(ls_modeled)
         ymin_val = np.nanmin(s2_modeled)
         ymax_val = np.nanmax(s2_modeled)
+        print(xmin_val, xmax_val, ymin_val, ymax_val)
         min_modeled = model['slope'] * xmin_val + model['intercept']
         max_modeled = model['slope'] * xmax_val + model['intercept']
 
         plt.figure(figsize=(8,6))
-        plt.scatter(ls_modeled, s2_modeled, s=1, marker='.', alpha=0.7)
+        plt.scatter(ls_modeled, s2_modeled, s=1, marker='.', alpha=0.4)
         plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='RMA Fit')
         # Add a 45 degree line for comparison
         plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
@@ -662,15 +664,14 @@ image_info = {
     'band_name': 'Green'
 }
 mask_params = {
-    'zone': 'lake',
-    'buffer_delim': -30,
+    'zone': 'land',
+    'buffer_delim': 60,
     'buffer_delim_outer': None,
 }
 regression_params = {
-    'sample_size': 10_000,
-    'outlier_frac': 0.01 
+    'sample_size': 50_000,
+    'outlier_frac': 0.01
 }
-
 # %%
 
 """
@@ -789,7 +790,7 @@ for level in levels:
                     image_info=image_info,
                     mask_params=mask_params,
                     regression_params=regression_params,
-                    return_hist=False
+                    hist_return=True
                 )
 
                 regression_summaries.append(summary)
@@ -800,7 +801,7 @@ print("Done making regression summaries")
 # %%
 
 df_regression_summary = pd.DataFrame(regression_summaries)
-df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
+#df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
 #regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
 
 # %%
