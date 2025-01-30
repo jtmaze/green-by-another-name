@@ -491,6 +491,17 @@ def mask_ndwi_images(
 
     return ndwi_masked
 
+def clean_ndwi_data(ndwi_data: np.array):
+    """
+    Removes NaN values from NDWI before computing Otsu Thresholds or Histograms
+    """
+    flat_ndwi = ndwi_data.flatten()
+    valid_mask = ~np.isnan(flat_ndwi)
+    valid_data = flat_ndwi[valid_mask]
+    valid_data = np.clip(valid_data, -1, 1)
+    
+    return valid_data
+
 
 def find_otsu_threshold(
         ndwi: np.array, 
@@ -501,10 +512,7 @@ def find_otsu_threshold(
     Output: Otsu Threshold, and possibly the data
     """
     
-    flat_ndwi = ndwi.flatten()
-    valid_mask = ~np.isnan(flat_ndwi)
-    valid_data = flat_ndwi[valid_mask]
-    valid_data = np.clip(valid_data, -1, 1)
+    valid_data = clean_ndwi_data(ndwi)
 
     n_bins = 500
     hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(-1, 1))
@@ -546,7 +554,7 @@ def find_otsu_threshold(
 def otsu_image_wtr_area(
         image_info: dict,
         write_mask: bool,
-        data_return: bool, 
+        hist_return: bool, 
     ):
     """
     Returns a dictionary with the otsu threshold, and water fraction from each image
@@ -557,8 +565,8 @@ def otsu_image_wtr_area(
     ls_water_frac = None 
     s2_threshold = None
     s2_water_frac = None
-    ls_data = None
-    s2_data = None
+    ls_hist = None
+    s2_hist = None
 
     level, date, roi, band_name = (
         image_info['level'], 
@@ -581,6 +589,7 @@ def otsu_image_wtr_area(
             ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = 'Poor Quality Image'
 
         else:
+
             print("----- LandSat Histogram --------------")
             ls_threshold = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
             print("----- Sentinel-2 Histogram --------------")
@@ -603,28 +612,141 @@ def otsu_image_wtr_area(
             if write_mask == True:
                 print("No code to export the water masks, yet...")
 
-            if data_return == True:
-                ls_flat = ls_ndwi.flatten()
-                valid_ls = ~np.isnan(ls_flat)
-                ls_data = ls_flat[valid_ls]
-                ls_data = np.clip(ls_data, -1, 1)
+            if hist_return == True:
+                ls_out_data = clean_ndwi_data(ls_ndwi_lakes)
+                s2_out_data = clean_ndwi_data(s2_ndwi_lakes)
 
-                s2_flat = s2_ndwi.flatten()
-                valid_s2 = ~np.isnan(s2_flat)
-                s2_data = s2_flat[valid_s2]
-                s2_data = np.clip(s2_data, -1, 1)
-            else:
-                s2_data = ls_data = None
+                bins = 500
+                ls_hist = np.histogram(ls_out_data, bins=bins, density=True)
+                s2_hist = np.histogram(s2_out_data, bins=bins, density=True)
 
     else:
-        ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = ls_data = s2_data = 'No Image Data'
+        ls_threshold = ls_water_frac = s2_threshold = s2_water_frac = ls_hist = s2_hist = 'No Image Data'
 
     return {'ls_threshold': ls_threshold, 
             'ls_water_frac': ls_water_frac, 
             's2_threshold': s2_threshold, 
             's2_water_frac': s2_water_frac, 
-            'ls_data': ls_data, 
-            's2_data': s2_data}
+            'ls_hist': ls_hist, 
+            's2_hist': s2_hist
+        }
+
+def plot_otsu_histograms(
+    sr: pd.Series,
+    toa: pd.Series,
+    date: str,
+    roi: str):
+    
+    """
+    Plots the NDWI histograms for Landsat and Sentinel-2 images
+    """
+    
+    # Access dictionary elements using iloc[0] and key names
+    ls_sr_threshold = sr['otsu_items'].iloc[0]['ls_threshold']
+    ls_sr_hist = sr['otsu_items'].iloc[0]['ls_hist'][0]
+    ls_sr_water_frac = sr['otsu_items'].iloc[0]['ls_water_frac']
+    ls_toa_threshold = toa['otsu_items'].iloc[0]['ls_threshold']
+    ls_toa_hist = toa['otsu_items'].iloc[0]['ls_hist'][0]
+    ls_toa_water_frac = toa['otsu_items'].iloc[0]['s2_water_frac']
+
+    s2_sr_threshold = sr['otsu_items'].iloc[0]['s2_threshold']
+    s2_sr_hist = sr['otsu_items'].iloc[0]['s2_hist'][0]
+    s2_sr_water_frac = sr['otsu_items'].iloc[0]['s2_water_frac']
+    s2_toa_threshold = toa['otsu_items'].iloc[0]['s2_threshold']
+    s2_toa_hist = toa['otsu_items'].iloc[0]['s2_hist'][0]
+    s2_toa_water_frac = toa['otsu_items'].iloc[0]['s2_water_frac']
+
+    # Should all have the same bin edges...
+    bin_edges = sr['otsu_items'].iloc[0]['ls_hist'][1]
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    # Plot histogram lines
+    ax.plot(bin_centers, ls_sr_hist, linestyle='-', color='red', label='Landsat SR', linewidth=2)
+    ax.plot(bin_centers, s2_sr_hist, linestyle='-', color='green', label='Sentinel-2 SR', linewidth=2)
+    ax.plot(bin_centers, ls_toa_hist, linestyle=':', color='red', label='Landsat TOA', linewidth=4)
+    ax.plot(bin_centers, s2_toa_hist, linestyle=':', color='green', label='Sentinel-2 TOA', linewidth=4)
+
+    # Add threshold lines
+    ax.axvline(x=ls_sr_threshold, color='red', linestyle='-')
+    ax.axvline(x=s2_sr_threshold, color='green', linestyle='-')
+    ax.axvline(x=ls_toa_threshold, color='red', linestyle=':')
+    ax.axvline(x=s2_toa_threshold, color='green', linestyle=':')
+
+    # Text boxes
+    ax.text(
+        0.95, 0.95,
+        f'LS SR water frac: {ls_sr_water_frac:.1f}',
+        color='white',
+        ha='right',
+        va='top',
+        transform=ax.transAxes,
+        fontweight='bold',
+        bbox=dict(facecolor='black', alpha=1, edgecolor='red')
+    )
+    ax.text(
+        0.95, 0.89,
+        f'S2 SR water frac: {s2_sr_water_frac:.1f}',
+        color='white',
+        ha='right',
+        va='top',
+        transform=ax.transAxes,
+        fontweight='bold',
+        bbox=dict(facecolor='black', alpha=1, edgecolor='green')
+    )
+    ax.text(
+        0.95, 0.80,
+        f'LS TOA water frac: {ls_toa_water_frac:.1f}',
+        color='white',
+        ha='right',
+        va='top',
+        transform=ax.transAxes,
+        fontweight='bold',
+        bbox=dict(facecolor='black', alpha=1, edgecolor='red')
+    )
+    ax.text(
+        0.95, 0.74,
+        f'S2 TOA water frac: {s2_toa_water_frac:.1f}',
+        color='white',
+        ha='right',
+        va='top',
+        transform=ax.transAxes,
+        fontweight='bold',
+        bbox=dict(facecolor='black', alpha=1, edgecolor='green')
+    )
+
+    # Customize plot
+    ax.set_xlabel('Value')
+    ax.set_ylabel('Density')
+    ax.set_title(f'Distribution of NDWI Values for {date} in {roi}')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
+    
+    sr = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'sr')
+    ]
+
+    toa = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'toa')
+    ]
+
+    if sr.empty or toa.empty:
+        print('Error: a level is missing')
+        return None
+
+    plot_otsu_histograms(sr, toa, date, roi)
+
+
 
 # %% Run the functions:
 """
@@ -779,11 +901,34 @@ for level in levels:
 
 print("Done making regression summaries")
 
+# %%
+
+def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
+    
+    sr = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'sr')
+    ]
+
+    toa = summary_data[
+        (summary_data['roi'] == roi) & 
+        (summary_data['date'] == date) & 
+        (summary_data['level'] == 'toa')
+    ]
+
+    if sr.empty or toa.empty:
+        print('Error: a level is missing')
+        return None
+
+    plot_otsu_histograms(sr, toa, date, roi)
+
+
 
 # %%
 
 df_regression_summary = pd.DataFrame(regression_summaries)
-df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
+#df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
 #regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
 
 # %%
@@ -819,7 +964,7 @@ for level in levels:
 
 
 
-            otsu_items = otsu_image_wtr_area(image_info, write_mask=False, data_return=True)
+            otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=True)
             if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
                 ls_s2_percent_diff = 'No Image Data'
             else:
@@ -845,69 +990,10 @@ df_area_summary = pd.DataFrame(area_summaries)
 df_area = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 df_area.head(20)
 
-# %% 
    
-def overlay_sr_toa_cdf(summary_data: pd.DataFrame, roi: str, date: str):
-    
-    sr = summary_data[
-        (summary_data['roi'] == roi) & 
-        (summary_data['date'] == date) & 
-        (summary_data['level'] == 'sr')
-    ]
-
-    toa = summary_data[
-        (summary_data['roi'] == roi) & 
-        (summary_data['date'] == date) & 
-        (summary_data['level'] == 'toa')
-    ]
-
-    if sr.empty or toa.empty:
-        print('Error: a level is missing')
-        return None
-    
-    # Access dictionary elements using iloc[0] and key names
-    sr_threshold = sr['otsu_items'].iloc[0]['ls_threshold']
-    sr_data = sr['otsu_items'].iloc[0]['ls_data'] 
-    toa_threshold = toa['otsu_items'].iloc[0]['ls_threshold']
-    toa_data = toa['otsu_items'].iloc[0]['ls_data']
-
-    def plot_cdfs(sr_data, toa_data, sr_threshold, toa_threshold):
-    # Calculate CDFs
-        sr_sorted = np.sort(sr_data)
-        toa_sorted = np.sort(toa_data[~np.isnan(toa_data)])
-        
-        # Create points for CDF
-        sr_p = np.linspace(0, 1, len(sr_sorted))
-        toa_p = np.linspace(0, 1, len(toa_sorted))
-        
-        # Create plot
-        fig, ax = plt.subplots(figsize=(10, 6))
-        
-        # Plot CDFs
-        ax.plot(sr_sorted, sr_p, 'b-', label='SR')
-        ax.plot(toa_sorted, toa_p, 'r-', label='TOA')
-        
-        # Add threshold lines
-        ax.axvline(x=sr_threshold, color='b', linestyle='--', label='SR Threshold')
-        ax.axvline(x=toa_threshold, color='r', linestyle='--', label='TOA Threshold')
-        
-        # Customize plot
-        ax.set_xlabel('NDWI Value')
-        ax.set_ylabel('Cumulative')
-        ax.set_title('CDF of NDWI Values')
-        ax.legend(loc='lower left')
-        
-        plt.grid(True)
-        plt.show()
-
-    plot_cdfs(sr_data, toa_data, sr_threshold, toa_threshold)
-
-    return None
-
-
 # %%
 
-overlay_sr_toa_cdf(summary_data=df_area_summary, roi='AKCP_sub1', date='2020-07-15')
+overlay_sr_toa_hist(summary_data=df_area_summary, roi='MRD_sub1', date='2024-06-15')
 
 
 # %% 
