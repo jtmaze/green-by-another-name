@@ -207,48 +207,69 @@ def downsample_image_arrays(ls_pixels: np.array,
 def regress_reflectance(
         ls_sample: np.array, # Array should be 1D i.e. flat
         s2_sample: np.array, # 1D array
-        outlier_frac: float # The fraction of outliers to remove
+        outlier_frac: float, # The fraction of outliers to remove
+        hist_return: bool
     ): 
+
     sample_size = ls_sample.size
-    
-    def outlier_filter(sample_data: np.array, outlier_frac: float):
-        """
-        Returns 
-        """
-        # size of data
-        omit_count = round(sample_data.size * outlier_frac)
-        # sort the data from high to low
-        sorted = np.sort(sample_data)[::-1] #[::-1] reverses the list (descending)
-        filtered = sorted[omit_count: ]
-
-        domain = (min(filtered), max(filtered))
-
-        return filtered, domain
-
-    ls_domain = outlier_filter(ls_sample, outlier_frac)
-    s2_domain = outlier_filter(s2_sample, outlier_frac)
-    lower = min(ls_domain[0], s2_domain[0])
-    upper = max(ls_domain[1], s2_domain[1])
-    
-    domain_mask = (ls_sample > lower) & (ls_sample < upper) & (s2_sample > lower) & (s2_sample < upper)
-    
-    # Filter both arrays using same mask
-    ls_modeled = ls_sample[domain_mask]
-    s2_modeled = s2_sample[domain_mask]
-
     if sample_size < 10_000:
         print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
-        model = 'Poor Quality Data'
-        excluded_frac = 'Poor Quality Image Data'
+        model = 'Poor Quality Image Data'
+        model_domain = 'Poor Quality Image Data'
+        ls_histogram = s2_histogram = 'Poor Quality Image Data'
 
-    else: 
-        # Count excluded samples
-        excluded_frac = ((sample_size - len(ls_modeled)) / sample_size) * 100
+    else:
+        def outlier_filter(sample_data: np.array, outlier_frac: float):
+            """
+            Returns the domain to model given X% of outliers removed from low and high
+            """
+            # size of data
+            omit_count = round(sample_data.size * outlier_frac)
+            # sort the data from high to low
+            asc_sorted = np.sort(sample_data)
+            trimmed = asc_sorted[omit_count: -omit_count]
+            domain = (trimmed[0], trimmed[-1])
+
+            return domain
+
+        ls_domain = outlier_filter(ls_sample, outlier_frac)
+        s2_domain = outlier_filter(s2_sample, outlier_frac)
+
+        lower = max(ls_domain[0], s2_domain[0])
+        upper = min(ls_domain[1], s2_domain[1])
+        model_domain = (upper, lower)
         
-        model = stats.linregress(ls_modeled, s2_modeled)
-        slope = model[0]
-        intercept = model[1]
-        r_squared = model[2] ** 2 #r_squared is the 3rd value in model tuple
+        domain_mask = (ls_sample > lower) & (ls_sample < upper) & (s2_sample > lower) & (s2_sample < upper)
+        
+        # Filter both arrays using same mask
+        ls_modeled = ls_sample[domain_mask]
+        s2_modeled = s2_sample[domain_mask]
+
+        def rma_regression(x: np.array, y: np.array):
+            """
+            Returns the slope, intercept, and r-squared of an RMA regression model
+            Code and steps adopted from (https://github.com/OceanOptics/pylr2/blob/master/pylr2/regress2.py)
+            """
+
+            xy_ols = stats.linregress(x, y)
+            yx_ols = stats.linregress(y, x)
+            
+            xy_slope = xy_ols.slope
+            yx_slope = 1 / yx_ols.slope # Need to invert the second slope so they're in y = mx + b form
+            slope = np.sign(xy_slope) * np.sqrt(xy_slope * yx_slope)
+            # Check that slopes have the same sign
+            if np.sign(xy_slope) != np.sign(yx_slope):
+                print('Warning: Slopes have different signs')
+                return None
+            intercept = np.mean(y) - slope * np.mean(x) 
+
+            # Calculate R-squared
+            r = np.sign(slope) * np.sqrt(xy_slope / yx_slope)
+            r_squared = r ** 2
+           
+            return {'slope': slope, 'intercept': intercept, 'r_squared': r_squared}
+
+        model = rma_regression(ls_modeled, s2_modeled)
 
         # Make a fit-line from the model
         # Becuase Landsat is x-axis use it to make the domain
@@ -256,19 +277,19 @@ def regress_reflectance(
         xmax_val = np.nanmax(ls_modeled)
         ymin_val = np.nanmin(s2_modeled)
         ymax_val = np.nanmax(s2_modeled)
-        min_modeled = slope * xmin_val + intercept
-        max_modeled = slope * xmax_val + intercept
+        min_modeled = model['slope'] * xmin_val + model['intercept']
+        max_modeled = model['slope'] * xmax_val + model['intercept']
 
         plt.figure(figsize=(8,6))
-        plt.scatter(ls_modeled, s2_modeled, s=1, marker='.')
-        plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='OLS Fit')
+        plt.scatter(ls_modeled, s2_modeled, s=1, marker='.', alpha=0.7)
+        plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='RMA Fit')
         # Add a 45 degree line for comparison
         plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
                 [min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
                 color='blue', 
                 linestyle='--', 
                 label='1:1 Line')
-        textstr = f'$R^2 = {r_squared:.4f}$\nSlope = {slope:.4f}'
+        textstr = f'$R^2 = {model['r_squared']:.4f}$\nSlope = {model['slope']:.4f}'
         box_props = dict(boxstyle='round', facecolor='white', alpha=0.5)
         plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
                 verticalalignment='top', bbox=box_props)
@@ -277,10 +298,13 @@ def regress_reflectance(
         plt.legend(loc='lower right')
         plt.show()
 
-        if excluded_frac > 10:
-            print(f'Warning fraction of pixels excluded from the model domain is high ({excluded_frac}%)')
-    
-    return model, excluded_frac
+        if hist_return == True:
+            ls_histogram = np.histogram(ls_modeled, bins=500)
+            s2_histogram = np.histogram(s2_modeled, bins=500)
+        else:
+            ls_histogram = s2_histogram = None
+
+    return model, model_domain, ls_histogram, s2_histogram
 
 def get_pixel_samples(ls8_path: str,
                       s2_path: str,
@@ -340,7 +364,8 @@ def get_ndwi_samples(image_info: dict,
 
 def regress_image_pairs(image_info: dict,
                         mask_params: dict,
-                        regression_params: dict
+                        regression_params: dict,
+                        hist_return: bool,
     ) -> dict:
     
     """
@@ -369,9 +394,9 @@ def regress_image_pairs(image_info: dict,
         mask_params['buffer_delim_outer']
     )
     
-    sample_size, model_domain = (
+    sample_size, outlier_frac = (
         regression_params['sample_size'],
-        regression_params['model_domain']
+        regression_params['outlier_frac']
     )
     
     # Make file paths
@@ -395,9 +420,9 @@ def regress_image_pairs(image_info: dict,
             )
         # Run regression function
         print(f'{level} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
-        model, excluded_frac = regress_reflectance(ls_sample, s2_sample, model_domain)
+        model, model_domain, ls_histogram, s2_histogram = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return)
     else: # Return no image data if matching images not found
-        model = excluded_frac = valid_pix_cnt = "No Image Data"
+        model = model_domain = valid_pix_cnt = ls_histogram = s2_histogram = "No Image Data"
 
     return {
         'level': level,
@@ -408,10 +433,13 @@ def regress_image_pairs(image_info: dict,
         'buffer_delim': buffer_delim,
         'buffer_delim_outer': buffer_delim_outer,
         'sample_size': sample_size,
+        'outlier_frac': outlier_frac,
         'model_domain': model_domain,
         'model': model,
-        'excluded_frac': excluded_frac,
-        'valid_pix_cnt': valid_pix_cnt
+        'model_domain': model_domain,
+        'valid_pix_cnt': valid_pix_cnt,
+        'ls_histogram': ls_histogram,
+        's2_histogram': s2_histogram
     }
 
 def calc_ndwi(
@@ -634,13 +662,13 @@ image_info = {
     'band_name': 'Green'
 }
 mask_params = {
-    'zone': 'shoreline',
-    'buffer_delim': -60,
-    'buffer_delim_outer': 60,
+    'zone': 'lake',
+    'buffer_delim': -30,
+    'buffer_delim_outer': None,
 }
 regression_params = {
     'sample_size': 10_000,
-    'model_domain': (-1, 1) 
+    'outlier_frac': 0.01 
 }
 
 # %%
@@ -693,12 +721,11 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (0, 0.7)
-
                 summary = regress_image_pairs(
                     image_info=image_info,
                     mask_params=mask_params,
-                    regression_params=regression_params
+                    regression_params=regression_params,
+                    hist_return=True
                 )
 
                 regression_summaries.append(summary)
@@ -726,12 +753,11 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (0, 0.7)
-
                 summary = regress_image_pairs(
                     image_info=image_info,
                     mask_params=mask_params,
-                    regression_params=regression_params
+                    regression_params=regression_params,
+                    hist_return=True
                 )
 
                 regression_summaries.append(summary)
@@ -759,12 +785,11 @@ for level in levels:
                 image_info['roi'] = roi
                 image_info['date'] = dt
 
-                regression_params['model_domain'] = (-1, 1)
-
                 summary = regress_image_pairs(
                     image_info=image_info,
                     mask_params=mask_params,
-                    regression_params=regression_params
+                    regression_params=regression_params,
+                    return_hist=False
                 )
 
                 regression_summaries.append(summary)
