@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 import rasterio as rio
 from rasterio.windows import from_bounds
@@ -212,8 +213,8 @@ def regress_reflectance(
     ): 
 
     sample_size = ls_sample.size
-    if sample_size < 50_000:
-        print(f'Error: Insuffcient quality pixels given parameter (less than 50,000)')
+    if sample_size < 10_000:
+        print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
         model = 'Poor Quality Image Data'
         model_domain = 'Poor Quality Image Data'
         ls_histogram = s2_histogram = 'Poor Quality Image Data'
@@ -301,8 +302,8 @@ def regress_reflectance(
         plt.show()
 
         if hist_return == True:
-            ls_histogram = np.histogram(ls_modeled, bins=500)
-            s2_histogram = np.histogram(s2_modeled, bins=500)
+            ls_histogram = np.histogram(ls_modeled, bins=100)
+            s2_histogram = np.histogram(s2_modeled, bins=100)
         else:
             ls_histogram = s2_histogram = None
 
@@ -509,14 +510,21 @@ def make_ndwi_images(
     ls_ndwi = calc_ndwi(ls_green, ls_nir)
     s2_ndwi = calc_ndwi(s2_green, s2_nir)
 
-    plt.imshow(ls_ndwi, cmap='viridis')
-    plt.title('Landsat NDWI')
-    plt.colorbar()
+    green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
+
+    fig, ax = plt.subplots()
+    ax.set_facecolor('darkgrey')
+    ax.imshow(ls_ndwi, cmap=green_white_blue)
+    ax.set_title('Landsat NDWI')
+    plt.colorbar(ax.images[0], ax=ax)
     plt.show()
 
-    plt.imshow(s2_ndwi, cmap='viridis')
-    plt.title('Sentinel-2 NDWI')
-    plt.colorbar()
+
+    fig, ax = plt.subplots()
+    ax.set_facecolor('darkgrey')
+    ax.imshow(s2_ndwi, cmap=green_white_blue)
+    ax.set_title('Sentinel-2 NDWI')
+    plt.colorbar(ax.images[0], ax=ax)
     plt.show()
     
     return ls_ndwi, s2_ndwi, image_window_params
@@ -717,10 +725,10 @@ def plot_otsu_histograms(
     ax.plot(bin_centers, s2_toa_hist, linestyle=':', color='green', label='Sentinel-2 TOA', linewidth=4)
 
     # Add threshold lines
-    ax.axvline(x=ls_sr_threshold, color='red', linestyle='-')
-    ax.axvline(x=s2_sr_threshold, color='green', linestyle='-')
-    ax.axvline(x=ls_toa_threshold, color='red', linestyle=':')
-    ax.axvline(x=s2_toa_threshold, color='green', linestyle=':')
+    ax.axvline(x=ls_sr_threshold, color='red', linestyle='-', linewidth=3)
+    ax.axvline(x=s2_sr_threshold, color='green', linestyle='-', linewidth=3)
+    ax.axvline(x=ls_toa_threshold, color='red', linestyle=':', linewidth=3)
+    ax.axvline(x=s2_toa_threshold, color='green', linestyle=':', linewidth=3)
 
     # Text boxes
     ax.text(
@@ -774,7 +782,67 @@ def plot_otsu_histograms(
     plt.tight_layout()
     plt.show()
 
-def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
+def plot_reflectance_histograms(
+    sr: pd.Series, 
+    toa: pd.Series, 
+    band: str,
+    date: str, 
+    roi: str,
+    hist_range: tuple[float, float] = (0.0, 0.1)
+    ):
+
+    """
+    Plots the Green or NIR histograms for Landsat and Sentinel-2 TOA/SR images
+    """
+    
+    # Access histograms for ls and s2 images
+    ls_sr_hist = sr['ls_histogram'].iloc[0][0]
+    ls_toa_hist = toa['ls_histogram'].iloc[0][0]
+    s2_sr_hist = sr['s2_histogram'].iloc[0][0]
+    s2_toa_hist = toa['s2_histogram'].iloc[0][0]
+
+    # Should all have the same bin edges...
+    bin_edges = sr['ls_histogram'].iloc[0][1]
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_hist))
+    ls_toa_mean = np.average(bin_centers, weights=np.array(ls_toa_hist))
+    s2_sr_mean = np.average(bin_centers, weights=np.array(s2_sr_hist))
+    s2_toa_mean = np.average(bin_centers, weights=np.array(s2_toa_hist))
+
+    mask = (bin_centers >= hist_range[0]) & (bin_centers <= hist_range[1])
+    
+    # Crop the bin centers and histograms by the mask
+    bin_centers_cropped = bin_centers[mask]
+    ls_sr_hist_cropped = np.array(ls_sr_hist)[mask]
+    ls_toa_hist_cropped = np.array(ls_toa_hist)[mask]
+    s2_sr_hist_cropped = np.array(s2_sr_hist)[mask]
+    s2_toa_hist_cropped = np.array(s2_toa_hist)[mask]
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(bin_centers_cropped, ls_sr_hist_cropped, linestyle='-', color='red', label='Landsat SR', linewidth=2)
+    ax.plot(bin_centers_cropped, s2_sr_hist_cropped, linestyle='-', color='green', label='Sentinel-2 SR', linewidth=2)
+    ax.plot(bin_centers_cropped, ls_toa_hist_cropped, linestyle=':', color='red', label='Landsat TOA', linewidth=4)
+    ax.plot(bin_centers_cropped, s2_toa_hist_cropped, linestyle=':', color='green', label='Sentinel-2 TOA', linewidth=4)
+
+    # Add histogram means
+    ax.axvline(x=ls_sr_mean, color='red', linestyle='-', linewidth=3)
+    ax.axvline(x=s2_sr_mean, color='green', linestyle='-', linewidth=3)
+    ax.axvline(x=ls_toa_mean, color='red', linestyle=':', linewidth=3)
+    ax.axvline(x=s2_toa_mean, color='green', linestyle=':', linewidth=3)
+
+    # Customize plot
+    ax.set_xlabel('Value')
+    ax.set_ylabel('Density')
+    ax.set_title(f'Distribution of {band} values for {date} in {roi}')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.grid(True)
+    plt.tight_layout()
+    #plt.show()
+
+def overlay_sr_toa_hist_otsu(summary_data: pd.DataFrame, roi: str, date: str):
     
     sr = summary_data[
         (summary_data['roi'] == roi) & 
@@ -794,6 +862,35 @@ def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
 
     plot_otsu_histograms(sr, toa, date, roi)
 
+def overlay_sr_toa_hist_reflect(regression_data: pd.DataFrame,
+                                roi: str,
+                                date: str,
+                                band_name: str,
+                                hist_range: tuple[float, float] = (0.0, 0.1)
+                                ):
+    
+    sr = regression_data[
+        (regression_data['roi'] == roi) &
+        (regression_data['date'] == date) &
+        (regression_data['level'] == 'sr') &
+        (regression_data['band_name'] == band_name)
+    ]
+
+    toa = regression_data[
+        (regression_data['roi'] == roi) &
+        (regression_data['date'] == date) &
+        (regression_data['level'] == 'toa') &
+        (regression_data['band_name'] == band_name)
+    ]
+
+    if sr.empty or toa.empty:
+        print('Error: a level is missing')
+        return None
+
+    plot_reflectance_histograms(sr, toa, band_name, date, roi, hist_range)
+
+    
+
 
 
 # %% Run the functions:
@@ -812,7 +909,7 @@ image_info = {
     'band_name': 'Green'
 }
 mask_params = {
-    'zone': 'land',
+    'zone': 'lake',
     'buffer_delim': 60,
     'buffer_delim_outer': None,
 }
@@ -848,6 +945,24 @@ def extract_unique(files: list, pattern: re.Pattern[str]):
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 levels = ['sr', 'toa']
+
+# %%
+image_info = {
+    'level': 'toa',
+    'date': '2021-07-01', # Dates will be itterated through
+    'roi': 'YKF_sub1', # ROIs will be itterated through
+    'band_name': 'Green'
+}
+
+rois = extract_unique(full_files, roi_pattern)
+levels = ['sr', 'toa']
+image_dates = ['2021-09-09', '2021-08-02', '2020-07-15', '2024-06-15']
+
+mask_params = {
+    'zone': 'lake',
+    'buffer_delim': 60,
+    'buffer_delim_outer': None,
+}
 
 # %%
 
@@ -892,7 +1007,6 @@ Make NIR Band Regression Models
 """
 
 image_info['band_name'] = 'NIR'
-regression_summaries = []
 
 for level in levels:
     for roi in rois:
@@ -923,49 +1037,26 @@ Make NDWI Regression Models
 ####################################
 """
 
-image_info['band_name'] = 'NDWI'
-regression_summaries = []
+# image_info['band_name'] = 'NDWI'
 
-for level in levels:
-    for roi in rois:
-            for dt in image_dates:
+# for level in levels:
+#     for roi in rois:
+#             for dt in image_dates:
 
-                image_info['level'] = level
-                image_info['roi'] = roi
-                image_info['date'] = dt
+#                 image_info['level'] = level
+#                 image_info['roi'] = roi
+#                 image_info['date'] = dt
 
-                summary = regress_image_pairs(
-                    image_info=image_info,
-                    mask_params=mask_params,
-                    regression_params=regression_params,
-                    hist_return=True
-                )
+#                 summary = regress_image_pairs(
+#                     image_info=image_info,
+#                     mask_params=mask_params,
+#                     regression_params=regression_params,
+#                     hist_return=True
+#                 )
 
-                regression_summaries.append(summary)
+#                 regression_summaries.append(summary)
 
-print("Done making regression summaries")
-
-# %%
-
-def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
-    
-    sr = summary_data[
-        (summary_data['roi'] == roi) & 
-        (summary_data['date'] == date) & 
-        (summary_data['level'] == 'sr')
-    ]
-
-    toa = summary_data[
-        (summary_data['roi'] == roi) & 
-        (summary_data['date'] == date) & 
-        (summary_data['level'] == 'toa')
-    ]
-
-    if sr.empty or toa.empty:
-        print('Error: a level is missing')
-        return None
-
-    plot_otsu_histograms(sr, toa, date, roi)
+# print("Done making regression summaries")
 
 
 
@@ -973,19 +1064,8 @@ def overlay_sr_toa_hist(summary_data: pd.DataFrame, roi: str, date: str):
 
 df_regression_summary = pd.DataFrame(regression_summaries)
 #df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
-#regression_summary_clean = df_regression_summary[df_regression_summary['excluded_frac'] != 'No Image Data']
+regression_summary_clean = df_regression_summary[df_regression_summary['model_domain'] != 'No Image Data']
 
-# %%
-image_info = {
-    'level': 'toa',
-    'date': '2021-07-01', # Dates will be itterated through
-    'roi': 'YKF_sub1', # ROIs will be itterated through
-    'band_name': 'Green'
-}
-
-rois = extract_unique(full_files, roi_pattern)
-levels = ['sr', 'toa']
-image_dates = ['2021-09-09', '2021-08-02', '2020-07-15', '2024-06-15']
 
 # %%
 
@@ -1030,6 +1110,7 @@ for level in levels:
 print("Done calculating water area")
 
 # %%
+
 df_area_summary = pd.DataFrame(area_summaries)
 df_area = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
 df_area.head(20)
@@ -1037,7 +1118,15 @@ df_area.head(20)
    
 # %%
 
-overlay_sr_toa_hist(summary_data=df_area_summary, roi='MRD_sub1', date='2024-06-15')
+comp_params = {
+    'roi': 'YKF_sub1',
+    'date': '2021-08-02'
+}
+
+overlay_sr_toa_hist_otsu(summary_data=df_area_summary, roi=comp_params['roi'], date=comp_params['date'])
+
+overlay_sr_toa_hist_reflect(regression_data=regression_summary_clean, roi=comp_params['roi'], date=comp_params['date'], band_name='Green', hist_range=(0.0, 0.1))
+overlay_sr_toa_hist_reflect(regression_data=regression_summary_clean, roi=comp_params['roi'], date=comp_params['date'], band_name='NIR', hist_range=(0.0, 0.15))
 
 
 # %% 
