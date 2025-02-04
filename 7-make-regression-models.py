@@ -4,7 +4,7 @@ import glob
 import pandas as pd
 
 from image_analysis_functions import extract_unique
-from image_analysis_functions import regress_image_pairs
+from image_analysis_functions import make_reflectance_summaries
 from image_analysis_functions import make_otsu_area_summaries
 
 
@@ -41,48 +41,26 @@ regression_params = {
 }
 
 # %% 2.1 Green Band PLD 60 meter buffered
-
 image_info['band_name'] = 'Green'
 
-for level in levels:
-    image_info['level'] = level
-    for roi in rois:
-        image_info['roi'] = roi
-        for date in image_dates:
-            image_info['date'] = date
+dates = image_dates[0:3]
 
-            regression_summary = regress_image_pairs(image_info, mask_params, regression_params, hist_return=True)
-            regression_summaries.append(regression_summary)
+df = make_reflectance_summaries(image_info=image_info, 
+                                mask_params=mask_params, 
+                                regression_params=regression_params,
+                                levels=levels, 
+                                rois=rois, 
+                                dates=dates,
+                                hist_return=True)
 
 # %% 2.2 NIR Band PLD 60 meter buffered
 
 image_info['band_name'] = 'NIR'
 
-for level in levels:
-    image_info['level'] = level
-    for roi in rois:
-        image_info['roi'] = roi
-        for date in image_dates:
-            image_info['date'] = date
-
-            regression_summary = regress_image_pairs(image_info, mask_params, regression_params, hist_return=True)
-            regression_summaries.append(regression_summary)
-
 # %% 2.3 NDWI Band PLD 60 meter buffered
 
 image_info['band_name'] = 'NDWI'
 regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
-
-for level in levels:
-    image_info['level'] = level
-    for roi in rois:
-        image_info['roi'] = roi
-        for date in image_dates:
-            image_info['date'] = date
-
-            regression_summary = regress_image_pairs(image_info, mask_params, regression_params, hist_return=False)
-            regression_summaries.append(regression_summary)
-
 regression_params['outlier_frac'] = 0.0005
 
 
@@ -114,7 +92,7 @@ mask_params['buffer_delim'] = 120
 # %% 3.2 NIR Band PLD 120 meter buffered
 
 # %% 3.3 NDWI Band PLD 120 meter buffered
-out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates)
+out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
 out_df = out_df[out_df['ls_s2_percent_diff'] != 'No Image Data']
 out_df.to_csv('./data/area_data_v1.csv', index=False)
 

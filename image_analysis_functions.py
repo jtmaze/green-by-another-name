@@ -955,7 +955,13 @@ def numpy_to_list(data):
     else:
         return data
 
-def make_otsu_area_summaries(image_info: dict, levels: list, rois: list, dates: list):
+def make_otsu_area_summaries(
+    image_info: dict, 
+    levels: list, 
+    rois: list, 
+    dates: list,
+    hist_return: bool
+):
 
     """
     Takes all the levels, rois, and dates for analysis
@@ -970,7 +976,7 @@ def make_otsu_area_summaries(image_info: dict, levels: list, rois: list, dates: 
                 image_info['date'] = date
 
                 # Calculate the Otsu thresholds and water fractions for each image
-                otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=True)
+                otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=hist_return)
                 if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
                     ls_s2_percent_diff = 'No Image Data'
                 else:
@@ -1006,5 +1012,85 @@ def make_otsu_area_summaries(image_info: dict, levels: list, rois: list, dates: 
 
     return pd.DataFrame(area_summaries)
 
+def make_reflectance_summaries(
+    image_info: dict,
+    mask_params: dict,
+    regression_params: dict,
+    levels: list,
+    rois: list,
+    dates: list,
+    hist_return: bool
+):
+    """
+    Takes a list of levels, rois and dates to process
+    Returns a dataframe with regression metrics for each pair of images
+    """
+    
+    regression_summaries = []
+    for level in levels:
+        image_info['level'] = level
+        for roi in rois:
+            image_info['roi'] = roi
+            for date in dates:
+                image_info['date'] = date
 
+                items = regress_image_pairs(
+                    image_info, mask_params, regression_params, hist_return=hist_return
+                )
+
+                regression_items_str = items['regression_output']
+                if regression_items_str == 'No Image Data':
+                    model = slope = intercept = r_squared = "No Image Data"
+                    above_frac = below_frac = model_domain = "No Image Data"
+                    ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "No Image Data"
+     
+                else: 
+                    if isinstance(regression_items_str, str):
+                        regression_items = ast.literal_eval(regression_items_str)
+                    else:
+                        regression_items = regression_items_str
+
+                    model = regression_items['model']
+                    if model != "Poor Quality Image Data":
+                        slope = model['slope']
+                        intercept = model['intercept']
+                        r_squared = model['r_squared']
+                        above_frac = regression_items['above_frac']
+                        below_frac = regression_items['below_frac']
+                        model_domain = regression_items['model_domain']
+                        ls_hist_counts = numpy_to_list(regression_items.get('ls_histogram')[0])
+                        ls_hist_bins = numpy_to_list(regression_items.get('ls_histogram')[1])
+                        s2_hist_counts = numpy_to_list(regression_items.get('s2_histogram')[0])
+                        s2_hist_bins = numpy_to_list(regression_items.get('s2_histogram')[1])
+                    else:
+                        slope = intercept = r_squared = "Poor Quality Image Data"
+                        model_domain = "Poor Quality Image Data"
+                        above_frac = below_frac = "Poor Quality Image Data"
+                        ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "Poor Quality Image Data"
+
+                summary = {
+                    'level': items['level'],
+                    'roi': items['roi'],
+                    'date': items['date'],
+                    'band_name': items['band_name'], 
+                    'buffer_delim': items['buffer_delim'],
+                    'buffer_delim_outer': items['buffer_delim_outer'],
+                    'sample_size': items['sample_size'],
+                    'outlier_frac': items['outlier_frac'], 
+                    'valid_pix_cnt': items['valid_pix_cnt'],
+                    'slope': slope,
+                    'intercept': intercept,
+                    'r_squared': r_squared,
+                    'above_frac': above_frac,
+                    'below_frac': below_frac,
+                    'model_domain': model_domain,
+                    'ls_hist_counts': ls_hist_counts,
+                    'ls_hist_bins': ls_hist_bins,
+                    's2_hist_counts': s2_hist_counts,
+                    's2_hist_bins': s2_hist_bins
+                }
+
+                regression_summaries.append(summary)
+
+    return(pd.DataFrame(regression_summaries))
 
