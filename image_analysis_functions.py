@@ -1,5 +1,6 @@
 # %% 1.0
 import random
+import ast
 from typing import Optional
 import os
 import re
@@ -724,23 +725,45 @@ def plot_otsu_histograms(
     Plots the NDWI histograms for Landsat and Sentinel-2 images
     """
     
-    # Access dictionary elements using iloc[0] and key names
-    ls_sr_threshold = sr['otsu_items'].iloc[0]['ls_threshold']
-    ls_sr_hist = sr['otsu_items'].iloc[0]['ls_hist'][0]
-    ls_sr_water_frac = sr['otsu_items'].iloc[0]['ls_water_frac']
-    ls_toa_threshold = toa['otsu_items'].iloc[0]['ls_threshold']
-    ls_toa_hist = toa['otsu_items'].iloc[0]['ls_hist'][0]
-    ls_toa_water_frac = toa['otsu_items'].iloc[0]['s2_water_frac']
+    # If the data was written to disk, it will be a string, 
+    # so convert it back to a dictionary
+    # The ast library should do this
+    # LS SR
+    ls_sr_threshold = sr['ls_threshold'].iloc[0]
+    ls_sr_hist = np.array(
+        ast.literal_eval(
+            sr['ls_hist_counts'].iloc[0]
+        )
+    )
+    ls_sr_water_frac = sr['ls_water_frac'].iloc[0]
+    # S2 SR
+    s2_sr_threshold = sr['s2_threshold'].iloc[0]
+    s2_sr_hist = np.array(
+        ast.literal_eval(
+            sr['s2_hist_counts'].iloc[0]
+        )
+    )
+    s2_sr_water_frac = sr['s2_water_frac'].iloc[0]
 
-    s2_sr_threshold = sr['otsu_items'].iloc[0]['s2_threshold']
-    s2_sr_hist = sr['otsu_items'].iloc[0]['s2_hist'][0]
-    s2_sr_water_frac = sr['otsu_items'].iloc[0]['s2_water_frac']
-    s2_toa_threshold = toa['otsu_items'].iloc[0]['s2_threshold']
-    s2_toa_hist = toa['otsu_items'].iloc[0]['s2_hist'][0]
-    s2_toa_water_frac = toa['otsu_items'].iloc[0]['s2_water_frac']
+    # LS TOA
+    ls_toa_threshold = toa['ls_threshold'].iloc[0]
+    ls_toa_hist = np.array(
+        ast.literal_eval(
+            toa['ls_hist_counts'].iloc[0]
+        )
+    )
+    ls_toa_water_frac = toa['ls_water_frac'].iloc[0]
+    # S2 TOA
+    s2_toa_threshold = toa['s2_threshold'].iloc[0]
+    s2_toa_hist = np.array(
+        ast.literal_eval(
+            toa['s2_hist_counts'].iloc[0]
+        )
+    )
+    s2_toa_water_frac = toa['s2_water_frac'].iloc[0]
 
     # Should all have the same bin edges...
-    bin_edges = sr['otsu_items'].iloc[0]['ls_hist'][1]
+    bin_edges = np.array(ast.literal_eval(sr['ls_hist_bins'].iloc[0]))
 
     # Create plot
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -821,18 +844,25 @@ def plot_reflectance_histograms(
     """
     Plots the Green or NIR histograms for Landsat and Sentinel-2 TOA/SR images
     """
+    print("James is dumb as hell")
     print(sr['regression_output'].iloc[0])
     # Access histograms for ls and s2 images
-    ls_sr_hist = sr['regression_output'].iloc[0]['ls_histogram'][0]
-    ls_toa_hist = toa['regression_output'].iloc[0]['ls_histogram'][0] 
-    s2_sr_hist = sr['regression_output'].iloc[0]['s2_histogram'][0]
-    s2_toa_hist = toa['regression_output'].iloc[0]['s2_histogram'][0]
+    ls_sr_hist_data = sr['regression_output'].iloc[0]['ls_histogram']
+    ls_toa_hist_data = toa['regression_output'].iloc[0]['ls_histogram']
+    s2_sr_hist_data = sr['regression_output'].iloc[0]['s2_histogram']
+    s2_toa_hist_data = toa['regression_output'].iloc[0]['s2_histogram']
+    
+    # Unpack counts and bins
+    ls_sr_counts, ls_sr_bins = ls_sr_hist_data
+    ls_toa_counts, _ = ls_toa_hist_data
+    s2_sr_counts, _ = s2_sr_hist_data
+    s2_toa_counts, _ = s2_toa_hist_data
 
     # Should all have the same bin edges...
-    bin_edges = sr['regression_output'].iloc[0]['ls_histogram'][1]
+    bin_edges = ls_sr_bins
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_hist))
+    ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_counts))
     ls_toa_mean = np.average(bin_centers, weights=np.array(ls_toa_hist))
     s2_sr_mean = np.average(bin_centers, weights=np.array(s2_sr_hist))
     s2_toa_mean = np.average(bin_centers, weights=np.array(s2_toa_hist))
@@ -915,4 +945,66 @@ def overlay_sr_toa_hist_reflect(regression_data: pd.DataFrame,
         return None
 
     plot_reflectance_histograms(sr, toa, band_name, date, roi, hist_range)
+
+def numpy_to_list(data):
+    """
+    Converts numpy arrays to lists for storage in a dataframe
+    """
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    else:
+        return data
+
+def make_otsu_area_summaries(image_info: dict, levels: list, rois: list, dates: list):
+
+    """
+    Takes all the levels, rois, and dates for analysis
+    Returns a dataframe with metrics for each image
+    """
+    area_summaries = []
+    for level in levels:
+        image_info['level'] = level
+        for roi in rois:
+            image_info['roi'] = roi
+            for date in dates:
+                image_info['date'] = date
+
+                # Calculate the Otsu thresholds and water fractions for each image
+                otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=True)
+                if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
+                    ls_s2_percent_diff = 'No Image Data'
+                else:
+                    ls_s2_percent_diff = (
+                        (otsu_items['ls_water_frac'] - otsu_items['s2_water_frac']) 
+                        / otsu_items['ls_water_frac']
+                    ) * 100
+
+                # Convert the numpy histogram objects to lists for storage
+                if otsu_items.get('ls_hist') == None:
+                    ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = 'Poor Quality Image'
+                else:
+                    ls_hist_counts = numpy_to_list(otsu_items.get('ls_hist')[0])
+                    ls_hist_bins = numpy_to_list(otsu_items.get('ls_hist')[1])
+                    s2_hist_counts = numpy_to_list(otsu_items.get('s2_hist')[0])
+                    s2_hist_bins = numpy_to_list(otsu_items.get('s2_hist')[1])
+
+                summary = {
+                    'date': date,
+                    'roi': roi,
+                    'level': level,
+                    'ls_threshold': otsu_items.get('ls_threshold'),
+                    'ls_water_frac': otsu_items.get('ls_water_frac'),
+                    's2_threshold': otsu_items.get('s2_threshold'),
+                    's2_water_frac': otsu_items.get('s2_water_frac'),
+                    'ls_hist_counts': ls_hist_counts,
+                    'ls_hist_bins': ls_hist_bins,
+                    's2_hist_counts': s2_hist_counts,
+                    's2_hist_bins': s2_hist_bins,
+                    'ls_s2_percent_diff': ls_s2_percent_diff
+                }
+                area_summaries.append(summary)
+
+    return pd.DataFrame(area_summaries)
+
+
 

@@ -5,7 +5,7 @@ import pandas as pd
 
 from image_analysis_functions import extract_unique
 from image_analysis_functions import regress_image_pairs
-from image_analysis_functions import otsu_image_wtr_area
+from image_analysis_functions import make_otsu_area_summaries
 
 
 toa_files = glob.glob('./data/toa_images/*tif')
@@ -114,36 +114,7 @@ mask_params['buffer_delim'] = 120
 # %% 3.2 NIR Band PLD 120 meter buffered
 
 # %% 3.3 NDWI Band PLD 120 meter buffered
-
-area_summaries = []
-
-for level in levels:
-    image_info['level'] = level
-    for roi in rois:
-        image_info['roi'] = roi
-        for date in image_dates:
-            image_info['date'] = date
-
-            otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=True)
-            if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
-                ls_s2_percent_diff = 'No Image Data'
-            else:
-                ls_s2_percent_diff = (
-                    (otsu_items['ls_water_frac'] - otsu_items['s2_water_frac']) 
-                    / otsu_items['ls_water_frac']
-                ) * 100
-
-            summary = {
-                'date': date,
-                'roi': roi,
-                'level': level,
-                'otsu_items': otsu_items,
-                'ls_s2_percent_diff': ls_s2_percent_diff
-            }
-
-            area_summaries.append(summary)
-
-# %%
-
-out_df = pd.DataFrame(area_summaries)
+out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates)
 out_df = out_df[out_df['ls_s2_percent_diff'] != 'No Image Data']
+out_df.to_csv('./data/area_data_v1.csv', index=False)
+
