@@ -239,18 +239,21 @@ def regress_reflectance(
             # Compute thresholds for lower and upper percentiles
             lower_thresh = np.percentile(sample_data, outlier_frac * 100)
             upper_thresh = np.percentile(sample_data, 100 - outlier_frac * 100)
-            
+
             # Create a copy of the sample data
             filtered_data = sample_data.copy()
             # Replace values below the lower threshold or above the upper threshold with np.nan
-            filtered_data[(sample_data > lower_thresh) | (sample_data < upper_thresh)] = np.nan
+            filtered_data = np.where(filtered_data < lower_thresh, np.nan, filtered_data)
+            filtered_data = np.where(filtered_data > upper_thresh, np.nan, filtered_data)
 
             return filtered_data
 
         ls_filtered = outlier_filter(ls_sample, outlier_frac)
         s2_filtered = outlier_filter(s2_sample, outlier_frac)
         
-        nan_mask = np.isnan(ls_filtered) | np.isnan(s2_filtered)
+        # Filter both arrays using same mask
+        nan_mask = np.isnan(ls_filtered) & np.isnan(s2_filtered)
+        print(sum(nan_mask == True))
         
         # Filter both arrays using same mask
         ls_modeled = ls_sample[nan_mask]

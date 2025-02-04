@@ -7,6 +7,7 @@ from image_analysis_functions import extract_unique
 from image_analysis_functions import regress_image_pairs
 from image_analysis_functions import otsu_image_wtr_area
 
+
 toa_files = glob.glob('./data/toa_images/*tif')
 sr_files = glob.glob('./data/sr_images/*.tif')
 full_files = toa_files + sr_files
@@ -36,7 +37,7 @@ mask_params = {
 
 regression_params = {
     'sample_size': 50_000,
-    'outlier_frac': 0.001
+    'outlier_frac': 0.02,
 }
 
 # %% 2.1 Green Band PLD 60 meter buffered
