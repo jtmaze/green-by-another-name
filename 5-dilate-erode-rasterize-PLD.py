@@ -9,7 +9,7 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'YKD_sub1'
+roi_name = 'TUK_sub1'
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]

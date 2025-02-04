@@ -37,7 +37,7 @@ mask_params = {
 
 regression_params = {
     'sample_size': 50_000,
-    'outlier_frac': 0.02,
+    'outlier_frac': 0.0005,
 }
 
 # %% 2.1 Green Band PLD 60 meter buffered
@@ -71,6 +71,7 @@ for level in levels:
 # %% 2.3 NDWI Band PLD 60 meter buffered
 
 image_info['band_name'] = 'NDWI'
+regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
 
 for level in levels:
     image_info['level'] = level
@@ -82,14 +83,37 @@ for level in levels:
             regression_summary = regress_image_pairs(image_info, mask_params, regression_params, hist_return=False)
             regression_summaries.append(regression_summary)
 
+regression_params['outlier_frac'] = 0.0005
 
-# %%
+
+# %% 2.4 Save the 60m Lake regression summaries to a csv
 
 out_df = pd.DataFrame(regression_summaries)
-out_df = out_df[out_df['model_domain'] == 'No Image Data']
-out_df.to_csv('./data/regression_summaries.csv', index=False)
+out_df.head(25)
 
 # %%
+out_df = out_df[out_df['regression_output'] != 'No Image Data']
+# Create mask for valid model outputs
+mask = out_df['regression_output'].apply(lambda x: x['model'] != 'Poor Quality Image Data')
+# Apply mask to filter dataframe
+out_df = out_df[mask]
+out_df.head(20)
+
+# %%
+out_df.to_csv('./data/regression_summaries_60m_lake.csv', index=False)
+
+# %% 3.0 Make regression summaries for land (PLD 120 meter buffered)
+
+# Update mask params
+mask_params['zone'] = 'land'
+mask_params['buffer_delim'] = 120
+
+
+# %% 3.1 Green Band PLD 120 meter buffered
+
+# %% 3.2 NIR Band PLD 120 meter buffered
+
+# %% 3.3 NDWI Band PLD 120 meter buffered
 
 area_summaries = []
 

@@ -19,8 +19,6 @@ from rasterio.warp import Resampling
 
 random.seed(20)
 
-# %% 
-
 """
 ####################################
 ------------------------------------
@@ -221,6 +219,7 @@ def regress_reflectance(
     model = None
     model_domain = None
     ls_histogram = s2_histogram = None
+    above_frac = below_frac = None
 
     sample_size = ls_sample.size
     if sample_size < 10_000:
@@ -228,6 +227,7 @@ def regress_reflectance(
         model = 'Poor Quality Image Data'
         model_domain = 'Poor Quality Image Data'
         ls_histogram = s2_histogram = 'Poor Quality Image Data'
+        above_frac = below_frac = 'Poor Quality Image Data'
 
     else:
         def outlier_filter(sample_data: np.array, outlier_frac: float):
@@ -237,13 +237,13 @@ def regress_reflectance(
             Returns the filtered array.
             """
             # Compute thresholds for lower and upper percentiles
-            lower_thresh = np.percentile(sample_data, outlier_frac * 100)
+            #lower_thresh = np.percentile(sample_data, outlier_frac * 100)
             upper_thresh = np.percentile(sample_data, 100 - outlier_frac * 100)
 
             # Create a copy of the sample data
             filtered_data = sample_data.copy()
             # Replace values below the lower threshold or above the upper threshold with np.nan
-            filtered_data = np.where(filtered_data < lower_thresh, np.nan, filtered_data)
+            #filtered_data = np.where(filtered_data < lower_thresh, np.nan, filtered_data)
             filtered_data = np.where(filtered_data > upper_thresh, np.nan, filtered_data)
 
             return filtered_data
@@ -252,8 +252,7 @@ def regress_reflectance(
         s2_filtered = outlier_filter(s2_sample, outlier_frac)
         
         # Filter both arrays using same mask
-        nan_mask = np.isnan(ls_filtered) & np.isnan(s2_filtered)
-        print(sum(nan_mask == True))
+        nan_mask = ~np.isnan(ls_filtered) & ~np.isnan(s2_filtered)
         
         # Filter both arrays using same mask
         ls_modeled = ls_sample[nan_mask]
@@ -293,7 +292,6 @@ def regress_reflectance(
             np.max([ls_modeled.max(), s2_modeled.max()])
         )
 
-
         # Make a fit-line from the model
         # Becuase Landsat is x-axis use it to make the domain
         xmin_val = np.nanmin(ls_modeled)
@@ -326,7 +324,18 @@ def regress_reflectance(
             ls_histogram = np.histogram(ls_modeled, bins=100)
             s2_histogram = np.histogram(s2_modeled, bins=100)
 
+        # Find the portion of pixels above/below the 45 degree line   
+    
+        below = np.where(ls_modeled > s2_modeled, 1, 0)
+        above = np.where(ls_modeled < s2_modeled, 1, 0)
+        below_frac = np.sum(below) / sample_size * 100
+        above_frac = np.sum(above) / sample_size * 100
+        print(f'Pixels above 45 degree line: {above_frac:.2f}')
+        print(f'Pixels below 45 degree line: {below_frac:.2f}')
+
     return {'model': model, 
+            'above_frac': above_frac,
+            'below_frac': below_frac,
             'model_domain': model_domain, 
             'ls_histogram': ls_histogram, 
             's2_histogram': s2_histogram}
@@ -812,15 +821,15 @@ def plot_reflectance_histograms(
     """
     Plots the Green or NIR histograms for Landsat and Sentinel-2 TOA/SR images
     """
-    
+    print(sr['regression_output'].iloc[0])
     # Access histograms for ls and s2 images
-    ls_sr_hist = sr['ls_histogram'].iloc[0][0]
-    ls_toa_hist = toa['ls_histogram'].iloc[0][0]
-    s2_sr_hist = sr['s2_histogram'].iloc[0][0]
-    s2_toa_hist = toa['s2_histogram'].iloc[0][0]
+    ls_sr_hist = sr['regression_output'].iloc[0]['ls_histogram'][0]
+    ls_toa_hist = toa['regression_output'].iloc[0]['ls_histogram'][0] 
+    s2_sr_hist = sr['regression_output'].iloc[0]['s2_histogram'][0]
+    s2_toa_hist = toa['regression_output'].iloc[0]['s2_histogram'][0]
 
     # Should all have the same bin edges...
-    bin_edges = sr['ls_histogram'].iloc[0][1]
+    bin_edges = sr['regression_output'].iloc[0]['ls_histogram'][1]
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
     ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_hist))
@@ -906,5 +915,4 @@ def overlay_sr_toa_hist_reflect(regression_data: pd.DataFrame,
         return None
 
     plot_reflectance_histograms(sr, toa, band_name, date, roi, hist_range)
-
 

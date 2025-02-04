@@ -13,8 +13,8 @@ from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
 level = 'toa' #level should be 'sr' or 'toa'
-roi_name = 'MRD_sub1'
-utm_epsg = 'EPSG:32608' 
+roi_name = 'TUK_sub1'
+utm_epsg = 'EPSG:32609' 
 
 """
 EPSG Codes for Sites:
@@ -22,6 +22,8 @@ YKF_sub1: EPSG:32606
 AKCP_sub1: EPSG:32605
 YKD_sub1: EPSG:32603
 MRD_sub1: EPSG: 32608
+AKCP_sub2: EPSG: 32604
+TUK_sub1: EPSG: 32609
 """
 # Dictionary to add description to bands based on the
 band_desc = {

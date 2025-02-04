@@ -12,7 +12,7 @@ from rasterio.transform import from_bounds
 import skimage as ski
 from skimage.morphology import binary_dilation
 
-roi_name = 'MRD_sub1'
+roi_name = 'TUK_sub1'
 out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
 buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 
@@ -38,8 +38,9 @@ def clip_dilate_rivers(rivers: gpd.GeoDataFrame, roi: gpd.GeoDataFrame, buffer_d
     """"""
     # Conversion to ROI's local UTM zone
     est_utm = rivers.estimate_utm_crs()
-    roi_utm = roi.to_crs(est_utm)
-    rivers_utm = rivers.to_crs(est_utm)
+    est_utm_roi = roi.estimate_utm_crs()
+    roi_utm = roi.to_crs(est_utm_roi)
+    rivers_utm = rivers.to_crs(est_utm_roi)
     # Clip the rivers to roi and buffer thier shapes
     clipped_rivers = gpd.clip(rivers_utm, roi_utm)
     dilated_rivers = clipped_rivers.buffer(buffer_dist)
@@ -93,6 +94,7 @@ def make_river_mask(bounds: tuple,
 # %% 3.0 Run the functions
 
 rivers_dilated, bounds = clip_dilate_rivers(rivers, roi, buffer_dist)
+print(rivers_dilated.crs)
 make_river_mask(bounds, rivers_dilated, out_res, out_path)
 
 # %%
