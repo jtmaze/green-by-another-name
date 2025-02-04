@@ -28,7 +28,13 @@ Processing functions
 ------------------------------------
 ####################################
 """
-
+def extract_unique(files: list, pattern: re.Pattern[str]):
+    unique_items = set()
+    for f in files:
+        match = re.search(pattern, f)
+        if match:
+            unique_items.add(match.group(1))
+    return list(unique_items)
 
 def check_match_imgs(ls_fp: str, s2_fp: str, image_info: dict):
 
@@ -212,6 +218,10 @@ def regress_reflectance(
         hist_return: bool
     ): 
 
+    model = None
+    model_domain = None
+    ls_histogram = s2_histogram = None
+
     sample_size = ls_sample.size
     if sample_size < 10_000:
         print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
@@ -220,28 +230,31 @@ def regress_reflectance(
         ls_histogram = s2_histogram = 'Poor Quality Image Data'
 
     else:
-        def outlier_filter(sample_data1: np.array, sample_data2, outlier_frac: float):
+        def outlier_filter(sample_data: np.array, outlier_frac: float):
             """
-            Returns the domain to model given X% of outliers removed from low and high
+            Replaces the lowest and highest outlier_frac fraction of values in sample_data with numpy.nan.
+            For example, if outlier_frac is 0.05, the lower 5% and upper 5% of values are replaced with nan.
+            Returns the filtered array.
             """
-            sample_data = np.concatenate((sample_data1, sample_data2))
-            # size of data
-            omit_count = round(sample_data.size * outlier_frac)
-            # sort the data from high to low
-            asc_sorted = np.sort(sample_data)
-            trimmed = asc_sorted[omit_count: -omit_count]
-            domain = (trimmed[0] - 0.0001, trimmed[-1] + 0.0001)
+            # Compute thresholds for lower and upper percentiles
+            lower_thresh = np.percentile(sample_data, outlier_frac * 100)
+            upper_thresh = np.percentile(sample_data, 100 - outlier_frac * 100)
+            
+            # Create a copy of the sample data
+            filtered_data = sample_data.copy()
+            # Replace values below the lower threshold or above the upper threshold with np.nan
+            filtered_data[(sample_data > lower_thresh) | (sample_data < upper_thresh)] = np.nan
 
-            return domain
+            return filtered_data
 
-        model_domain = outlier_filter(ls_sample, s2_sample, outlier_frac)
-        lower, upper = model_domain
+        ls_filtered = outlier_filter(ls_sample, outlier_frac)
+        s2_filtered = outlier_filter(s2_sample, outlier_frac)
         
-        domain_mask = (ls_sample >= lower) & (ls_sample <= upper) & (s2_sample >= lower) & (s2_sample <= upper)
+        nan_mask = np.isnan(ls_filtered) | np.isnan(s2_filtered)
         
         # Filter both arrays using same mask
-        ls_modeled = ls_sample[domain_mask]
-        s2_modeled = s2_sample[domain_mask]
+        ls_modeled = ls_sample[nan_mask]
+        s2_modeled = s2_sample[nan_mask]
 
         def rma_regression(x: np.array, y: np.array):
             """
@@ -272,6 +285,11 @@ def regress_reflectance(
             return {'slope': slope, 'intercept': intercept, 'r_squared': r_squared}
 
         model = rma_regression(ls_modeled, s2_modeled)
+        model_domain = (
+            np.min([ls_modeled.min(), s2_modeled.min()]), 
+            np.max([ls_modeled.max(), s2_modeled.max()])
+        )
+
 
         # Make a fit-line from the model
         # Becuase Landsat is x-axis use it to make the domain
@@ -304,10 +322,11 @@ def regress_reflectance(
         if hist_return == True:
             ls_histogram = np.histogram(ls_modeled, bins=100)
             s2_histogram = np.histogram(s2_modeled, bins=100)
-        else:
-            ls_histogram = s2_histogram = None
 
-    return model, model_domain, ls_histogram, s2_histogram
+    return {'model': model, 
+            'model_domain': model_domain, 
+            'ls_histogram': ls_histogram, 
+            's2_histogram': s2_histogram}
 
 def get_pixel_samples(ls8_path: str,
                       s2_path: str,
@@ -423,9 +442,9 @@ def regress_image_pairs(image_info: dict,
             )
         # Run regression function
         print(f'{level} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
-        model, model_domain, ls_histogram, s2_histogram = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return)
+        regression_output = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return)
     else: # Return no image data if matching images not found
-        model = model_domain = valid_pix_cnt = ls_histogram = s2_histogram = "No Image Data"
+        valid_pix_cnt = regression_output = "No Image Data"
 
     return {
         'level': level,
@@ -437,12 +456,8 @@ def regress_image_pairs(image_info: dict,
         'buffer_delim_outer': buffer_delim_outer,
         'sample_size': sample_size,
         'outlier_frac': outlier_frac,
-        'model_domain': model_domain,
-        'model': model,
-        'model_domain': model_domain,
         'valid_pix_cnt': valid_pix_cnt,
-        'ls_histogram': ls_histogram,
-        's2_histogram': s2_histogram
+        'regression_output': regression_output
     }
 
 def calc_ndwi(
@@ -889,250 +904,4 @@ def overlay_sr_toa_hist_reflect(regression_data: pd.DataFrame,
 
     plot_reflectance_histograms(sr, toa, band_name, date, roi, hist_range)
 
-    
 
-
-
-# %% Run the functions:
-"""
-####################################
-------------------------------------
-Make dictionaries to hold parameters
-------------------------------------
-####################################
-"""
-
-image_info = {
-    'level': 'toa',
-    'date': '2021-07-01', # Dates will be itterated through
-    'roi': 'YKF_sub1', # ROIs will be itterated through
-    'band_name': 'Green'
-}
-mask_params = {
-    'zone': 'lake',
-    'buffer_delim': 60,
-    'buffer_delim_outer': None,
-}
-regression_params = {
-    'sample_size': 50_000,
-    'outlier_frac': 0.01
-}
-# %%
-
-"""
-####################################
-------------------------------------
-Gather all the combinations of rois and dates
-------------------------------------
-####################################
-"""
-
-toa_files = glob.glob('./data/toa_images/*tif')
-sr_files = glob.glob('./data/sr_images/*.tif')
-full_files = toa_files + sr_files
-
-date_pattern = r'_date_(.*?)_roi'
-roi_pattern = r'_roi_(.*?)_resampled'
-
-def extract_unique(files: list, pattern: re.Pattern[str]):
-    unique_items = set()
-    for f in files:
-        match = re.search(pattern, f)
-        if match:
-            unique_items.add(match.group(1))
-    return list(unique_items)
-
-image_dates = extract_unique(full_files, date_pattern)
-rois = extract_unique(full_files, roi_pattern)
-levels = ['sr', 'toa']
-
-# %%
-image_info = {
-    'level': 'toa',
-    'date': '2021-07-01', # Dates will be itterated through
-    'roi': 'YKF_sub1', # ROIs will be itterated through
-    'band_name': 'Green'
-}
-
-rois = extract_unique(full_files, roi_pattern)
-levels = ['sr', 'toa']
-image_dates = ['2021-09-09', '2021-08-02', '2020-07-15', '2024-06-15']
-
-mask_params = {
-    'zone': 'lake',
-    'buffer_delim': 60,
-    'buffer_delim_outer': None,
-}
-
-# %%
-
-"""
-####################################
-------------------------------------
-Make Green Band Regression Models
-------------------------------------
-####################################
-"""
-
-image_info['band_name'] = 'Green'
-regression_summaries = []
-
-for level in levels:
-    for roi in rois:
-            for dt in image_dates:
-
-                image_info['level'] = level
-                image_info['roi'] = roi
-                image_info['date'] = dt
-
-                summary = regress_image_pairs(
-                    image_info=image_info,
-                    mask_params=mask_params,
-                    regression_params=regression_params,
-                    hist_return=True
-                )
-
-                regression_summaries.append(summary)
-
-print("Done making regression summaries")
-
-# %% 
-
-"""
-####################################
-------------------------------------
-Make NIR Band Regression Models
-------------------------------------
-####################################
-"""
-
-image_info['band_name'] = 'NIR'
-
-for level in levels:
-    for roi in rois:
-            for dt in image_dates:
-
-                image_info['level'] = level
-                image_info['roi'] = roi
-                image_info['date'] = dt
-
-                summary = regress_image_pairs(
-                    image_info=image_info,
-                    mask_params=mask_params,
-                    regression_params=regression_params,
-                    hist_return=True
-                )
-
-                regression_summaries.append(summary)
-
-print("Done making regression summaries")
-
-# %%
-
-"""
-####################################
-------------------------------------
-Make NDWI Regression Models
-------------------------------------
-####################################
-"""
-
-# image_info['band_name'] = 'NDWI'
-
-# for level in levels:
-#     for roi in rois:
-#             for dt in image_dates:
-
-#                 image_info['level'] = level
-#                 image_info['roi'] = roi
-#                 image_info['date'] = dt
-
-#                 summary = regress_image_pairs(
-#                     image_info=image_info,
-#                     mask_params=mask_params,
-#                     regression_params=regression_params,
-#                     hist_return=True
-#                 )
-
-#                 regression_summaries.append(summary)
-
-# print("Done making regression summaries")
-
-
-
-# %%
-
-df_regression_summary = pd.DataFrame(regression_summaries)
-#df_regression_summary.to_csv('./data/regression_results_60m_-60m_shoreline.csv', index=False)
-regression_summary_clean = df_regression_summary[df_regression_summary['model_domain'] != 'No Image Data']
-
-
-# %%
-
-"""
-####################################
-------------------------------------
-Calculate water area for different images
-------------------------------------
-####################################
-"""
-
-area_summaries = []
-
-for level in levels:
-    for roi in rois:
-        for dt in image_dates:
-            image_info['date'] = dt
-            image_info['roi'] = roi
-            image_info['level'] = level
-
-
-
-            otsu_items = otsu_image_wtr_area(image_info, write_mask=False, hist_return=True)
-            if otsu_items['ls_threshold'] == 'No Image Data' or otsu_items['ls_threshold'] == 'Poor Quality Image':
-                ls_s2_percent_diff = 'No Image Data'
-            else:
-                ls_s2_percent_diff = (
-                    (otsu_items['ls_water_frac'] - otsu_items['s2_water_frac']) 
-                    / otsu_items['ls_water_frac']
-                ) * 100
-
-            summary = {
-                'date': dt,
-                'roi': roi,
-                'level': level,
-                'otsu_items': otsu_items,
-                'ls_s2_percent_diff': ls_s2_percent_diff
-            }
-
-            area_summaries.append(summary)
-
-print("Done calculating water area")
-
-# %%
-
-df_area_summary = pd.DataFrame(area_summaries)
-df_area = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
-df_area.head(20)
-
-   
-# %%
-
-comp_params = {
-    'roi': 'YKF_sub1',
-    'date': '2021-08-02'
-}
-
-overlay_sr_toa_hist_otsu(summary_data=df_area_summary, roi=comp_params['roi'], date=comp_params['date'])
-
-overlay_sr_toa_hist_reflect(regression_data=regression_summary_clean, roi=comp_params['roi'], date=comp_params['date'], band_name='Green', hist_range=(0.0, 0.1))
-overlay_sr_toa_hist_reflect(regression_data=regression_summary_clean, roi=comp_params['roi'], date=comp_params['date'], band_name='NIR', hist_range=(0.0, 0.15))
-
-
-# %% 
-
-df_area_summary = pd.DataFrame(area_summaries)
-df_area_clean = df_area_summary[df_area_summary['ls_s2_percent_diff'] != 'No Image Data']
-print(df_area_clean)
-
-#df_area_summary.to_csv('./data/area_results.csv', index=False)
