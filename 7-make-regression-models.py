@@ -70,12 +70,10 @@ out_df = pd.DataFrame(regression_summaries)
 out_df.head(25)
 
 # %%
-out_df = out_df[out_df['regression_output'] != 'No Image Data']
+out_df = df[df['slope'] != 'No Image Data']
 # Create mask for valid model outputs
-mask = out_df['regression_output'].apply(lambda x: x['model'] != 'Poor Quality Image Data')
-# Apply mask to filter dataframe
-out_df = out_df[mask]
-out_df.head(20)
+out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
+out_df.to_csv('./data/test_60m_lake.csv', index=False)
 
 # %%
 out_df.to_csv('./data/regression_summaries_60m_lake.csv', index=False)

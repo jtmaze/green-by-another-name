@@ -1,3 +1,9 @@
+import ast
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+
 def plot_otsu_histograms(
     sr: pd.Series,
     toa: pd.Series,
@@ -127,37 +133,46 @@ def plot_reflectance_histograms(
     """
     Plots the Green or NIR histograms for Landsat and Sentinel-2 TOA/SR images
     """
-    print("James is dumb as hell")
-    print(sr['regression_output'].iloc[0])
     # Access histograms for ls and s2 images
-    ls_sr_hist_data = sr['regression_output'].iloc[0]['ls_histogram']
-    ls_toa_hist_data = toa['regression_output'].iloc[0]['ls_histogram']
-    s2_sr_hist_data = sr['regression_output'].iloc[0]['s2_histogram']
-    s2_toa_hist_data = toa['regression_output'].iloc[0]['s2_histogram']
-    
-    # Unpack counts and bins
-    ls_sr_counts, ls_sr_bins = ls_sr_hist_data
-    ls_toa_counts, _ = ls_toa_hist_data
-    s2_sr_counts, _ = s2_sr_hist_data
-    s2_toa_counts, _ = s2_toa_hist_data
+    ls_sr_hist_data = np.array(
+        ast.literal_eval(
+            sr['ls_hist_counts'].iloc[0]
+        )
+    )
+    ls_toa_hist_data = np.array(
+        ast.literal_eval(
+            toa['ls_hist_counts'].iloc[0]
+        )
+    )
+    s2_sr_hist_data = np.array(
+        ast.literal_eval(
+            sr['s2_hist_counts'].iloc[0]
+        )
+    )
+    s2_toa_hist_data = np.array(
+        ast.literal_eval(
+            toa['s2_hist_counts'].iloc[0]
+        )
+    )
+
 
     # Should all have the same bin edges...
-    bin_edges = ls_sr_bins
+    bin_edges = np.array(ast.literal_eval(sr['ls_hist_bins'].iloc[0]))
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_counts))
-    ls_toa_mean = np.average(bin_centers, weights=np.array(ls_toa_hist))
-    s2_sr_mean = np.average(bin_centers, weights=np.array(s2_sr_hist))
-    s2_toa_mean = np.average(bin_centers, weights=np.array(s2_toa_hist))
+    ls_sr_mean = np.average(bin_centers, weights=np.array(ls_sr_hist_data))
+    ls_toa_mean = np.average(bin_centers, weights=np.array(ls_toa_hist_data))
+    s2_sr_mean = np.average(bin_centers, weights=np.array(s2_sr_hist_data))
+    s2_toa_mean = np.average(bin_centers, weights=np.array(s2_toa_hist_data))
 
     mask = (bin_centers >= hist_range[0]) & (bin_centers <= hist_range[1])
     
     # Crop the bin centers and histograms by the mask
     bin_centers_cropped = bin_centers[mask]
-    ls_sr_hist_cropped = np.array(ls_sr_hist)[mask]
-    ls_toa_hist_cropped = np.array(ls_toa_hist)[mask]
-    s2_sr_hist_cropped = np.array(s2_sr_hist)[mask]
-    s2_toa_hist_cropped = np.array(s2_toa_hist)[mask]
+    ls_sr_hist_cropped = np.array(ls_sr_hist_data)[mask]
+    ls_toa_hist_cropped = np.array(ls_toa_hist_data)[mask]
+    s2_sr_hist_cropped = np.array(s2_sr_hist_data)[mask]
+    s2_toa_hist_cropped = np.array(s2_toa_hist_data)[mask]
 
     # Create plot
     fig, ax = plt.subplots(figsize=(12, 6))
