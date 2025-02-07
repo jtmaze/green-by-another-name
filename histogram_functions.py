@@ -58,16 +58,16 @@ def plot_otsu_histograms(
     fig, ax = plt.subplots(figsize=(12, 6))
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     # Plot histogram lines
-    ax.plot(bin_centers, ls_sr_hist, linestyle='-', color='red', label='Landsat SR', linewidth=2)
-    ax.plot(bin_centers, s2_sr_hist, linestyle='-', color='green', label='Sentinel-2 SR', linewidth=2)
-    ax.plot(bin_centers, ls_toa_hist, linestyle=':', color='red', label='Landsat TOA', linewidth=4)
-    ax.plot(bin_centers, s2_toa_hist, linestyle=':', color='green', label='Sentinel-2 TOA', linewidth=4)
+    ax.plot(bin_centers, ls_sr_hist, linestyle='-', color='brown', label='Landsat SR', linewidth=2)
+    ax.plot(bin_centers, s2_sr_hist, linestyle='-', color='blue', label='Sentinel-2 SR', linewidth=2)
+    ax.plot(bin_centers, ls_toa_hist, linestyle=':', color='brown', label='Landsat TOA', linewidth=4)
+    ax.plot(bin_centers, s2_toa_hist, linestyle=':', color='blue', label='Sentinel-2 TOA', linewidth=4)
 
     # Add threshold lines
-    ax.axvline(x=ls_sr_threshold, color='red', linestyle='-', linewidth=3)
-    ax.axvline(x=s2_sr_threshold, color='green', linestyle='-', linewidth=3)
-    ax.axvline(x=ls_toa_threshold, color='red', linestyle=':', linewidth=3)
-    ax.axvline(x=s2_toa_threshold, color='green', linestyle=':', linewidth=3)
+    ax.axvline(x=ls_sr_threshold, color='brown', linestyle='-', linewidth=3)
+    ax.axvline(x=s2_sr_threshold, color='blue', linestyle='-', linewidth=3)
+    ax.axvline(x=ls_toa_threshold, color='brown', linestyle=':', linewidth=3)
+    ax.axvline(x=s2_toa_threshold, color='blue', linestyle=':', linewidth=3)
 
     # Text boxes
     ax.text(
@@ -78,7 +78,7 @@ def plot_otsu_histograms(
         va='top',
         transform=ax.transAxes,
         fontweight='bold',
-        bbox=dict(facecolor='black', alpha=1, edgecolor='red')
+        bbox=dict(facecolor='black', alpha=1, edgecolor='brown')
     )
     ax.text(
         0.95, 0.89,
@@ -88,7 +88,7 @@ def plot_otsu_histograms(
         va='top',
         transform=ax.transAxes,
         fontweight='bold',
-        bbox=dict(facecolor='black', alpha=1, edgecolor='green')
+        bbox=dict(facecolor='black', alpha=1, edgecolor='blue')
     )
     ax.text(
         0.95, 0.80,
@@ -98,7 +98,7 @@ def plot_otsu_histograms(
         va='top',
         transform=ax.transAxes,
         fontweight='bold',
-        bbox=dict(facecolor='black', alpha=1, edgecolor='red')
+        bbox=dict(facecolor='black', alpha=1, edgecolor='brown')
     )
     ax.text(
         0.95, 0.74,
@@ -108,7 +108,7 @@ def plot_otsu_histograms(
         va='top',
         transform=ax.transAxes,
         fontweight='bold',
-        bbox=dict(facecolor='black', alpha=1, edgecolor='green')
+        bbox=dict(facecolor='black', alpha=1, edgecolor='blue')
     )
 
     # Customize plot
@@ -176,16 +176,16 @@ def plot_reflectance_histograms(
 
     # Create plot
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(bin_centers_cropped, ls_sr_hist_cropped, linestyle='-', color='red', label='Landsat SR', linewidth=2)
-    ax.plot(bin_centers_cropped, s2_sr_hist_cropped, linestyle='-', color='green', label='Sentinel-2 SR', linewidth=2)
-    ax.plot(bin_centers_cropped, ls_toa_hist_cropped, linestyle=':', color='red', label='Landsat TOA', linewidth=4)
-    ax.plot(bin_centers_cropped, s2_toa_hist_cropped, linestyle=':', color='green', label='Sentinel-2 TOA', linewidth=4)
+    ax.plot(bin_centers_cropped, ls_sr_hist_cropped, linestyle='-', color='brown', label='Landsat SR', linewidth=2)
+    ax.plot(bin_centers_cropped, s2_sr_hist_cropped, linestyle='-', color='blue', label='Sentinel-2 SR', linewidth=2)
+    ax.plot(bin_centers_cropped, ls_toa_hist_cropped, linestyle=':', color='brown', label='Landsat TOA', linewidth=4)
+    ax.plot(bin_centers_cropped, s2_toa_hist_cropped, linestyle=':', color='blue', label='Sentinel-2 TOA', linewidth=4)
 
     # Add histogram means
-    ax.axvline(x=ls_sr_mean, color='red', linestyle='-', linewidth=3)
-    ax.axvline(x=s2_sr_mean, color='green', linestyle='-', linewidth=3)
-    ax.axvline(x=ls_toa_mean, color='red', linestyle=':', linewidth=3)
-    ax.axvline(x=s2_toa_mean, color='green', linestyle=':', linewidth=3)
+    ax.axvline(x=ls_sr_mean, color='brown', linestyle='-', linewidth=3)
+    ax.axvline(x=s2_sr_mean, color='blue', linestyle='-', linewidth=3)
+    ax.axvline(x=ls_toa_mean, color='brown', linestyle=':', linewidth=3)
+    ax.axvline(x=s2_toa_mean, color='blue', linestyle=':', linewidth=3)
 
     # Customize plot
     ax.set_xlabel('Value')
