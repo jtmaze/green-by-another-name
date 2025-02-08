@@ -35,18 +35,22 @@ for r in unique_rois:
         columns={'formatted_': 'date'})
     
     # Read the original roi to find the % coincident overlap on a given date.
-    roi_files_path = glob.glob('./data/roi_shapes/*.shp')
-    roi_file = [f for f in roi_files_path if re.search(fr'{r}.*\_shape.shp$', f)][0]
-    roi_shape = gpd.read_file(roi_file)
-    roi_est_crs = roi_shape.estimate_utm_crs()
-    roi_shape = roi_shape.to_crs(roi_est_crs)
+    roi_prefix = r.split('_')[0]
+    file = f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp'
+    sub_rois = gpd.read_file(file)
+    roi = sub_rois[sub_rois['sub_name'] == r]
+    roi_epsg = roi['utm_epsg'].iloc[0]
+    est_utm_crs = roi.estimate_utm_crs()
+    print(f'string epsg -- {roi_epsg} || estimated -- {est_utm_crs}')
+
+    roi_shape = roi.geometry
+    roi_shape = roi_shape.to_crs(est_utm_crs)
     roi_area = (roi_shape.geometry.iloc[0].area / 1_000_000)
     print(f'{roi_area} in square kilometers')
-    print(f'{r} utm is {roi_est_crs}')
 
     # Convert to local UTM for area opperations
-    ls8_footprints = ls8_footprints.to_crs(roi_est_crs)
-    s2_footprints = s2_footprints.to_crs(roi_est_crs)
+    ls8_footprints = ls8_footprints.to_crs(est_utm_crs)
+    s2_footprints = s2_footprints.to_crs(est_utm_crs)
     merged = ls8_footprints.merge(s2_footprints,
                                   on='date',
                                   suffixes=('_ls8', '_s2'))
@@ -57,7 +61,7 @@ for r in unique_rois:
         axis=1
     )
     merged = merged.set_geometry('inter')
-    merged.crs = roi_est_crs
+    merged.crs = est_utm_crs
     
     merged['int_sqkm'] = (merged['inter'].area / 1_000_000).round(2)
 
