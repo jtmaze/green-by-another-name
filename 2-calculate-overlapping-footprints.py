@@ -27,8 +27,9 @@ unique_rois = extract_unique(footprint_file_list, roi_pattern)
 
 for r in unique_rois:
     # Read footprints and rename the date column
-    ls8_path = [f for f in footprint_file_list if re.search(fr'footprints_ls8_roi_{r}.*\.shp$', f)][0]
-    s2_path = [f for f in footprint_file_list if re.search(fr'footprints_s2_roi_{r}.*\.shp$', f)][0]
+    print(r)
+    ls8_path = [f for f in footprint_file_list if re.search(fr'footprints_ls8_roi_{r}_years.*\.shp$', f)][0]
+    s2_path = [f for f in footprint_file_list if re.search(fr'footprints_s2_roi_{r}_years.*\.shp$', f)][0]
     ls8_footprints = gpd.read_file(ls8_path).rename(
         columns={'formatted_': 'date'})
     s2_footprints = gpd.read_file(s2_path).rename(
