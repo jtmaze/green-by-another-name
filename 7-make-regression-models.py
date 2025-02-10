@@ -42,6 +42,7 @@ regression_params = {
 
 # %% 2.1 Green Band PLD 60 meter buffered
 image_info['band_name'] = 'Green'
+levels = ['toa']
 
 green_df = make_reflectance_summaries(
     image_info=image_info,
@@ -68,6 +69,7 @@ nir_df = make_reflectance_summaries(
 )
 print("Done")
 # 2.3 NDWI Band PLD 60 meter buffered
+# %%
 
 image_info['band_name'] = 'NDWI'
 regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
@@ -140,8 +142,9 @@ nir_df = make_reflectance_summaries(
 
 print("Done")
 
-# %% 3.3 Write the land Green and NIR bands to a csv
+# %% 3.3 Write PLD 120m buffered regressions to a csv
 out_df = pd.concat([green_df, nir_df])
+print(len(out_df))
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv('./data/regression_summaries_120m_land.csv', index=False)
@@ -205,6 +208,7 @@ ndwi_df = make_reflectance_summaries(
 print("Done")
 # %% 4.4 Write the conservative -60m lake Green, NIR, NDWI bands to a csv
 out_df = pd.concat([green_df, nir_df, ndwi_df])
+print(len(out_df))
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv('./data/regression_summaries_neg60m_lake.csv', index=False)

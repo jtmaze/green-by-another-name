@@ -17,6 +17,7 @@ regression_data = pd.read_csv('./data/regression_summaries_60m_lake.csv')
 roi_pair_counts = area_data.groupby(['roi', 'level']).size().reset_index(name='counts')
 roi_pair_counts.head(15)
 
+
 # %% Box plot to compare lake areas with sr and toa data
 
 area_data_clean = area_data.copy()
