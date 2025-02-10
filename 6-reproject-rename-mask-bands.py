@@ -12,19 +12,15 @@ import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
-level = 'toa' #level should be 'sr' or 'toa'
-roi_name = 'TUK_sub1'
-utm_epsg = 'EPSG:32609' 
+level = 'sr' #level should be 'sr' or 'toa'
+roi_name = 'AND_sub1'
 
-"""
-EPSG Codes for Sites:
-YKF_sub1: EPSG:32606
-AKCP_sub1: EPSG:32605
-YKD_sub1: EPSG:32603
-MRD_sub1: EPSG: 32608
-AKCP_sub2: EPSG: 32604
-TUK_sub1: EPSG: 32609
-"""
+roi_prefix = roi_name.split('_')[0]
+sub_rois = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
+roi = sub_rois[sub_rois['sub_name'] == roi_name]
+utm_epsg = roi['utm_epsg'].iloc[0]
+
+
 # Dictionary to add description to bands based on the
 band_desc = {
     1: 'Blue',

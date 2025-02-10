@@ -9,13 +9,14 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'TUK_sub1'
+roi_name = 'AND_sub1'
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]
 
 pld = gpd.read_file(f'./data/pld_shapes/{roi_prefix}_pld_clipped.shp')
-roi = gpd.read_file(f'./data/roi_shapes/{roi_name}_shape.shp')
+sub_rois = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
+roi = sub_rois[sub_rois['sub_name'] == roi_name]
 est_utm = pld.estimate_utm_crs()
 est_utm_roi = roi.estimate_utm_crs()
 

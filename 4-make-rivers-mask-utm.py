@@ -12,13 +12,19 @@ from rasterio.transform import from_bounds
 import skimage as ski
 from skimage.morphology import binary_dilation
 
-roi_name = 'TUK_sub1'
+roi_name = 'AND_sub1'
 out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
 buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 
+# These regions (MRD, TUK, AND) have the same river file
 roi_prefix = roi_name.split('_')[0]
-rivers_dir = f'./data/river_files/{roi_prefix}_river.shp'
-roi_dir = f'./data/roi_shapes/{roi_name}_shape.shp'
+if roi_prefix in ['AND', 'TUK', 'MRD']:
+    rivers_prefix = 'MRD'
+else:
+    rivers_prefix = roi_prefix
+
+rivers_dir = f'./data/river_files/{rivers_prefix}_river.shp'
+roi_dir = f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp'
 out_dir = f'./data/river_files/'
 out_path = f'{out_dir}/{roi_name}_binary_rivers_dilated{buffer_dist}.tif'
 
@@ -30,7 +36,10 @@ else:
     print(rivers.crs)
 
 
-roi = gpd.read_file(roi_dir)
+sub_rois = gpd.read_file(roi_dir)
+roi = sub_rois[sub_rois['sub_name'] == roi_name]
+
+# %%
 
 # %% 2.0 Generate a mask image from the River shapefiles
 
