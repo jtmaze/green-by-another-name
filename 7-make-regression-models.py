@@ -2,6 +2,7 @@
 
 import glob
 import pandas as pd
+import pprint as pp
 
 from image_analysis_functions import extract_unique
 from image_analysis_functions import make_reflectance_summaries
@@ -36,7 +37,7 @@ mask_params = {
 }
 
 regression_params = {
-    'sample_size': 50_000,
+    'sample_size': 10_000,
     'outlier_frac': 0.0005,
 }
 
@@ -336,5 +337,9 @@ out_df.to_csv('./data/regression_summaries_shoreline_0-plus30.csv', index=False)
 
 out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
 out_df = out_df[out_df['ls_s2_percent_diff'] != 'No Image Data']
-out_df.to_csv('./data/area_data_v1.csv', index=False)
 
+# %%
+out_df.to_csv('./data/area_data_v2.csv', index=False)
+
+
+# %%

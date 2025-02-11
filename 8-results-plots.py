@@ -50,7 +50,8 @@ plt.ylabel('Percent Lake Area Difference')
 plt.show(True)
 
 # %% TOA T-test to see if LS8 is biased higher
-toa_data = area_data[area_data['level'] == 'toa']
+toa_data = area_data_clean[area_data_clean['level'] == 'toa']
+
 plt.hist(toa_data['ls_s2_percent_diff'], bins=50)
 plt.xlabel('LS8 vs S2 area difference ((LS8 - S2) / LS8)')
 plt.title("TOA area comparison for Sentinel-2 and Landsat8")
@@ -58,8 +59,8 @@ plt.axvline(x=0, color="red", linestyle='--', linewidth=2)
 
 t_stat, p_val = stats.ttest_1samp(toa_data['ls_s2_percent_diff'], popmean=0)
 
-print(t_stat)
-print(p_val)
+print(f'The t-statistic is {t_stat}')
+print(f'The p-value is {p_val}')
 
 # %% TOA T-test to see if LS8 is biased higher
 temp = toa_data[(toa_data['month'] == 9) | (toa_data['month'] == 8)]

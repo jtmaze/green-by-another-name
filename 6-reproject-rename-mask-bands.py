@@ -12,8 +12,8 @@ import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.warp import calculate_default_transform, reproject, transform_bounds, Resampling
 
-level = 'sr' #level should be 'sr' or 'toa'
-roi_name = 'AND_sub1'
+level = 'toa' #level should be 'sr' or 'toa'
+roi_name = 'YKD_sub3'
 
 roi_prefix = roi_name.split('_')[0]
 sub_rois = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
