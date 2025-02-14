@@ -56,6 +56,8 @@ for r in unique_rois:
                                   on='date',
                                   suffixes=('_ls8', '_s2'))
     
+    # Filter out invalid geometries
+    merged = merged[merged['geometry_ls8'].is_valid & merged['geometry_s2'].is_valid]
     # Merge the satellite footprints for calculations
     merged['inter'] = merged.apply(
         lambda row: row['geometry_ls8'].intersection(row['geometry_s2']),
@@ -70,6 +72,7 @@ for r in unique_rois:
     top_dates = merged.sort_values(by='int_sqkm', 
                                    ascending=False)
     
+    print(f'Found {len(top_dates)} overlapping dates')
     top_dates.drop(columns=['geometry_ls8', 'geometry_s2'], inplace=True)
     top_dates['per_cover'] = (top_dates['int_sqkm'] / roi_area * 100).round(0)
     top_dates = top_dates[top_dates['per_cover'] > 25]
