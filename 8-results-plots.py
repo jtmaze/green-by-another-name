@@ -1,10 +1,11 @@
 # %% 
-
+import glob
 import pandas as pd
 import numpy as np
 
 from scipy import stats
 
+import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
@@ -271,3 +272,200 @@ ax.set_ylabel('Percent Lake Area Difference')
 ax.set_xlabel('Month of the Year')
 plt.tight_layout()
 plt.show()
+
+# %% 
+
+regression_120land = pd.read_csv('./data/regression_summaries_120m_land.csv')
+regression_120land['zone'] = 'land'
+regression_60lake = pd.read_csv('./data/regression_summaries_60m_lake.csv')
+regression_60lake['zone'] = 'lake'
+regression_shoreline = pd.read_csv('./data/regression_summaries_shoreline_0-plus30.csv')
+regression_shoreline['zone'] = 'shoreline'
+
+regression_data = pd.concat([regression_120land, regression_60lake, regression_shoreline])
+
+# %% Compare r_squared values across "Green band"
+
+df = regression_data[regression_data['band_name'] == 'Green']
+
+# Convert r_squared to numeric
+df['r_squared'] = pd.to_numeric(df['r_squared'], errors='coerce')
+
+# Create plot
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='r_squared',
+            hue='level',
+            palette=['skyblue', 'lightgreen'])
+
+# Style plot
+plt.title('Green R-squared Values by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('R-squared')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+
+# %%
+
+df = regression_data[regression_data['band_name'] == 'NIR']
+
+# Convert r_squared to numeric
+df['r_squared'] = pd.to_numeric(df['r_squared'], errors='coerce')
+
+# Create plot
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='r_squared',
+            hue='level',
+            palette=['skyblue', 'lightgreen'])
+
+# Style plot
+plt.title('NIR R-squared Values by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('R-squared')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+
+# %%
+
+df = regression_data[regression_data['band_name'] == 'NDWI']
+
+# Convert r_squared to numeric
+df['r_squared'] = pd.to_numeric(df['r_squared'], errors='coerce')
+
+# Create plot
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='r_squared',
+            hue='level',
+            palette=['skyblue', 'lightgreen'])
+
+# Style plot
+plt.title('NDWI R-squared Values by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('R-squared')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+
+# %%
+
+
+df = regression_data[regression_data['band_name'] == 'Green']
+
+# Convert r_squared to numeric
+df['below_frac'] = pd.to_numeric(df['below_frac'], errors='coerce')
+
+# Create plot
+# Create plot
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='below_frac',
+            hue='level',
+            palette=['skyblue', 'lightgreen'],
+            ax=ax)
+
+# Add horizontal line at y=0.5
+ax.axhline(y=50, color='red', linestyle='--', linewidth=3)
+
+# Style plot
+plt.title('Green pixels below 1:1 line by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('below fraction')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+# %%
+
+df = regression_data[regression_data['band_name'] == 'NIR']
+
+# Convert r_squared to numeric
+df['below_frac'] = pd.to_numeric(df['below_frac'], errors='coerce')
+
+# Create plot
+# Create plot
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='below_frac',
+            hue='level',
+            palette=['skyblue', 'lightgreen'],
+            ax=ax)
+
+# Add horizontal line at y=0.5
+ax.axhline(y=50, color='red', linestyle='--', linewidth=3)
+
+# Style plot
+plt.title('NIR pixels below 1:1 line by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('below fraction')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+# %%
+
+df = regression_data[regression_data['band_name'] == 'NDWI']
+
+# Convert r_squared to numeric
+df['below_frac'] = pd.to_numeric(df['below_frac'], errors='coerce')
+
+# Create plot
+# Create plot
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.boxplot(data=df, 
+            x='zone',
+            y='below_frac',
+            hue='level',
+            palette=['skyblue', 'lightgreen'],
+            ax=ax)
+
+# Add horizontal line at y=0.5
+ax.axhline(y=50, color='red', linestyle='--', linewidth=3)
+
+# Style plot
+plt.title('NDWI pixels below 1:1 line by Zone and Processing Level')
+plt.xlabel('Zone')
+plt.ylabel('below fraction')
+plt.legend(title='Level')
+
+plt.tight_layout()
+plt.show()
+
+# %% plot cloud mask stats
+
+cloud_mask_files = glob.glob('./data/img_cloud_solar_stats/*mask_stats.csv')
+
+cloud_mask_data = [pd.read_csv(f) for f in cloud_mask_files]
+cloud_mask_data = pd.concat(cloud_mask_data)
+
+df_melted = cloud_mask_data[['ls8_shaddow_frac', 's2_shaddow_frac']].melt(
+    var_name='Satellite',
+    value_name='All Masked Fraction'
+)
+
+plt.figure(figsize=(8, 6))
+ax = sns.boxplot(data=df_melted,
+                 y='All Masked Fraction',
+                 hue='Satellite',
+                 palette=['lightgreen', 'skyblue'])
+
+# Set y-axis to log scale
+ax.set_yscale('log')
+
+# Style the plot
+plt.title('Comparison of All Masked Fraction: LS8 vs S2 (Log Scale)')
+plt.tight_layout()
+plt.show()
+
+# %%
