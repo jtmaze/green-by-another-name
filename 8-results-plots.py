@@ -1,5 +1,5 @@
 # %% 
-
+import glob
 import pandas as pd
 import numpy as np
 
@@ -439,6 +439,32 @@ plt.xlabel('Zone')
 plt.ylabel('below fraction')
 plt.legend(title='Level')
 
+plt.tight_layout()
+plt.show()
+
+# %% plot cloud mask stats
+
+cloud_mask_files = glob.glob('./data/img_cloud_solar_stats/*mask_stats.csv')
+
+cloud_mask_data = [pd.read_csv(f) for f in cloud_mask_files]
+cloud_mask_data = pd.concat(cloud_mask_data)
+
+df_melted = cloud_mask_data[['ls8_shaddow_frac', 's2_shaddow_frac']].melt(
+    var_name='Satellite',
+    value_name='All Masked Fraction'
+)
+
+plt.figure(figsize=(8, 6))
+ax = sns.boxplot(data=df_melted,
+                 y='All Masked Fraction',
+                 hue='Satellite',
+                 palette=['lightgreen', 'skyblue'])
+
+# Set y-axis to log scale
+ax.set_yscale('log')
+
+# Style the plot
+plt.title('Comparison of All Masked Fraction: LS8 vs S2 (Log Scale)')
 plt.tight_layout()
 plt.show()
 
