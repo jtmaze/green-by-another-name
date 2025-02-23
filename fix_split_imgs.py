@@ -11,7 +11,7 @@ from rasterio.warp import reproject, Resampling
 
 import pprint as pp
 
-data_dir = './data/new_test_v3/'
+data_dir = './data/new_test2/'
 river_dir = './data/river_files/'
 river_path = f'{river_dir}/YKF_sub3_binary_rivers_dilated180.tif'
 
@@ -90,12 +90,18 @@ stacked_rasters = np.stack(dst_raster_list)
 print(stacked_rasters.shape)
 imgs_mean = np.nanmean(stacked_rasters, axis=0)
 print(imgs_mean.shape)
+zeros_count = (imgs_mean == 0).sum()
+nan_count = np.isnan(imgs_mean).sum()
+valid_count = (imgs_mean > 0).sum()
+print(valid_count)
+print(nan_count)
+print(zeros_count)
 mean_meta = out_meta.copy()
-mean_out_path = f'{data_dir}/mean_{sat}_composite.tif'
-with rio.open(mean_out_path, 'w', **mean_meta) as dst:
-    dst.write(imgs_mean, indexes=list(range(1, imgs_mean.shape[0] + 1)))
+# mean_out_path = f'{data_dir}/mean_{sat}_composite.tif'
+# with rio.open(mean_out_path, 'w', **mean_meta) as dst:
+#     dst.write(imgs_mean, indexes=list(range(1, imgs_mean.shape[0] + 1)))
 
-print(f"Mean composite saved to: {mean_out_path}")
+# print(f"Mean composite saved to: {mean_out_path}")
 
 # %%
 
