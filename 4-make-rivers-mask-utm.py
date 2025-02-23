@@ -9,8 +9,7 @@ from rasterio import features, warp
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 from rasterio.transform import from_bounds
 
-import skimage as ski
-from skimage.morphology import binary_dilation
+
 
 roi_name = 'TUK_sub3'
 out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
