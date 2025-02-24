@@ -9,17 +9,11 @@ import geopandas as gpd
 import glob
 import re
 
+from image_analysis_functions import extract_unique
+
 footprint_file_list = glob.glob('./data/image_footprints/*.shp')
 
 roi_pattern = r'roi_(.*?)_years'
-
-def extract_unique(files, pattern):
-    unique_items = set()
-    for file in files:
-        match = re.search(pattern, file)
-        if match:
-            unique_items.add(match.group(1))
-    return list(unique_items)
 
 unique_rois = extract_unique(footprint_file_list, roi_pattern)
 
