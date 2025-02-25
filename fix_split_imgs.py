@@ -3,28 +3,39 @@
 import glob
 import re
 import numpy as np
+from itertools import product
 
 import rasterio as rio
 from rasterio.merge import merge
 from rasterio.coords import BoundingBox
 from rasterio.warp import reproject, Resampling
 
+from image_analysis_functions import extract_unique
+
 import pprint as pp
 
-data_dir = './data/new_test2/'
+level = 'sr' #level should be 'sr' or 'toa'
+roi_name = 'YKF_sub3'
+
+
+data_dir = './data/new_test/'
+#roi_prefix = roi_name.split('_')[0]
 river_dir = './data/river_files/'
-river_path = f'{river_dir}/YKF_sub3_binary_rivers_dilated180.tif'
+river_path = f'{river_dir}/{roi_name}_binary_rivers_dilated180.tif'
+all_files = glob.glob(f'{data_dir}/*.tif')
+all_s2_files = glob.glob(f'{data_dir}/Sentinel2*.tif')
+all_ls8_files = glob.glob(f'{data_dir}/Landsat8*.tif')
 
-s2_files = glob.glob(f'{data_dir}/Sentinel2*.tif')
-print(s2_files)
-ls8_files = glob.glob(f'{data_dir}/Landsat8*.tif')
-print(ls8_files)
+roi_pattern = r'roi_(.*?)_resampled'
+date_pattern = r'date_(.*?)_roi'
+resamp_pattern = r'resampled_(.*?)_date'
+unique_rois = extract_unique(all_files, roi_pattern)
+unique_dates = extract_unique(all_files, date_pattern)
 
-sat = 'ls8'
-if sat == 's2':
-    batch = s2_files
-else:
-    batch = ls8_files
+batches = list(product(unique_dates, unique_rois))
+print(batches)
+
+
 
 # %% 2.0 
 
@@ -96,12 +107,13 @@ valid_count = (imgs_mean > 0).sum()
 print(valid_count)
 print(nan_count)
 print(zeros_count)
+imgs_mean[imgs_mean == 0] = np.nan
 mean_meta = out_meta.copy()
-# mean_out_path = f'{data_dir}/mean_{sat}_composite.tif'
-# with rio.open(mean_out_path, 'w', **mean_meta) as dst:
-#     dst.write(imgs_mean, indexes=list(range(1, imgs_mean.shape[0] + 1)))
+mean_out_path = f'{data_dir}/mean_{sat}_composite.tif'
+with rio.open(mean_out_path, 'w', **mean_meta) as dst:
+    dst.write(imgs_mean, indexes=list(range(1, imgs_mean.shape[0] + 1)))
 
-# print(f"Mean composite saved to: {mean_out_path}")
+print(f"Mean composite saved to: {mean_out_path}")
 
 # %%
 
