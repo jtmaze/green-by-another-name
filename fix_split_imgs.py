@@ -15,43 +15,89 @@ from image_analysis_functions import extract_unique
 import pprint as pp
 
 level = 'sr' #level should be 'sr' or 'toa'
-roi_name = 'YKF_sub3'
-
-
 data_dir = './data/new_test/'
 #roi_prefix = roi_name.split('_')[0]
 river_dir = './data/river_files/'
-river_path = f'{river_dir}/{roi_name}_binary_rivers_dilated180.tif'
+
 all_files = glob.glob(f'{data_dir}/*.tif')
 all_s2_files = glob.glob(f'{data_dir}/Sentinel2*.tif')
 all_ls8_files = glob.glob(f'{data_dir}/Landsat8*.tif')
 
 roi_pattern = r'roi_(.*?)_resampled'
 date_pattern = r'date_(.*?)_roi'
-resamp_pattern = r'resampled_(.*?)_date'
+resamp_pattern = r'resampled_(.*?)_'
 unique_rois = extract_unique(all_files, roi_pattern)
 unique_dates = extract_unique(all_files, date_pattern)
+unique_resamps = extract_unique(all_files, resamp_pattern)
 
-batches = list(product(unique_dates, unique_rois))
+batches = list(product(unique_dates, unique_rois, unique_resamps))
 print(batches)
 
 
+# %% 2.0 Functions
 
-# %% 2.0 
+def get_img_paths(batch_info: tuple, files: list):
+    """ 
+    Gets all the image paths for a given batch (i.e., same date and conditions)
+    The batch is defined by the date, roi, and resampled value.
+    """
 
-# def get_full_bounds(bounds_list: list):
+    date = batch_info[0]
+    roi = batch_info[1]
+    resamp = batch_info[2]
+    img_paths = [f for f in files if re.search(fr'date_{date}_roi_{roi}_resampled_{resamp}', f)]
+    if len(img_paths) < 0:
+        print(f"No images found for batch")
+        return None
+    else:
+        print("Batch contains ...")
+        print(img_paths)
+        return img_paths
+    
+# %% 3.0
 
-#     left = min(bb.left for bb in bounds_list)
-#     right = max(bb.right for bb in bounds_list)
-#     bottom = min(bb.bottom for bb in bounds_list)
-#     top = max(bb.top for bb in bounds_list)
+def read_reproj_raster(
+    img_path: str,
+    ref_raster: rio.DatasetReader
+):
+    """
+    Reprojects the image to the reference raster
+    """
+    with rio.open(img_path) as src:
+        # Create destination array with the shape (# bands, height, width)
+        src_data = src.read()
+        dst_data = np.empty((src.count, ref_raster.height, ref_raster.width), dtype=np.float32)
+        reproject(
+            source=src_data,
+            destination=dst_data,
+            src_transform=src.transform,
+            src_crs=src.crs,
+            dst_transform=ref_raster.transform,
+            dst_crs=ref_raster.crs,
+            resampling=Resampling.nearest
+        )
+        return dst_data
+    
+def get_reproj_raster_list(
+    img_paths: list,
+    ref_path: str,
+):
+    """
+    Reprojects a list of images to the reference raster
+    """
+    ref_raster = rio.open(ref_path)
+    dst_rasters = []
+    for path in img_paths:
+        data = read_reproj_raster(path, ref_raster)
+        dst_raster_list.append(data)
 
-#     full_bounds = BoundingBox(left=left, right=right, bottom=bottom, top=top)
+def generate_mosaic(raster_list: list):
 
-#     return full_bounds
+    stacked = np.stack(raster_list)
+    imgs_mean = np.nanmean(stacked_rasters, axis=0)
 
 
-######################################################
+# %% 
 
 
 ref_raster = rio.open(river_path)
@@ -97,8 +143,7 @@ for idx, path in enumerate(batch):
 
 # %%
 
-stacked_rasters = np.stack(dst_raster_list)
-print(stacked_rasters.shape)
+
 imgs_mean = np.nanmean(stacked_rasters, axis=0)
 print(imgs_mean.shape)
 zeros_count = (imgs_mean == 0).sum()
@@ -115,5 +160,19 @@ with rio.open(mean_out_path, 'w', **mean_meta) as dst:
 
 print(f"Mean composite saved to: {mean_out_path}")
 
-# %%
+# %% Run the functions:
 
+for batch in batches:
+    s2_imgs = get_img_paths(batch, all_s2_files)
+    ls_imgs = get_img_paths(batch, all_ls8_files)
+    roi_name = batch[1]
+    river_path = f'{river_dir}/{roi_name}_binary_rivers_dilated180.tif'
+
+    if s2_imgs or ls_imgs is None:
+        print("No images found for batch")
+        continue
+
+
+
+
+# %%
