@@ -13,7 +13,7 @@ roi_shapes = gpd.read_file(f'{data_dir}{roi_prefix}_sub_rois.shp')
 
 # %% 3.0 
 
-resolution = 30 # meters
+resolution = 60 # meters
 original_crs = roi_shapes.crs
 print(original_crs)
 

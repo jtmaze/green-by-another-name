@@ -7,15 +7,13 @@ import pandas as pd
 from itertools import product
 
 import rasterio as rio
-from rasterio.merge import merge
-from rasterio.coords import BoundingBox
 from rasterio.warp import reproject, Resampling
 
 from image_analysis_functions import extract_unique
 
 import pprint as pp
 
-level = 'toa' #level should be 'sr' or 'toa'
+level = 'sr' #level should be 'sr' or 'toa'
 raw_dir = f'./data/{level}_image_downloads/'
 out_dir = f'./data/{level}_images/'
 #roi_prefix = roi_name.split('_')[0]
@@ -140,6 +138,9 @@ def find_best_image(
     fracs = [f[1] for f in nan_frac_list]
     lowest_frac = min(fracs)
     best_img = [img[0] for img in nan_frac_list if img[1] == lowest_frac]
+    # Edge case where both images have same nan frac
+    if len(best_img) > 1:
+        best_img = [best_img[0]]
     
     return best_img, lowest_frac
 
@@ -189,9 +190,9 @@ def find_best_images(
             'ls8_fp': best_ls8[0],
             'ls8_nan_frac': best_ls8[1]
         }
-        print(best_pair)
+
         best_pair = pd.DataFrame(best_pair)
-        print(best_pair)
+
 
         img_pairs_list.append(best_pair)
         mask_attrs_list.append(mask_attrs)
@@ -212,56 +213,12 @@ mask_attrs, s2_attrs, ls8_attrs, img_pairs = output
 
 # %% 
 
+img_pairs.to_csv(f'./data/{level}_img_exports_to_use.csv', index=False)
+s2_attrs.to_csv('./data/img_mask_solar_stats/Sentinel2_attrs_best_imgs_v1.csv', index=False)
+ls8_attrs.to_csv('./data/img_mask_solar_stats/LandSat8_attrs_best_imgs_v1.csv', index=False)
+mask_attrs.to_csv('./data/img_mask_solar_stats/mask_attrs_best_imgs_v1.csv', index=False)
 
 
 
-# %% 
-
-
-ref_raster = rio.open(river_path)
-ref_trans = ref_raster.transform
-ref_crs = ref_raster.crs
-ref_bounds = ref_raster.bounds
-
-
-src_files = []
-dst_raster_list = []
-
-for idx, path in enumerate(batch):
-    print(path)
-    with rio.open(path) as src:
-        # Create destination array with the shape (# bands, height, width)
-        src_data = src.read()
-        dst_data = np.empty((src.count, ref_raster.height, ref_raster.width), dtype=np.float32)
-        reproject(
-            source=src_data,
-            destination=dst_data,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            dst_transform=ref_trans,
-            dst_crs=ref_crs,
-            resampling=Resampling.nearest
-        )
-        out_meta = ref_raster.meta.copy()
-        out_meta.update({
-            "driver": "GTiff",
-            "count": src.count,
-            "height": dst_data.shape[1],
-            "width": dst_data.shape[2],
-            "transform": ref_trans,
-            "dtype": 'float32',
-            "crs": ref_crs,
-            "bounds": ref_bounds
-        })
-
-        out_path = f'{data_dir}/reproj_{sat}_test_{idx}.tif'
-        dst_raster_list.append(dst_data)
-    # with rio.open(out_path, 'w', **out_meta) as dst:
-    #     dst.write(dst_data, indexes=list(range(1, dst_data.shape[0] + 1)))
-
-
-
-
-
-
+# 
 # %%
