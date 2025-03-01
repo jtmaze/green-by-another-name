@@ -1,9 +1,11 @@
 # %% 1.0 Libaries and directories
 
 import re
+import os
 import pandas as pd
 import rasterio as rio
-from rasterio.warp import reproject
+
+from rasterio.warp import reproject, calculate_default_transform, Resampling
 import numpy as np
 
 level = 'toa'
@@ -46,38 +48,111 @@ def extract_res(file_path):
         return match.group(1)
     else:
         return None
+    
+def calc_union_bounds(
+        src1: rio.DatasetReader,
+        src2: rio.DatasetReader
+):
+    """
+    Finds the minimum set of bounds from two raster images
+    NOTE: CRS should be UTM
+    """
+    left = min(src1.bounds.left, src2.bounds.left)
+    bottom = min(src1.bounds.bottom, src2.bounds.bottom)
+    right = max(src1.bounds.right, src2.bounds.right)
+    top = max(src1.bounds.top, src2.bounds.top)
+
+    if (left >= right) or (bottom >= top):
+        raise ValueError("No overlap on the rasters")
+    
+    inter_bounds = {
+        "left": left,
+        "bottom": bottom,
+        "right": right, 
+        "top": top
+    }
+
+    return inter_bounds
 
 
-def read_imgs_ls8_ref(
-        s2_path: str, 
-        ls8_path: str,
-        ref_path: str,
+def reproj_to_ref(
+    in_path: str,
+    out_path: str,
+    ref_meta: dict
+):
+    with rio.open(in_path) as src:
+        out_meta = src.meta.copy()
+        out_meta.update({
+            'crs': ref_meta['crs'],
+            'transform': ref_meta['transform'],
+            'width': ref_meta['width'],
+            'height': ref_meta['height']
+        })
+
+        with rio.open(out_path, 'w', **out_meta) as dst:
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rio.band(src, i), 
+                    destination=rio.band(dst, i),
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=ref_meta['transform'],
+                    dst_crs=ref_meta['crs'],
+                    resampling=Resampling.bilinear
+                )
+
+    print(f"Reprojected to {out_path}")
+    
+def match_imgs_to_ref(
+    s2_path: str, 
+    ls8_path: str,
+    ref_path: str
 ):
     
-    with rio.open(s2_path) as s2_src, rio.open(ls8_path) as ls8_scr:
-        s2_trans = s2_src.transform
-    
+    with rio.open(ref_path) as ref:
+        ref_meta = {
+            'crs': ref.crs,
+            'transform': ref.transform,
+            'width': ref.width,
+            'height': ref.height
+        }
 
+    s2_basename = os.path.basename(s2_path)
+    s2_out_path = os.path.join('./data/temp/', s2_basename)
+    reproj_to_ref(s2_path, s2_out_path, ref_meta)
+
+    ls8_basename = os.path.basename(ls8_path)
+    ls8_out_path = os.path.join('./data/temp/', ls8_basename)
+    reproj_to_ref(ls8_path, ls8_out_path, ref_meta)
+
+    
 
     
 
 # %%
-mis_match = 0
 
-for idx, row in image_pairs.iterrows():
+image_pairs_test = image_pairs.iloc[0:5]
+
+# %% 
+
+for idx, row in image_pairs_test.iterrows():
 
     s2_fp = row['s2_fp']
     roi = extract_roi(s2_fp)
     res = extract_res(s2_fp)
     ls8_fp = row['ls8_fp']
-    print(res)
-    print(roi)
 
-    ref_path = f'./data/roi_shapes/rois/rasterized{roi}_shape_res{res}.tif'
+    ref_path = f'./data/roi_shapes/rois/rasterized_{roi}_shape_res{res}.tif'
 
-    result = read_imgs(s2_path=s2_fp, ls8_path=ls8_fp, ref_path=ref_path)
-    if result == 'fml':
-        mis_match += 1
+    match_imgs_to_ref(
+        s2_path=s2_fp,
+        ls8_path=ls8_fp,
+        ref_path=ref_path
+    )
+
+
+
+
 
 
 
