@@ -15,7 +15,6 @@ import pprint as pp
 
 level = 'sr' #level should be 'sr' or 'toa'
 raw_dir = f'./data/{level}_image_downloads/'
-out_dir = f'./data/{level}_images/'
 #roi_prefix = roi_name.split('_')[0]
 roi_dir = './data/roi_shapes/rois/'
 
@@ -66,7 +65,7 @@ def get_batch_attrs(
         batch_info: tuple
 ):
     """
-    Finds the image attributes for given batch
+    Finds the image attributes for given batch (with date, roi, level, and resampling method)
     """
     date = batch_info[0]
     roi = batch_info[1]
@@ -96,7 +95,9 @@ def get_img_nan_frac(
     ref_raster: rio.DatasetReader
 ):
     """
-    Reprojects the image to the reference raster
+    Reprojects the image to the reference raster (the roi mask)
+    Then, the function calculates the amount of NaN & zero values inside the roi mask
+    Returns a tuple with 
     """
     with rio.open(img_path) as src:
         # Create destination array with the shape (# bands, height, width)
@@ -180,7 +181,9 @@ def find_best_images(
 
         s2_attrs, ls8_attrs, mask_attrs = get_batch_attrs(level=level, batch_info=batch)
         best_s2 = find_best_image(s2_imgs, ref_path)
+        print(f'Best S2 has {(best_s2[1] * 100):.2f}% of ROI masked')
         best_ls8 = find_best_image(ls8_imgs, ref_path)
+        print(f'Best LS8 has {(best_ls8[1] * 100):.2f}% of ROI masked')
         s2_attrs = select_attrs(best_s2, s2_attrs)
         ls8_attrs = select_attrs(best_ls8, ls8_attrs)
         

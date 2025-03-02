@@ -8,7 +8,7 @@ import rasterio as rio
 from rasterio.warp import reproject, calculate_default_transform, Resampling
 import numpy as np
 
-level = 'toa'
+level = 'sr'
 image_pairs = pd.read_csv(f'./data/{level}_img_exports_to_use.csv')
 
 """
@@ -131,7 +131,7 @@ def match_imgs_to_ref(
 
 # %%
 
-image_pairs_test = image_pairs.iloc[0:5]
+image_pairs_test = image_pairs.iloc[0:10]
 
 # %% 
 
