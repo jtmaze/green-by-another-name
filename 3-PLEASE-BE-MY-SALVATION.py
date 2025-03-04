@@ -24,7 +24,7 @@ full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
 # %% Functions for the pipeline
 
-test = best_image_dates.iloc[4]
+test = best_image_dates.iloc[0]
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -299,11 +299,12 @@ def determine_best_img(
     return (best_img_mask, best_img_id, highest_frac_unmasked) 
         
 def calculate_tile_overlap(
-    s2_mask: ee.Image(),
-    ls8_mask: ee.Image()
+    s2_mask: ee.Image,
+    ls8_mask: ee.Image,
+    polygon: ee.Geometry
 ):
     """
-    Calculates the area of overlap between two tiles.
+    Calculates the area of overlap between two tiles inside the roi
     NOTE: Shouldn't need to worry about projections/scale differences between images
           This is because geometry operations are applied to a consistent internal coordinate system
     """
@@ -311,11 +312,22 @@ def calculate_tile_overlap(
     s2_geom = s2_mask.geometry()
     ls8_geom = ls8_mask.geometry()
 
-    intersection = s2_geom.intersection(ls8_geom, maxError=1)
-    intersection_m2 = intersection.area(maxError=1)
+    # First find the intersection of both image footprints
+    intersection_tiles = s2_geom.intersection(ls8_geom, maxError=1)
+    # Then find where this intersection overlaps with the ROI polygon
+    roi_intersection = intersection_tiles.intersection(polygon, maxError=1)
+
+    # Calculate area in square meters and kilometers
+    intersection_m2 = roi_intersection.area(maxError=1)
     intersection_km2 = intersection_m2.divide(1_000_000).getInfo()
 
+    # Also get the total ROI area for context
+    roi_area_km2 = polygon.area(maxError=1).divide(1_000_000).getInfo()
+
+    overlap_percentage = (intersection_km2 / roi_area_km2) * 100
+
     print(f"Tile overlap area = {intersection_km2:.2f} sqkm")
+    print(f"This is {overlap_percentage}% of roi area")
 
     return intersection_km2
 
@@ -341,7 +353,7 @@ def pair_processor(
     ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d)
     best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
 
-    intersection_km2 = calculate_tile_overlap(best_s2_mask, best_ls8_mask)
+    intersection_km2 = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
 
 
     return None
