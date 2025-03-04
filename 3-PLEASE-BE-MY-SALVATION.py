@@ -13,7 +13,7 @@ ee.Initialize(project='ee-green-by-another-name')
 roi_name = 'YKF_sub1'
 resamp_method = 'bilinear'
 resamp_res = 30
-level = 'toa'
+level = 'sr'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
 best_image_dates = gpd.read_file(image_footprints_path) 
@@ -24,7 +24,7 @@ full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
 # %% Functions for the pipeline
 
-test = best_image_dates.iloc[0]
+test = best_image_dates.iloc[4]
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -197,6 +197,9 @@ def make_ls8_mask_col(
     date: str,
     date_plus1d: str
 ): 
+    """
+    Worth noting that the Landsat TOA and SR data have the same QA_Pixel band, so we can use either.
+    """
     
     ls8_qa = (ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
               .filterBounds(polygon)
@@ -223,7 +226,7 @@ def make_ls8_mask_col(
 
     return ls8_mask_col
 
-# %% 
+# %% Functions evaluating pixel coverage and 
 
 def compute_valid_pixel_coverage(
     mask_image: ee.Image, 
@@ -251,9 +254,9 @@ def compute_valid_pixel_coverage(
     unmasked_pixels = ee.Number(unmasked_pixels_dict.get(band_name))
     frac_unmasked = unmasked_pixels.divide(total_roi_pixels)
 
-    print('Total pixels in ROI:', total_roi_pixels.getInfo())
-    print('Unmasked pixels in ROI:', unmasked_pixels.getInfo())
-    print('Fraction unmasked:', frac_unmasked.getInfo())
+    #print('Total pixels in ROI:', total_roi_pixels.getInfo())
+    #print('Unmasked pixels in ROI:', unmasked_pixels.getInfo())
+    # print('Fraction unmasked:', frac_unmasked.getInfo())
 
     return frac_unmasked.getInfo()
 
@@ -280,6 +283,8 @@ def determine_best_img(
     best_img_mask = None
     highest_frac_unmasked = float(0)
 
+    print(satellite)
+
     for i in range(col_len):
         img = ee.Image(col_list.get(i))
         img_id = img.get(img_id_str).getInfo()
@@ -293,6 +298,27 @@ def determine_best_img(
     
     return (best_img_mask, best_img_id, highest_frac_unmasked) 
         
+def calculate_tile_overlap(
+    s2_mask: ee.Image(),
+    ls8_mask: ee.Image()
+):
+    """
+    Calculates the area of overlap between two tiles.
+    NOTE: Shouldn't need to worry about projections/scale differences between images
+          This is because geometry operations are applied to a consistent internal coordinate system
+    """
+    
+    s2_geom = s2_mask.geometry()
+    ls8_geom = ls8_mask.geometry()
+
+    intersection = s2_geom.intersection(ls8_geom, maxError=1)
+    intersection_m2 = intersection.area(maxError=1)
+    intersection_km2 = intersection_m2.divide(1_000_000).getInfo()
+
+    print(f"Tile overlap area = {intersection_km2:.2f} sqkm")
+
+    return intersection_km2
+
     
 
 
@@ -315,11 +341,8 @@ def pair_processor(
     ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d)
     best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
 
-    print("*******************")
-    print(f"Best LS8 id: {best_ls8_id}")
-    print(ls8_unmasked_frac)
-    print(f"Best S2 id: {best_s2_id}")
-    print(s2_unmasked_frac)
+    intersection_km2 = calculate_tile_overlap(best_s2_mask, best_ls8_mask)
+
 
     return None
 # %% Run tests
@@ -327,4 +350,13 @@ def pair_processor(
 items = pair_processor(test, level=level)
 
 
+# %%
+# if level == 'toa':
+#     best_ls8_id = 'LANDSAT/LC08/C02/T1_TOA/' + best_ls8_id
+#     best_s2_id = "COPERNICUS/S2_HARMONIZED/" + best_s2_id
+# elif level == 'sr':
+#     best_ls8_id = 'LANDSAT/LC08/C02/T1_L2/' + best_ls8_id
+#     best_s2_id = "COPERNICUS/S2_SR_HARMONIZED/" + best_s2_id
+# else:
+#     print("Error: Specify sr or toa for level")
 # %%
