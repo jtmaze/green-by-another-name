@@ -114,12 +114,21 @@ def get_img_nan_frac(
         )
         roi_mask = ref_raster.read(1)
 
-        invalid_pix = np.any(np.isnan(dst_data), axis=0)
-        img_nan_pix = np.sum(invalid_pix & (roi_mask == 1)) # dst_data has nan values and roi_mask is 1
+        # Check per-pixel across all bands:
+        # nan_pix = True if any band is NaN
+        nan_pix = np.any(np.isnan(dst_data), axis=0)
+        # zero_or_neg_pix = True if any band ≤ 0
+        zero_or_neg_pix = np.any(dst_data <= 0, axis=0)
+        
+        # Combine both conditions (OR) within the ROI
+        invalid_condition = (nan_pix | zero_or_neg_pix) & (roi_mask == 1)
+        
+        # Count invalid vs total
+        img_invalid_pix = np.sum(invalid_condition)
         roi_tot_pix = np.sum(roi_mask == 1)
-        nan_frac = img_nan_pix / roi_tot_pix
+        invalid_frac = img_invalid_pix / roi_tot_pix
 
-        return (img_path, nan_frac)
+        return (img_path, invalid_frac)
     
 def find_best_image(
     img_paths: list,
@@ -131,14 +140,14 @@ def find_best_image(
 
     ref_raster = rio.open(ref_path)
     #print(ref_raster.meta)
-    nan_frac_list = []
+    invalid_frac_list = []
     for path in img_paths:
-        nan_frac = get_img_nan_frac(path, ref_raster)
-        nan_frac_list.append(nan_frac)
+        invalid_frac = get_img_nan_frac(path, ref_raster)
+        invalid_frac_list.append(invalid_frac)
 
-    fracs = [f[1] for f in nan_frac_list]
+    fracs = [f[1] for f in invalid_frac_list]
     lowest_frac = min(fracs)
-    best_img = [img[0] for img in nan_frac_list if img[1] == lowest_frac]
+    best_img = [img[0] for img in invalid_frac_list if img[1] == lowest_frac]
     # Edge case where both images have same nan frac
     if len(best_img) > 1:
         best_img = [best_img[0]]
@@ -189,9 +198,9 @@ def find_best_images(
         
         best_pair = {
             's2_fp': best_s2[0], 
-            's2_nan_frac': best_s2[1],
+            's2_invalid_frac': best_s2[1],
             'ls8_fp': best_ls8[0],
-            'ls8_nan_frac': best_ls8[1]
+            'ls8_invalid_frac': best_ls8[1]
         }
 
         best_pair = pd.DataFrame(best_pair)
