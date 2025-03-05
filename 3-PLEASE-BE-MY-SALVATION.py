@@ -10,7 +10,7 @@ import datetime #??
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
-roi_name = 'YKF_sub1'
+roi_name = 'AKCP_sub1'
 resamp_method = 'bilinear'
 resamp_res = 30
 level = 'sr'
@@ -19,8 +19,8 @@ image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.
 best_image_dates = gpd.read_file(image_footprints_path) 
 est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
-region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
-full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
+#region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
+#full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
 # %% Functions for the pipeline
 
@@ -253,10 +253,11 @@ def compute_valid_pixel_coverage(
 
     unmasked_pixels = ee.Number(unmasked_pixels_dict.get(band_name))
     frac_unmasked = unmasked_pixels.divide(total_roi_pixels)
+    frac_unmasked_float = frac_unmasked.getInfo()
 
     #print('Total pixels in ROI:', total_roi_pixels.getInfo())
     #print('Unmasked pixels in ROI:', unmasked_pixels.getInfo())
-    # print('Fraction unmasked:', frac_unmasked.getInfo())
+    print(f'Tile fraction unmasked: {frac_unmasked_float:.2f}')
 
     return frac_unmasked.getInfo()
 
@@ -290,7 +291,7 @@ def determine_best_img(
         img_id = img.get(img_id_str).getInfo()
         frac_unmasked = compute_valid_pixel_coverage(img, band_name, polygon, scale)
 
-        if frac_unmasked > highest_frac_unmasked:
+        if frac_unmasked < highest_frac_unmasked:
             highest_frac_unmasked = frac_unmasked
             best_img_id = img_id
             best_img_mask = img
@@ -329,14 +330,14 @@ def calculate_tile_overlap(
     print(f"Tile overlap area = {intersection_km2:.2f} sqkm")
     print(f"This is {overlap_percentage}% of roi area")
 
-    return intersection_km2
+    return overlap_percentage
 
     
 
 
 # %% Full Pipeline
 
-def pair_processor(
+def find_pairs_and_masks(
     footprint: gpd.GeoSeries,
     level: str
 ):
@@ -353,10 +354,31 @@ def pair_processor(
     ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d)
     best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
 
-    intersection_km2 = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
+    overlap_percentage = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
+
+    if overlap_percentage < 40:
+        print("WARNING: LOW OVERLAP")
+
+    return best_s2_mask, best_s2_id, best_ls8_mask, best_ls8_id
+
+def fetch_imgs_from_ids(
+    s2_id: str,
+    ls8_id: str
+):
+    s2_img = ee.ImageCollection()
+    ls8_img = None
+
+    return s2_img, ls8_img
 
 
-    return None
+def pair_processor(
+    footprint: gpd.GeoSeries,
+    level: str,
+):
+    
+    pairs_and_masks = find_pairs_and_masks(footprint, level)
+
+
 # %% Run tests
 
 items = pair_processor(test, level=level)
