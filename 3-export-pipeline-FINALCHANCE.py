@@ -553,7 +553,7 @@ def calc_common_mask_frac(
         # The downside is it increases overall workload due to splitting load into smaller chunks.
     ).getInfo()
 
-    common_mask_fraction = common_mask_stats.get('combined_mask', -1)
+    common_mask_fraction = common_mask_stats.get('common_mask', -1)
 
     return common_mask_fraction
 
@@ -573,25 +573,19 @@ def generate_common_mask(
         crs=roi_est_crs)
         .resample('bilinear')
     )
-    print("Check the fucking band names")
-    print(s2_mask_reproj.bandNames().getInfo())
+
     ls8_mask_reproj = (ls8_mask.reproject(
         scale=30,
         crs=roi_est_crs)
         .resample('bilinear')
     )
-    print(ls8_mask_reproj.bandNames().getInfo())
 
     ls8_mask_reproj = ls8_mask_reproj.rename('common_mask')
     s2_mask_reproj = s2_mask_reproj.rename('common_mask')
-    print(ls8_mask_reproj.projection().getInfo())
-    print(s2_mask_reproj.projection().getInfo())
-    print(ls8_mask_reproj.bandNames().getInfo())
-    print(s2_mask_reproj.bandNames().getInfo())
 
     combined_mask = s2_mask_reproj.Or(ls8_mask_reproj)
     connected_pixels = combined_mask.connectedPixelCount(maxSize=1_000, eightConnected=True)
-    sieved_mask = combined_mask.updateMask(connected_pixels.gte(50))
+    sieved_mask = combined_mask.updateMask(connected_pixels.gte(25))
     dilation_kernal = ee.Kernel.circle(radius=500, units='meters', normalize=False)
     dilated_mask = sieved_mask.focal_max(kernel=dilation_kernal, iterations=1)
 
@@ -599,29 +593,30 @@ def generate_common_mask(
 
     return dilated_mask, common_mask_fraction
 
-def apply_common_mask(
-    img: ee.Image,
-    mask: ee.Image
-):
-    """
-    Brings the common mask into the image's projection. 
-    Then, applies mask to the image
-    """
-    img_proj = img.projection().getInfo()
-    mask_repoj = mask.reproject(
-        crs=img_proj['crs'], 
-        crsTransform=img_proj['transform']
-    ).resample('bilinear') # Default is nearest neighbor
+# def apply_common_mask(
+#     img: ee.Image,
+#     mask: ee.Image
+# ):
+#     """
+#     Brings the common mask into the image's projection. 
+#     Then, applies mask to the image
+#     """
+#     img_proj = img.projection().getInfo()
+#     mask_repoj = mask.reproject(
+#         crs=img_proj['crs'], 
+#         crsTransform=img_proj['transform']
+#     ).resample('bilinear') # Default is nearest neighbor
 
-    masked_img = img.updateMask(mask_repoj.eq(0))
+#     masked_img = img.updateMask(mask_repoj.eq(0))
 
-    return masked_img
+#     return masked_img
 
 # %% Export Function
 
 def export_imgs_to_drive(
     s2_out_img: ee.Image,
     ls8_out_img: ee.Image,
+    common_mask: ee.Image,
     polygon: ee.Geometry, # TODO: see if this arg breaks shit
     roi_name: str,
     date: str,
@@ -629,8 +624,10 @@ def export_imgs_to_drive(
 ):
     if level == 'sr':
         folder = 'sr_images'
+        mask_folder = 'sr_masks'
     elif level == 'toa':
         folder = 'toa_images'
+        mask_folder = 'toa_masks'
     else:
         print("ERROR: specify level as sr or toa")
 
@@ -638,6 +635,8 @@ def export_imgs_to_drive(
     s2_proj = s2_out_img.projection().getInfo()
     ls8_export_name = f'Landsat8_{level}_date_{date}_roi_{roi_name}'
     ls8_proj = ls8_out_img.projection().getInfo()
+    mask_export_name = f'CommonMask_{level}_date_{date}_roi_{roi_name}'
+    mask_proj = common_mask.projection().getInfo()
     print("---- checking projections -------")
     print(s2_proj)
     print(ls8_proj)
@@ -646,7 +645,7 @@ def export_imgs_to_drive(
         image=s2_out_img,
         description=s2_export_name,
         fileNamePrefix=s2_export_name,
-        folder='test',
+        folder=folder,
         region=polygon,
         crs=s2_proj['crs'],
         crsTransform=s2_proj['transform'],
@@ -658,7 +657,7 @@ def export_imgs_to_drive(
         image=ls8_out_img,
         description=ls8_export_name,
         fileNamePrefix=ls8_export_name,
-        folder='test',
+        folder=folder,
         region=polygon,
         crs=ls8_proj['crs'],
         crsTransform=ls8_proj['transform'],
@@ -666,7 +665,19 @@ def export_imgs_to_drive(
     )
     ls8_task.start()
 
-    return s2_export_name, ls8_export_name
+    mask_task = ee.batch.Export.image.toDrive(
+        image=common_mask,
+        description=mask_export_name,
+        fileNamePrefix=mask_export_name,
+        folder=mask_folder,
+        region=polygon,
+        crs=mask_proj['crs'],
+        crsTransform=mask_proj['transform'],
+        maxPixels=1e13
+    )
+    mask_task.start()
+
+    return s2_export_name, ls8_export_name, mask_export_name
 
 
 # %% Full Function
@@ -705,6 +716,8 @@ def pair_processor(
     s2_img = rescale_imgs(s2_img, satellite="S2", level=level)
     ls8_img = rescale_imgs(ls8_img, satellite="LS8", level=level)
 
+    # TODO: Calculate mask summary stats here???
+
     # Make the common mask
     s2_mask = pairs_and_masks[0]
     ls8_mask = pairs_and_masks[2]
@@ -713,12 +726,13 @@ def pair_processor(
     print(f'The common mask covers {masked_frac:.2f}% of the region')
 
     # Apply the common mask to the images
-    out_s2_img = apply_common_mask(s2_img, common_mask)
-    out_ls8_img = apply_common_mask(ls8_img, common_mask)
+    # out_s2_img = apply_common_mask(s2_img, common_mask)
+    # out_ls8_img = apply_common_mask(ls8_img, common_mask)
 
-    s2_export_name, ls8_export_name = export_imgs_to_drive(
-        out_s2_img,
-        out_ls8_img,
+    s2_export_name, ls8_export_name, mask_export_name = export_imgs_to_drive(
+        s2_img,
+        ls8_img,
+        common_mask,
         polygon,
         roi_name,
         date,
@@ -726,9 +740,12 @@ def pair_processor(
     )
 
     s2_attrs['s2_export_name'] = s2_export_name
+    s2_attrs['mask_export_name'] = mask_export_name
     s2_attrs['roi_name'] = roi_name
     s2_attrs['date'] = date
+
     ls8_attrs['ls8_export_name'] = ls8_export_name
+    ls8_attrs['mask_export_name'] = mask_export_name
     ls8_attrs['roi_name'] = roi_name
     ls8_attrs['date'] = date
 
@@ -743,9 +760,4 @@ s2_attrs, ls8_attrs = pair_processor(
     level=level
 )
 
-
-# %%
-
-s2_attrs_list = []
-ls8_attrs_list = []
 # %%
