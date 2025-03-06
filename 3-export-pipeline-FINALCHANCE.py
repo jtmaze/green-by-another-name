@@ -1,4 +1,4 @@
-# %% Libraries and directories
+# %% 1.0 Libraries and directories
 
 import ee
 import re
@@ -12,7 +12,7 @@ ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
 roi_name = 'YKF_sub1'
-level = 'sr'
+level = 'toa'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
 best_image_dates = gpd.read_file(image_footprints_path) 
@@ -20,10 +20,9 @@ est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
-
-# %% Functions for the pipeline
-
 test = best_image_dates.iloc[0]
+
+# 2.0 %% Helper Functions for the pipeline
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -71,8 +70,14 @@ def make_s2_mask_col(
     date: str,
     date_plus1d: str,
 ):
-    
-    "Returns a collection of Binary Masks "
+    """
+    Uses Sentinel-2 SCL and Cloud Probability Bands to produce a collection of cloud masks.
+    Eliminates:
+        1) Clouds
+        2) Cloud Shaddows
+        3) Snow/ICE
+        4) Cirrus clouds
+    """
     
     s2_clouds = (ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
                  .filterBounds(polygon)
@@ -184,7 +189,8 @@ def compute_valid_pixel_coverage(
     scale: int
 ):
     """
-    Calculates the fraction of the ROI covered by valid pixels (i.e. no clouds, cirrus, shaddows, snow/ice)
+    For a given tile in the mask collection...
+    Calculates the fraction of the ROI covered by valid pixels
     """
     total_roi_pixels_dict = ee.Image.constant(1).reduceRegion(
         reducer=ee.Reducer.count(),
@@ -294,7 +300,6 @@ def find_pairs_and_masks(
     polygon: ee.Geometry,
     date: str, 
     date_plus1d: str,
-    level: str
 ):
 
     s2_mask_col = make_s2_mask_col(polygon, date, date_plus1d)
@@ -325,7 +330,8 @@ def fetch_imgs_from_ids(
     level: str
 ):  
     """
-    Finds the Sentinel-2 and LandSat8 images for 
+    Finds a single specific Sentinel-2 and LandSat8 image based on PRODUCT_ID
+    Returns each image
     """
  
     if level == 'sr':
@@ -336,14 +342,12 @@ def fetch_imgs_from_ids(
 
         ls8_img = (ee.ImageCollection(ls8_asset_string)
                .filterDate(date, date_plus1d)
-               .filterBounds(polygon)
                .filter(ee.Filter.eq('LANDSAT_PRODUCT_ID', ls8_id))
                .select(ls8_bands)
         )
 
         s2_img = (ee.ImageCollection(s2_asset_string)
             .filterDate(date, date_plus1d)
-            .filterBounds(polygon)
             .filter(ee.Filter.eq('PRODUCT_ID', s2_id))
             .select(s2_bands)
         )
@@ -381,7 +385,6 @@ def fetch_imgs_from_ids(
         ls8_id = change_ls8_collection_num(ls8_id) 
         ls8_img = (ee.ImageCollection(ls8_asset_string)
                .filterDate(date, date_plus1d)
-               .filterBounds(polygon)
                .filter(ee.Filter.eq('LANDSAT_PRODUCT_ID', ls8_id))
                .select(ls8_bands)
         )
@@ -390,7 +393,6 @@ def fetch_imgs_from_ids(
 
         s2_img = (ee.ImageCollection(s2_asset_string)
                   .filterDate(date, date_plus1d)
-                  .filterBounds(polygon)
                   .filter(ee.Filter.eq('MGRS_TILE', s2_tile_num))
                   .filter(ee.Filter.eq('SENSING_ORBIT_NUMBER', s2_relative_orbit_number))
                   .select(s2_bands)
@@ -402,11 +404,11 @@ def fetch_imgs_from_ids(
     # Check that we found only 1 exact image. 
     s2_size = s2_img.size().getInfo()
     ls8_size = ls8_img.size().getInfo()
+    print(f"LS8 size = {ls8_size}")
+    print(f"S2 size = {s2_size}")
 
     if ls8_size != 1 and s2_size != 1:
         print("ERROR in fetch_imgs_from_ids, collection size != 1")
-        print(f"LS8 size = {ls8_size}")
-        print(f"S2 size = {s2_size}")
         return None, None
 
     return s2_img.first(), ls8_img.first()
@@ -432,6 +434,8 @@ def find_ls8_img_attrs(
     ls8_img: ee.Image,
     level: str
 ):
+    
+    "Finds specific attributes for a give LandSat8 image"
     
     if level == 'toa':
         attrs_list = [
@@ -567,18 +571,28 @@ def generate_common_mask(
     s2_mask_reproj = (s2_mask.reproject(
         scale=30,
         crs=roi_est_crs)
-        .rename('combined_mask')
+        .resample('bilinear')
     )
+    print("Check the fucking band names")
+    print(s2_mask_reproj.bandNames().getInfo())
     ls8_mask_reproj = (ls8_mask.reproject(
         scale=30,
         crs=roi_est_crs)
-        .rename('combined_mask')
+        .resample('bilinear')
     )
+    print(ls8_mask_reproj.bandNames().getInfo())
+
+    ls8_mask_reproj = ls8_mask_reproj.rename('common_mask')
+    s2_mask_reproj = s2_mask_reproj.rename('common_mask')
+    print(ls8_mask_reproj.projection().getInfo())
+    print(s2_mask_reproj.projection().getInfo())
+    print(ls8_mask_reproj.bandNames().getInfo())
+    print(s2_mask_reproj.bandNames().getInfo())
 
     combined_mask = s2_mask_reproj.Or(ls8_mask_reproj)
     connected_pixels = combined_mask.connectedPixelCount(maxSize=1_000, eightConnected=True)
     sieved_mask = combined_mask.updateMask(connected_pixels.gte(50))
-    dilation_kernal = ee.Kernel.circle(radius=1_000, units='meters', normalize=False)
+    dilation_kernal = ee.Kernel.circle(radius=500, units='meters', normalize=False)
     dilated_mask = sieved_mask.focal_max(kernel=dilation_kernal, iterations=1)
 
     common_mask_fraction = calc_common_mask_frac(dilated_mask, polygon)
@@ -597,7 +611,7 @@ def apply_common_mask(
     mask_repoj = mask.reproject(
         crs=img_proj['crs'], 
         crsTransform=img_proj['transform']
-    ) # default is nearest neighbor resampling
+    ).resample('bilinear') # Default is nearest neighbor
 
     masked_img = img.updateMask(mask_repoj.eq(0))
 
@@ -620,16 +634,19 @@ def export_imgs_to_drive(
     else:
         print("ERROR: specify level as sr or toa")
 
-    s2_export_name = f'POLY_Sentinel2_{level}_date_{date}_roi_{roi_name}'
+    s2_export_name = f'Sentinel2_{level}_date_{date}_roi_{roi_name}'
     s2_proj = s2_out_img.projection().getInfo()
-    ls8_export_name = f'POLY_Landsat8_{level}_date_{date}_roi_{roi_name}'
+    ls8_export_name = f'Landsat8_{level}_date_{date}_roi_{roi_name}'
     ls8_proj = ls8_out_img.projection().getInfo()
+    print("---- checking projections -------")
+    print(s2_proj)
+    print(ls8_proj)
 
     s2_task = ee.batch.Export.image.toDrive(
         image=s2_out_img,
         description=s2_export_name,
         fileNamePrefix=s2_export_name,
-        folder=folder,
+        folder='test',
         region=polygon,
         crs=s2_proj['crs'],
         crsTransform=s2_proj['transform'],
@@ -641,7 +658,7 @@ def export_imgs_to_drive(
         image=ls8_out_img,
         description=ls8_export_name,
         fileNamePrefix=ls8_export_name,
-        folder=folder,
+        folder='test',
         region=polygon,
         crs=ls8_proj['crs'],
         crsTransform=ls8_proj['transform'],
@@ -652,7 +669,7 @@ def export_imgs_to_drive(
     return s2_export_name, ls8_export_name
 
 
-# %%
+# %% Full Function
 
 def pair_processor(
     footprint: gpd.GeoSeries,
@@ -667,7 +684,7 @@ def pair_processor(
     date_plus1d = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     polygon = convert_gpd_geom_to_ee(geom, None)
 
-    pairs_and_masks = find_pairs_and_masks(polygon, date, date_plus1d, level)
+    pairs_and_masks = find_pairs_and_masks(polygon, date, date_plus1d)
     if pairs_and_masks is None: # Don't bother exporting bad tiles. 
         return None 
     
@@ -708,11 +725,14 @@ def pair_processor(
         level
     )
 
-    s2_attrs['export_name'] = s2_export_name
-    ls8_attrs['export_name'] = ls8_export_name
+    s2_attrs['s2_export_name'] = s2_export_name
+    s2_attrs['roi_name'] = roi_name
+    s2_attrs['date'] = date
+    ls8_attrs['ls8_export_name'] = ls8_export_name
+    ls8_attrs['roi_name'] = roi_name
+    ls8_attrs['date'] = date
 
     return s2_attrs, ls8_attrs
-
 
 # %% Run tests
 
@@ -724,4 +744,8 @@ s2_attrs, ls8_attrs = pair_processor(
 )
 
 
+# %%
+
+s2_attrs_list = []
+ls8_attrs_list = []
 # %%
