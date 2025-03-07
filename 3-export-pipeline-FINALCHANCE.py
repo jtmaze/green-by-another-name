@@ -12,7 +12,7 @@ ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
 roi_name = 'YKF_sub1'
-level = 'toa'
+level = 'sr'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
 best_image_dates = gpd.read_file(image_footprints_path) 
@@ -149,13 +149,18 @@ def make_s2_mask_col(
 def make_ls8_mask_col(
     polygon: ee.Geometry,
     date: str,
-    date_plus1d: str
+    date_plus1d: str,
+    level: str
 ): 
     """
-    Worth noting that the Landsat TOA and SR data have the same QA_Pixel band, so we can use either.
+    BUG: Ensure qa_pixel value is the same different for ls8 products.
     """
+    if level == 'sr':
+        asset_string = "LANDSAT/LC08/C02/T1_L2"
+    elif level == 'toa':
+        asset_string = "LANDSAT/LC08/C02/T1_TOA"
     
-    ls8_qa = (ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+    ls8_qa = (ee.ImageCollection(asset_string)
               .filterBounds(polygon)
               .filterDate(date, date_plus1d)
               .select('QA_PIXEL')
@@ -291,21 +296,19 @@ def calculate_tile_overlap(
 
     return overlap_percentage
 
-    
-
-
 # %% Full Pipeline
 
 def find_pairs_and_masks(
     polygon: ee.Geometry,
     date: str, 
     date_plus1d: str,
+    level: str
 ):
 
     s2_mask_col = make_s2_mask_col(polygon, date, date_plus1d)
     best_s2_mask, best_s2_id, s2_unmasked_frac = determine_best_img(s2_mask_col, polygon=polygon, satellite="S2")
 
-    ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d)
+    ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d, level)
     best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
 
     if s2_unmasked_frac < 0.25 or ls8_unmasked_frac < 0.25: # TODO: think more about this threshold
@@ -342,12 +345,14 @@ def fetch_imgs_from_ids(
 
         ls8_img = (ee.ImageCollection(ls8_asset_string)
                .filterDate(date, date_plus1d)
+               .filterBounds(polygon)
                .filter(ee.Filter.eq('LANDSAT_PRODUCT_ID', ls8_id))
                .select(ls8_bands)
         )
 
         s2_img = (ee.ImageCollection(s2_asset_string)
             .filterDate(date, date_plus1d)
+            .filterBounds(polygon)
             .filter(ee.Filter.eq('PRODUCT_ID', s2_id))
             .select(s2_bands)
         )
@@ -382,9 +387,10 @@ def fetch_imgs_from_ids(
             tile = re.search(r"T([A-Z0-9]+)", tile_num).group(1) # Any uppercase characters and digits following T
             return int(relative_orbit_number), str(tile)
         
-        ls8_id = change_ls8_collection_num(ls8_id) 
+        #ls8_id = change_ls8_collection_num(ls8_id) 
         ls8_img = (ee.ImageCollection(ls8_asset_string)
                .filterDate(date, date_plus1d)
+               .filterBounds(polygon)
                .filter(ee.Filter.eq('LANDSAT_PRODUCT_ID', ls8_id))
                .select(ls8_bands)
         )
@@ -393,6 +399,7 @@ def fetch_imgs_from_ids(
 
         s2_img = (ee.ImageCollection(s2_asset_string)
                   .filterDate(date, date_plus1d)
+                  .filterBounds(polygon)
                   .filter(ee.Filter.eq('MGRS_TILE', s2_tile_num))
                   .filter(ee.Filter.eq('SENSING_ORBIT_NUMBER', s2_relative_orbit_number))
                   .select(s2_bands)
@@ -540,7 +547,7 @@ def calc_common_mask_frac(
     common_mask_reproj = common_mask.reproject(
         crs="EPSG:4326",
         scale=30
-    )
+    ).resample('bilinear')
     # Get the number of pixels for the dilated mask
     # NOTE: Due to timeout errors, I had to adjust a few arguments sacrificing precision
     common_mask_stats = common_mask_reproj.reduceRegion(
@@ -553,7 +560,7 @@ def calc_common_mask_frac(
         # The downside is it increases overall workload due to splitting load into smaller chunks.
     ).getInfo()
 
-    common_mask_fraction = common_mask_stats.get('common_mask', -1)
+    common_mask_fraction = (common_mask_stats.get('common_mask', -1) * 100)
 
     return common_mask_fraction
 
@@ -695,7 +702,7 @@ def pair_processor(
     date_plus1d = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     polygon = convert_gpd_geom_to_ee(geom, None)
 
-    pairs_and_masks = find_pairs_and_masks(polygon, date, date_plus1d)
+    pairs_and_masks = find_pairs_and_masks(polygon, date, date_plus1d, level)
     if pairs_and_masks is None: # Don't bother exporting bad tiles. 
         return None 
     
@@ -724,20 +731,25 @@ def pair_processor(
     common_mask, masked_frac = generate_common_mask(s2_mask, ls8_mask, polygon, roi_est_crs)
 
     print(f'The common mask covers {masked_frac:.2f}% of the region')
+    if masked_frac > 70:
+        print("Bad image -- skipping export")
+        mask_export_name = 'bad_img'
+        s2_export_name = 'bad_img'
+        ls8_export_name = 'bad_img'
 
     # Apply the common mask to the images
     # out_s2_img = apply_common_mask(s2_img, common_mask)
     # out_ls8_img = apply_common_mask(ls8_img, common_mask)
-
-    s2_export_name, ls8_export_name, mask_export_name = export_imgs_to_drive(
-        s2_img,
-        ls8_img,
-        common_mask,
-        polygon,
-        roi_name,
-        date,
-        level
-    )
+    else:
+        s2_export_name, ls8_export_name, mask_export_name = export_imgs_to_drive(
+            s2_img,
+            ls8_img,
+            common_mask,
+            polygon,
+            roi_name,
+            date,
+            level
+        )
 
     s2_attrs['s2_export_name'] = s2_export_name
     s2_attrs['mask_export_name'] = mask_export_name
@@ -751,13 +763,32 @@ def pair_processor(
 
     return s2_attrs, ls8_attrs
 
-# %% Run tests
+# %%
 
-s2_attrs, ls8_attrs = pair_processor(
-    test,
-    roi_name=roi_name,
-    roi_est_crs=est_utm, 
-    level=level
-)
+s2_attrs_list = []
+ls8_attrs_list = []
+
+for idx, row in best_image_dates.iterrows():
+
+    s2_attrs, ls8_attrs = pair_processor(
+        row,
+        roi_name=roi_name,
+        roi_est_crs=est_utm, 
+        level=level
+    )
+
+    s2_attrs_list.append(s2_attrs)
+    ls8_attrs_list.append(ls8_attrs)
 
 # %%
+
+s2_batch_summary = pd.DataFrame(s2_attrs_list)
+s2_batch_summary.to_csv(
+    f'./data/img_overlap_solar_stats/{roi_name}_{level}_Sentinel2_attrs.csv',
+    index=False
+)
+ls8_batch_summary = pd.DataFrame(ls8_attrs_list)
+ls8_batch_summary.to_csv(
+    f'data/img_overlap_solar_stats/{roi_name}_{level}_Landsat8_attrs.csv',
+    index=False
+)
