@@ -20,7 +20,7 @@ est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
-best_image_dates = best_image_dates[6:]
+test = best_image_dates.iloc[0]
 
 # 2.0 %% Helper Functions for the pipeline
 
@@ -312,7 +312,8 @@ def find_pairs_and_masks(
     best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
 
     if s2_unmasked_frac < 0.25 or ls8_unmasked_frac < 0.25: # TODO: think more about this threshold
-        print(f'WARNING: UNMASKED FRACTION IS LOW, will probably skip export')
+        print(f'SKIPPING EXPORT: Bad ROI coverage with tiles')
+        return None
 
     overlap_percentage = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
 
@@ -788,8 +789,6 @@ s2_batch_summary.to_csv(
 )
 ls8_batch_summary = pd.DataFrame(ls8_attrs_list)
 ls8_batch_summary.to_csv(
-    f'./data/img_overlap_solar_stats/{roi_name}_{level}_Landsat8_attrs.csv',
+    f'data/img_overlap_solar_stats/{roi_name}_{level}_Landsat8_attrs.csv',
     index=False
 )
-
-# %%
