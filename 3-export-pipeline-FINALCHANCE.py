@@ -20,7 +20,8 @@ est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
-best_image_dates = best_image_dates[6:]
+
+best_image_dates_f = best_image_dates[19:25]
 
 # 2.0 %% Helper Functions for the pipeline
 
@@ -37,6 +38,23 @@ def convert_gpd_geom_to_ee(geom, est_utm):
     coords_list = [[x, y] for x, y in coords]
 
     return ee.Geometry.Polygon(coords_list, proj=out_crs)
+
+def get_mask_frac(
+    mask: ee.Image,
+    band_name: str,
+    polygon: ee.Geometry,
+    scale: int
+):
+    stats = mask.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=polygon,
+        maxPixels=1e13,
+        scale=scale
+    ).getInfo()
+
+    fraction = stats.get(band_name, -1)
+
+    return fraction
 
 
 
@@ -64,6 +82,74 @@ def add_cloud_join_key(img):
 
     return img.set('join_key', join_key)
 
+def mask_full_s2_mask(feature):
+
+    scl_img = ee.Image(feature.get('primary'))
+    cloud_img = ee.Image(feature.get('secondary'))
+    
+    # Create binary masks:
+    # Cloud mask: probability > 70.
+    cloud_mask = cloud_img.gt(70)
+    # Shadow mask: SCL equals 3.
+    shadow_mask = scl_img.eq(3)
+    # Cirrus mask: SCL equals 10.
+    cirrus_mask = scl_img.eq(10)
+    # Snow/Ice mask: SCL equals 11.
+    snowice_mask = scl_img.eq(11)
+    
+    # Combine the masks with a logical OR.
+    combined_mask = cloud_mask.Or(shadow_mask).Or(cirrus_mask).Or(snowice_mask)
+    combined_mask = combined_mask.rename('s2_mask')
+    
+    # Copy the 'PRODUCT_ID' property from the SCL image to the mask image.
+    mask_with_id = combined_mask.copyProperties(scl_img, ['PRODUCT_ID'])
+    
+    return mask_with_id
+
+def calc_s2_mask_stats(
+    s2_scl: ee.ImageCollection,
+    s2_clouds: ee.ImageCollection,
+    polygon: ee.Geometry,
+):
+
+    mask_attrs_list = []
+    col_size = s2_scl.size().getInfo()
+    s2_scl_list = s2_scl.toList(col_size)
+    cloud_col_size = s2_clouds.size().getInfo()
+    s2_cloud_list = s2_clouds.toList(col_size)
+    # TODO: Remove this join key sanity-check later 
+    print("***************************")
+    print("Checking Sentinel-2 SCL and Cloud Probability join keys")
+    print(f"Sizes are scl={col_size} and clouds={cloud_col_size}")
+    for i in range(col_size):
+        print('---------------------')
+        print('CHECKING JOIN KEYS FOR S2 MASK...')
+        scl_img = ee.Image(s2_scl_list.get(i))
+        scl_key = scl_img.get('join_key').getInfo()  # get join_key as a client-side string
+        print("SCL join_key:", scl_key)
+        shaddows = scl_img.eq(3).rename('s2_shaddows')
+        shaddow_frac = get_mask_frac(shaddows, 's2_shaddows', polygon, 10)
+        cirrus = scl_img.eq(10).rename('s2_cirrus')
+        cirrus_frac = get_mask_frac(cirrus, 's2_cirrus', polygon, 10)
+        snowice = scl_img.eq(11).rename('s2_snowice')
+        snowice_frac = get_mask_frac(snowice, 's2_snowice', polygon, 10)
+
+        cloud_img = ee.Image(s2_cloud_list.get(i))
+        cloud_binary = cloud_img.gte(70).rename('s2_opaque_clouds')
+        cloud_frac = get_mask_frac(cloud_binary, 's2_opaque_clouds', polygon, 10)
+        cloud_key = cloud_img.get('join_key').getInfo()
+        print("Cloud join_key:", cloud_key)
+        print('----------------------')
+        attrs = {
+            's2_shaddows': shaddow_frac,
+            's2_cirrus': cirrus_frac,
+            's2_snowice': snowice_frac,
+            's2_clouds': cloud_frac
+        }
+        mask_attrs_list.append(attrs)
+    print("****************************")
+
+    return mask_attrs_list
 
 def make_s2_mask_col(
     polygon: ee.Geometry,
@@ -72,11 +158,9 @@ def make_s2_mask_col(
 ):
     """
     Uses Sentinel-2 SCL and Cloud Probability Bands to produce a collection of cloud masks.
-    Eliminates:
-        1) Clouds
-        2) Cloud Shaddows
-        3) Snow/ICE
-        4) Cirrus clouds
+    Eliminates: Clouds, Cloud Shaddows, Snow/Ice, cirrus clouds
+    Returns: A collection of images for each tile's combined mask
+
     """
     
     s2_clouds = (ee.ImageCollection("COPERNICUS/S2_CLOUD_PROBABILITY")
@@ -94,57 +178,53 @@ def make_s2_mask_col(
     s2_scl = s2_scl.map(add_scl_join_key)
     s2_clouds = s2_clouds.map(add_cloud_join_key)
 
-    col_size = s2_scl.size().getInfo()
-    # s2_scl_list = s2_scl.toList(col_size)
-    # s2_cloud_list = s2_clouds.toList(col_size)
-
-    # TODO: Remove this sanity-check later
-    # for i in range(col_size):
-    #     print('---------------------')
-    #     print('CHECKING JOIN KEYS FOR S2 MASK...')
-    #     scl_img = ee.Image(s2_scl_list.get(i))
-    #     scl_key = scl_img.get('join_key').getInfo()  # get join_key as a client-side string
-    #     print("SCL join_key:", scl_key)
-        
-    #     cloud_img = ee.Image(s2_cloud_list.get(i))
-    #     cloud_key = cloud_img.get('join_key').getInfo()
-    #     print("Cloud join_key:", cloud_key)
-    #     print('----------------------')
+    mask_attrs_list = calc_s2_mask_stats(s2_scl, s2_clouds, polygon)
 
     join = ee.Join.inner()
     filter_join_key = ee.Filter.equals(leftField='join_key', rightField='join_key')
 
     joined = join.apply(s2_scl, s2_clouds, filter_join_key)
-
-    def full_s2_mask(feature):
-
-        scl_img = ee.Image(feature.get('primary'))
-        cloud_img = ee.Image(feature.get('secondary'))
-        
-        # Create binary masks:
-        # Cloud mask: probability > 70.
-        cloud_mask = cloud_img.gt(70)
-        # Shadow mask: SCL equals 3.
-        shadow_mask = scl_img.eq(3)
-        # Cirrus mask: SCL equals 10.
-        cirrus_mask = scl_img.eq(10)
-        # Snow/Ice mask: SCL equals 11.
-        snowice_mask = scl_img.eq(11)
-        
-        # Combine the masks with a logical OR.
-        combined_mask = cloud_mask.Or(shadow_mask).Or(cirrus_mask).Or(snowice_mask)
-        combined_mask = combined_mask.rename('s2_mask')
-        
-        # Copy the 'PRODUCT_ID' property from the SCL image to the mask image.
-        mask_with_id = combined_mask.copyProperties(scl_img, ['PRODUCT_ID'])
-        
-        return mask_with_id
     
-    s2_mask_col = joined.map(full_s2_mask)
+    s2_mask_col = joined.map(mask_full_s2_mask)
 
-    return s2_mask_col
+    return s2_mask_col, mask_attrs_list
 
 # %% Landsat Cloud Masking Functions
+def calc_ls8_mask_stats(
+    ls8_qa: ee.ImageCollection,
+    polygon: ee.Geometry
+):
+    mask_attrs_list = []
+    cloud_bit_mask = 1 << 3
+    shaddow_bit_mask = 1 << 4
+    snowice_bit_mask = 1 << 5
+    cirrus_bit_mask = 1 << 2
+
+    ls8_size = ls8_qa.size().getInfo()
+    ls8_qa_list = ls8_qa.toList(ls8_size)
+
+    for i in range(ls8_size):
+        img = ee.Image(ls8_qa_list.get(i))
+        shaddows = img.bitwiseAnd(shaddow_bit_mask).gt(0).rename('ls8_shaddows')
+        shaddow_frac = get_mask_frac(shaddows, 'ls8_shaddows', polygon, 30)
+        cirrus = img.bitwiseAnd(cirrus_bit_mask).gt(0).rename('ls8_cirrus')
+        cirrus_frac = get_mask_frac(cirrus, 'ls8_cirrus', polygon, 30)
+        snowice = img.bitwiseAnd(snowice_bit_mask).gt(0).rename('ls8_snowice')
+        snowice_frac = get_mask_frac(snowice, 'ls8_snowice', polygon, 30)
+        clouds = img.bitwiseAnd(cloud_bit_mask).gt(0).rename('ls8_clouds')
+        cloud_frac = get_mask_frac(clouds, 'ls8_clouds', polygon, 30)
+
+        mask_attrs = {
+            'ls8_shaddows': shaddow_frac,
+            'ls8_cirrus': cirrus_frac,
+            'ls8_snowice': snowice_frac,
+            'cloud_frac': cloud_frac
+        }
+
+        mask_attrs_list.append(mask_attrs)
+
+    return mask_attrs_list
+
 
 def make_ls8_mask_col(
     polygon: ee.Geometry,
@@ -165,6 +245,8 @@ def make_ls8_mask_col(
               .filterDate(date, date_plus1d)
               .select('QA_PIXEL')
     )
+
+    ls8_attrs_list = calc_ls8_mask_stats(ls8_qa, polygon)
     # Define the cloud, cloud shadow, snow/ice, and cirrus bitmasks
     cloud_bit_mask = 1 << 3
     shaddow_bit_mask = 1 << 4
@@ -183,7 +265,7 @@ def make_ls8_mask_col(
     
     ls8_mask_col = ls8_qa.map(apply_bitmask)
 
-    return ls8_mask_col
+    return ls8_mask_col, ls8_attrs_list
 
 # %% Functions evaluating pixel coverage and 
 
@@ -225,6 +307,7 @@ def compute_valid_pixel_coverage(
 
 def determine_best_img(
     mask_col: ee.ImageCollection,
+    mask_attrs_list: list, 
     polygon: ee.Geometry,
     satellite: str
 ):
@@ -248,6 +331,7 @@ def determine_best_img(
     col_list = mask_col.toList(col_len)
     best_img_id = None
     best_img_mask = None
+    best_img_mask_attrs = None
     highest_frac_unmasked = float(0)
 
     for i in range(col_len):
@@ -259,9 +343,13 @@ def determine_best_img(
             highest_frac_unmasked = frac_unmasked
             best_img_id = img_id
             best_img_mask = img
+            if i < len(mask_attrs_list):  # Safety check
+                best_img_mask_attrs = mask_attrs_list[i]
+            else:
+                print(f"WARNING: No attributes for {satellite} image at index {i}")
 
     print(f'{satellite} Highest Frac Unmasked = {highest_frac_unmasked:.2f}')
-    return best_img_mask, best_img_id, highest_frac_unmasked
+    return best_img_mask, best_img_id, highest_frac_unmasked, best_img_mask_attrs
         
 def calculate_tile_overlap(
     s2_mask: ee.Image,
@@ -304,23 +392,53 @@ def find_pairs_and_masks(
     date_plus1d: str,
     level: str
 ):
-
-    s2_mask_col = make_s2_mask_col(polygon, date, date_plus1d)
-    best_s2_mask, best_s2_id, s2_unmasked_frac = determine_best_img(s2_mask_col, polygon=polygon, satellite="S2")
-
-    ls8_mask_col = make_ls8_mask_col(polygon, date, date_plus1d, level)
-    best_ls8_mask, best_ls8_id, ls8_unmasked_frac = determine_best_img(ls8_mask_col, polygon=polygon, satellite="LS8")
-
-    if s2_unmasked_frac < 0.25 or ls8_unmasked_frac < 0.25: # TODO: think more about this threshold
-        print(f'WARNING: UNMASKED FRACTION IS LOW, will probably skip export')
-
+    """
+    Identifies the best Sentinel-2 and Landsat 8 image pairs and their cloud masks
+    for a given region and date.
+    
+    Args:
+        polygon: Earth Engine geometry defining the region of interest
+        date: Start date for image search (YYYY-MM-DD)
+        date_plus1d: End date for image search (YYYY-MM-DD)
+        level: Processing level ('sr' or 'toa')
+        
+    Returns:
+        Best S2 mask, S2 image ID, best LS8 mask, LS8 image ID, and mask attributes
+        Returns None if tile overlap is insufficient
+    """
+    # Step 1: Find the best Sentinel-2 image and its mask
+    s2_mask_col, s2_mask_attrs = make_s2_mask_col(polygon, date, date_plus1d)
+    best_s2_mask, best_s2_id, s2_unmasked_frac, best_s2_mask_attrs = determine_best_img(
+        s2_mask_col, 
+        s2_mask_attrs, 
+        polygon=polygon, 
+        satellite="S2"
+    )
+    
+    # Step 2: Find the best Landsat 8 image and its mask
+    ls8_mask_col, ls8_mask_attrs = make_ls8_mask_col(polygon, date, date_plus1d, level)
+    best_ls8_mask, best_ls8_id, ls8_unmasked_frac, best_ls8_mask_attrs = determine_best_img(
+        ls8_mask_col, 
+        ls8_mask_attrs, 
+        polygon=polygon, 
+        satellite="LS8"
+    )
+    
+    # Step 3: Check if either image has too much cloud/mask coverage
+    # (unmasked fraction < 25% means >75% of image is masked/cloudy)
+    UNMASKED_THRESHOLD = 0.25
+    if s2_unmasked_frac < UNMASKED_THRESHOLD or ls8_unmasked_frac < UNMASKED_THRESHOLD:
+        print(f'WARNING: UNMASKED FRACTION IS LOW (S2: {s2_unmasked_frac:.2f}, LS8: {ls8_unmasked_frac:.2f}), will probably skip export')
+    
+    # Step 4: Verify sufficient overlap between the two satellite images
     overlap_percentage = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
-
-    if overlap_percentage < 40:
-        print("SKIPPING EXPORT: LOW TILE OVERLAP")
+    
+    OVERLAP_THRESHOLD = 40  # percent
+    if overlap_percentage < OVERLAP_THRESHOLD:
+        print(f"SKIPPING EXPORT: LOW TILE OVERLAP ({overlap_percentage:.2f}% < {OVERLAP_THRESHOLD}%)")
         return None
-
-    return best_s2_mask, best_s2_id, best_ls8_mask, best_ls8_id
+    
+    return best_s2_mask, best_s2_id, best_ls8_mask, best_ls8_id, best_s2_mask_attrs, best_ls8_mask_attrs
 
 
 def fetch_imgs_from_ids(
@@ -563,11 +681,34 @@ def calc_common_mask_frac(
 
     return common_mask_fraction
 
+def export_undilated_common_mask(
+    mask: ee.Image,
+    polygon: ee.Geometry,
+    date: str,
+    roi_name:str
+):  
+    export_name = f'CommonMask_RAW_date_{date}_roi_{roi_name}'
+    mask_proj = mask.projection().getInfo()
+    task = ee.batch.Export.image.toDrive(
+        image=mask,
+        description=export_name,
+        fileNamePrefix=export_name,
+        folder='raw_masks',
+        region=polygon,
+        crs=mask_proj['crs'],
+        crsTransform=mask_proj['transform'],
+        maxPixels=1e13
+    )
+    task.start()
+    print("EXPORTING raw common mask")
+
 
 def generate_common_mask(
     s2_mask: ee.Image,
     ls8_mask: ee.Image,
     polygon: ee.Geometry,
+    date: str,
+    roi_name: str,
     roi_est_crs: str # The EPSG code assocaited with the Region's UTM zone
 ):
     """
@@ -590,8 +731,17 @@ def generate_common_mask(
     s2_mask_reproj = s2_mask_reproj.rename('common_mask')
 
     combined_mask = s2_mask_reproj.Or(ls8_mask_reproj)
+
+    # I don't trust Google Earth Engine anymore (want to double check sieving and dilating)
+    export_undilated_common_mask(
+        combined_mask,
+        polygon,
+        date,
+        roi_name
+    )
+
     connected_pixels = combined_mask.connectedPixelCount(maxSize=1_000, eightConnected=True)
-    sieved_mask = combined_mask.updateMask(connected_pixels.gte(25))
+    sieved_mask = combined_mask.updateMask(connected_pixels.gte(50))
     dilation_kernal = ee.Kernel.circle(radius=500, units='meters', normalize=False)
     dilated_mask = sieved_mask.focal_max(kernel=dilation_kernal, iterations=1)
 
@@ -641,7 +791,7 @@ def export_imgs_to_drive(
     s2_proj = s2_out_img.projection().getInfo()
     ls8_export_name = f'Landsat8_{level}_date_{date}_roi_{roi_name}'
     ls8_proj = ls8_out_img.projection().getInfo()
-    mask_export_name = f'CommonMask_{level}_date_{date}_roi_{roi_name}'
+    mask_export_name = f'CommonMask_date_{date}_roi_{roi_name}'
     mask_proj = common_mask.projection().getInfo()
     print("---- checking projections -------")
     print(s2_proj)
@@ -701,10 +851,18 @@ def pair_processor(
     date_plus1d = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     polygon = convert_gpd_geom_to_ee(geom, None)
 
+###############################################################################
+# 1.0 Find the optimal image pair (i.e. lowest masked portion and high overlap)
+##############################################################################
+
     pairs_and_masks = find_pairs_and_masks(polygon, date, date_plus1d, level)
-    if pairs_and_masks is None: # Don't bother exporting bad tiles. 
+    if pairs_and_masks is None: # Don't bother exporting non-overlapping tiles
         return None 
-    
+
+######################################################################
+# 2.0 Fetch the best image pair and their attributes
+######################################################################
+
     s2_id =pairs_and_masks[1]
     ls8_id = pairs_and_masks[3]
 
@@ -724,21 +882,31 @@ def pair_processor(
 
     # TODO: Calculate mask summary stats here???
 
-    # Make the common mask
+#########################################################################
+# Produce the common mask
+#########################################################################
     s2_mask = pairs_and_masks[0]
     ls8_mask = pairs_and_masks[2]
-    common_mask, masked_frac = generate_common_mask(s2_mask, ls8_mask, polygon, roi_est_crs)
+    common_mask, masked_frac = generate_common_mask(
+        s2_mask, 
+        ls8_mask, 
+        polygon, 
+        date,
+        roi_name,
+        roi_est_crs
+    )
+
+#########################################################################
+# Check the common mask's fraction, Export images and attributes
+#########################################################################
 
     print(f'The common mask covers {masked_frac:.2f}% of the region')
-    if masked_frac > 70:
+    if masked_frac > 55:
         print("Bad image -- skipping export")
         mask_export_name = 'bad_img'
         s2_export_name = 'bad_img'
         ls8_export_name = 'bad_img'
 
-    # Apply the common mask to the images
-    # out_s2_img = apply_common_mask(s2_img, common_mask)
-    # out_ls8_img = apply_common_mask(ls8_img, common_mask)
     else:
         s2_export_name, ls8_export_name, mask_export_name = export_imgs_to_drive(
             s2_img,
@@ -750,6 +918,11 @@ def pair_processor(
             level
         )
 
+    pp.pp(pairs_and_masks[4])
+    pp.pp(pairs_and_masks[5])
+
+    mask_attrs = pairs_and_masks[4] | pairs_and_masks[5]
+
     s2_attrs['s2_export_name'] = s2_export_name
     s2_attrs['mask_export_name'] = mask_export_name
     s2_attrs['roi_name'] = roi_name
@@ -760,26 +933,28 @@ def pair_processor(
     ls8_attrs['roi_name'] = roi_name
     ls8_attrs['date'] = date
 
-    return s2_attrs, ls8_attrs
+    return s2_attrs, ls8_attrs, mask_attrs
 
-# %%
+# %% Run the script
 
 s2_attrs_list = []
 ls8_attrs_list = []
+mask_attrs_list = []
 
-for idx, row in best_image_dates.iterrows():
+for idx, row in best_image_dates_f.iterrows():
 
-    s2_attrs, ls8_attrs = pair_processor(
+    s2_attrs, ls8_attrs, mask_attrs = pair_processor(
         row,
         roi_name=roi_name,
         roi_est_crs=est_utm, 
         level=level
     )
 
+    mask_attrs_list.append(mask_attrs)
     s2_attrs_list.append(s2_attrs)
     ls8_attrs_list.append(ls8_attrs)
 
-# %%
+# %% Write output to a dataframe
 
 s2_batch_summary = pd.DataFrame(s2_attrs_list)
 s2_batch_summary.to_csv(
