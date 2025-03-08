@@ -11,7 +11,7 @@ import datetime #??
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
-roi_name = 'YKF_sub1'
+roi_name = 'AND_sub1'
 level = 'sr'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
@@ -21,7 +21,7 @@ roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
-best_image_dates_f = best_image_dates[19:25]
+best_image_dates_f = best_image_dates[30:]
 
 # 2.0 %% Helper Functions for the pipeline
 
@@ -332,7 +332,7 @@ def determine_best_img(
     best_img_id = None
     best_img_mask = None
     best_img_mask_attrs = None
-    highest_frac_unmasked = float(0)
+    highest_frac_unmasked = float(-0.01) # Negative incase valid pixel coverage is zero
 
     for i in range(col_len):
         img = ee.Image(col_list.get(i))
@@ -922,6 +922,11 @@ def pair_processor(
     pp.pp(pairs_and_masks[5])
 
     mask_attrs = pairs_and_masks[4] | pairs_and_masks[5]
+    mask_attrs['s2_export_name'] = s2_export_name
+    mask_attrs['ls8_export_name'] = ls8_export_name
+    mask_attrs['mask_export_name'] = mask_export_name
+    mask_attrs['roi_name'] = roi_name
+    mask_attrs['date'] = date
 
     s2_attrs['s2_export_name'] = s2_export_name
     s2_attrs['mask_export_name'] = mask_export_name
@@ -955,15 +960,19 @@ for idx, row in best_image_dates_f.iterrows():
     ls8_attrs_list.append(ls8_attrs)
 
 # %% Write output to a dataframe
-
+mask_batch_summary = pd.DataFrame(mask_attrs_list)
+mask_batch_summary.to_csv(
+    f'./data/img_mask_solar_stats/{roi_name}_{level}_mask_attrs.csv',
+    index=False
+)
 s2_batch_summary = pd.DataFrame(s2_attrs_list)
 s2_batch_summary.to_csv(
-    f'./data/img_overlap_solar_stats/{roi_name}_{level}_Sentinel2_attrs.csv',
+    f'./data/img_mask_solar_stats/{roi_name}_{level}_Sentinel2_attrs.csv',
     index=False
 )
 ls8_batch_summary = pd.DataFrame(ls8_attrs_list)
 ls8_batch_summary.to_csv(
-    f'./data/img_overlap_solar_stats/{roi_name}_{level}_Landsat8_attrs.csv',
+    f'./data/img_mask_solar_stats/{roi_name}_{level}_Landsat8_attrs.csv',
     index=False
 )
 
