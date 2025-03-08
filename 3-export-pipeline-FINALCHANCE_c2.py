@@ -12,7 +12,7 @@ ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
 roi_name = 'AND_sub1'
-level = 'sr'
+level = 'toa'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
 best_image_dates = gpd.read_file(image_footprints_path) 
@@ -20,8 +20,6 @@ est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
-
-best_image_dates_f = best_image_dates[30:]
 
 # 2.0 %% Helper Functions for the pipeline
 
@@ -946,7 +944,7 @@ s2_attrs_list = []
 ls8_attrs_list = []
 mask_attrs_list = []
 
-for idx, row in best_image_dates_f.iterrows():
+for idx, row in best_image_dates.iterrows():
 
     s2_attrs, ls8_attrs, mask_attrs = pair_processor(
         row,
