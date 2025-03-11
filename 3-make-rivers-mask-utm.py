@@ -5,14 +5,11 @@ import numpy as np
 import geopandas as gpd
 
 import rasterio as rio
-from rasterio import features, warp
-from rasterio.warp import calculate_default_transform, reproject, Resampling
-from rasterio.transform import from_bounds
+from rasterio import features
 
 
-
-roi_name = 'YKF_sub3'
-out_res = 60 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
+roi_name = 'YKD_sub2'
+out_res = 30 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
 buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 
 # These regions (MRD, TUK, AND) have the same river file

@@ -11,8 +11,17 @@ import numpy as np
 
 from image_analysis_functions import extract_unique
 
-level = 'toa' # must be 'sr' or 'toa'
+level = 'sr' # must be 'sr' or 'toa'
 res = 30 # 30 or 60 meters
+resample_method = 'bilinear'
+
+band_desc = {
+    1: 'Blue',
+    2: 'Green',
+    3: 'Red', 
+    4: 'NIR'
+}
+
 download_dir = f'./data/{level}_image_downloads/'
 roi_dir = './data/roi_shapes/rois/'
 
@@ -28,8 +37,7 @@ unique_dates = extract_unique(all_s2_files, date_pattern)
 
 pairs = list(product(unique_rois, unique_dates))
 
-
-# %% 2.0 
+# %% 2.0 Functions
 
 def check_for_pair_fp(
     pair_info: tuple,
@@ -48,17 +56,6 @@ def check_for_pair_fp(
     if ls8_exist and s2_exist:
         return (s2_fp, ls8_fp)
     
-def find_bounds_intersection(
-    bounds1: dict,
-    bounds2: dict,
-):
-    
-    left = max(bounds1.left, bounds2.left)
-    right = min(bounds1.right, bounds2.left)
-    top = min(bounds1.top, bounds2.top)
-    bottom = max(bounds1.bottom, bounds2.bottom)
-
-    pass
     
 def reproject_to_ref(
     img_fp: str,
@@ -122,28 +119,38 @@ def reproject_to_ref(
 
         return out_fp
 
-
-# %% Functions to mask the images
-
 def apply_cloud_river_masks(
     s2_temp_fp: str,
     ls8_temp_fp: str,
     cloud_mask_fp: str,
+    rivers_fp: str,
+    band_dict: dict,
     level: str, 
+    roi: str,
+    resample_method: str,
+    res: int
 ):
-    
-    with rio.open(s2_temp_fp) as s2, rio.open(ls8_temp_fp) as ls8, rio.open(cloud_mask_fp) as mask:
+    """
+    Applies the appropriate rivers and cloud masks to a given image. 
+    """
+    with (
+        rio.open(s2_temp_fp) as s2, 
+        rio.open(ls8_temp_fp) as ls8, 
+        rio.open(cloud_mask_fp) as mask, 
+        rio.open(rivers_fp) as rivers
+    ):
 
         s2_data = s2.read()
         s2_meta = s2.meta
         ls8_data = ls8.read()
         ls8_meta = ls8.meta
         cloud_mask_data = mask.read(1)
+        river_mask_data = rivers.read(1)
 
         s2_valid = np.any(s2_data != 0, axis=0) # Checks for any bands not equal to zero
         ls8_valid = np.any(ls8_data != 0, axis=0)
         # Valid pixels for images and cloud mask
-        valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0)
+        valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0) & (river_mask_data == 0)
 
         s2_masked = s2_data.copy()
         for i in range(s2.count):
@@ -154,7 +161,8 @@ def apply_cloud_river_masks(
             ls8_masked[i, ~valid_pixels_mask] = 0
 
 
-        out_dir = f'./data/{level}_images/'
+        out_dir = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}{res}/'
+        os.makedirs(out_dir, exist_ok=True)
 
         s2_basename = os.path.basename(s2_temp_fp)
         ls8_basename = os.path.basename(ls8_temp_fp)
@@ -166,26 +174,24 @@ def apply_cloud_river_masks(
 
         with rio.open(s2_out_fp, 'w', **s2_meta) as dst_s2:
             dst_s2.write(s2_masked)
+            for idx, band_name in band_dict.items():
+                dst_s2.set_band_description(idx, band_name)
 
         with rio.open(ls8_out_fp, 'w', **ls8_meta) as dst_ls8:
             dst_ls8.write(ls8_masked)
-
-    print("Masked some images")
-    # os.remove(s2_temp_fp)
-    # os.remove(ls8_temp_fp)
-    # os.remove(cloud_mask_fp)
+            for idx, band_name in band_dict.items():
+                dst_ls8.set_band_description(idx, band_name)
 
 
+def reproj_mask_img_pairs(
+    pair: tuple,
+    level: str,
+    resample_method: str,
+    res: str,
+    band_desc: dict
+):
 
-
-
-
-
-# %%
-
-for p in pairs[0:10]:
-
-    pair_paths = check_for_pair_fp(p, level)
+    pair_paths = check_for_pair_fp(pair, level)
     if pair_paths is not None:
         roi = extract_unique(pair_paths, roi_pattern)[0]
         date = extract_unique(pair_paths, date_pattern)[0]
@@ -193,24 +199,25 @@ for p in pairs[0:10]:
         ls8_fp = pair_paths[1]
         ref_fp = f'./data/roi_shapes/rois/rasterized_{roi}_shape_res{res}.tif'
         mask_fp = f'./data/{level}_masks/CommonMask_date_{date}_roi_{roi}.tif'
+        river_mask_fp = f'./data/river_files/{roi}_binary_rivers_dilated180_res{res}.tif'
 
         # Reproject the data to common reference grid write to temp folder
         s2_temp_fp = reproject_to_ref(
             s2_fp,
             ref_fp,
-            'nearest'
+            resample_method
         )
 
         ls8_temp_fp = reproject_to_ref(
             ls8_fp,
             ref_fp,
-            'nearest'
+            resample_method
         ) 
 
         cloud_temp_fp = reproject_to_ref(
             mask_fp,
             ref_fp, 
-            'nearest'
+            resample_method
         )
 
         # Apply the cloud mask to the images
@@ -218,8 +225,29 @@ for p in pairs[0:10]:
             s2_temp_fp,
             ls8_temp_fp,
             cloud_temp_fp,
+            river_mask_fp,
+            band_desc,
             level,
+            roi,
+            resample_method,
+            res
         )
+        print(roi, date)
+        os.remove(s2_temp_fp)
+        os.remove(ls8_temp_fp)
+        os.remove(cloud_temp_fp)
+
+# %%
+
+for p in pairs:
+
+    reproj_mask_img_pairs(
+        pair=p,
+        level=level,
+        resample_method=resample_method,
+        res=res,
+        band_desc=band_desc
+    )
 
 
     

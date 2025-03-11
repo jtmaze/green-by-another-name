@@ -434,6 +434,7 @@ def regress_image_pairs(image_info: dict,
     )
     
     # Make file paths
+    # TODO: Swap these around for the new directory structure
     s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
@@ -657,6 +658,7 @@ def otsu_image_wtr_area(
         image_info['roi'],
         image_info['band_name']
     )
+    # TODO: Swap these around for the new directory structure
     s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
     ls_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
 
