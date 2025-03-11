@@ -21,7 +21,7 @@ roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
-# 2.0 %% Helper Functions for the pipeline
+# 2.0 %% Functions
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -56,7 +56,7 @@ def get_mask_frac(
 
 
 
-# %% Cloud mask functions 
+
 
 def add_scl_join_key(img):
     """
@@ -187,7 +187,7 @@ def make_s2_mask_col(
 
     return s2_mask_col, mask_attrs_list
 
-# %% Landsat Cloud Masking Functions
+
 def calc_ls8_mask_stats(
     ls8_qa: ee.ImageCollection,
     polygon: ee.Geometry
@@ -265,7 +265,7 @@ def make_ls8_mask_col(
 
     return ls8_mask_col, ls8_attrs_list
 
-# %% Functions evaluating pixel coverage and 
+
 
 def compute_valid_pixel_coverage(
     mask_image: ee.Image, 
@@ -382,7 +382,7 @@ def calculate_tile_overlap(
 
     return overlap_percentage
 
-# %% Full Pipeline
+
 
 def find_pairs_and_masks(
     polygon: ee.Geometry,
@@ -649,7 +649,7 @@ def find_s2_img_attrs(
 
     return attrs_out
 
-# %% 
+
 
 def calc_common_mask_frac(
     common_mask: ee.Image,
@@ -766,7 +766,7 @@ def generate_common_mask(
 
 #     return masked_img
 
-# %% Export Function
+
 
 def export_imgs_to_drive(
     s2_out_img: ee.Image,
