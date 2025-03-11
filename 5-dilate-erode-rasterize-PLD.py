@@ -9,8 +9,13 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'TUK_sub3'
+roi_name = 'MRD_sub1'
+res = 30 # or 60 meters
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
+
+if res == 60:
+    buffers = [-120, -60, 0, 60, 120] # Change buffers to increments matching the resolution
+
 out_dir = './data/pld_rasterized/'
 roi_prefix = roi_name.split('_')[0]
 
@@ -30,9 +35,11 @@ roi_utm = roi.to_crs(est_utm)
 
 # %% 2.0 Define functions
 
-def pld_buffer_img_clip(gdf_utm: gpd.GeoDataFrame, 
-                        buffer_size: int, 
-                        clip_bounds: gpd.GeoDataFrame):
+def pld_buffer_img_clip(
+    gdf_utm: gpd.GeoDataFrame, 
+    buffer_size: int, 
+    clip_bounds: gpd.GeoDataFrame
+):
     """
     Clips the PLD lakes to the roi boudary
     Returns a tupple of dilated/eroded lakes and a band name for writing to raster
@@ -55,11 +62,13 @@ def pld_buffer_img_clip(gdf_utm: gpd.GeoDataFrame,
     return (out_gdf, band_name)
 
 
-def rasterize_buffers(gdf: gpd.GeoDataFrame, 
-                      band_name: str, 
-                      img_path: str,
-                      out_path: str,
-                      band_idx: int):
+def rasterize_buffers(
+    gdf: gpd.GeoDataFrame, 
+    band_name: str, 
+    img_path: str,
+    out_path: str,
+    band_idx: int
+):
     """
     Rasterize the dilated/eroded lake shapes and write them to disk
     """
@@ -82,7 +91,7 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
     # Convert the lakes the local UTM from the image
     gdf = gdf.to_crs(img_meta['crs'])
     # Rasterize the the lake shapes to a binary raster
-    # The image path to rivers raster, bc satellite images have variable footprints by date.
+    # The image path to roi shape raster, becuase satellite images have variable footprints by date.
     lake_raster = rasterize(
         shapes=[(geom, 1) for geom in gdf.geometry],
         out_shape=(img_meta['height'], img_meta['width']),
@@ -102,8 +111,8 @@ def rasterize_buffers(gdf: gpd.GeoDataFrame,
 
 # %% Rasterize the new shapes as bands
 
-img_path = f'./data/river_files/{roi_name}_binary_rivers_dilated180.tif'
-out_path = f'{out_dir}/{roi_name}_lake_masks.tif'
+img_path = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res{res}.tif'
+out_path = f'{out_dir}/{roi_name}_lake_masks_res{res}.tif'
 
 for i, buffer in enumerate(buffers):
     pld_buffered, band_name = pld_buffer_img_clip(pld_utm, buffer, roi_utm)
