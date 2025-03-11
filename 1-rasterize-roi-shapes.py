@@ -7,13 +7,13 @@ import rasterio as rio
 from rasterio.features import rasterize
 from rasterio.transform import from_bounds
 
-roi_prefix = 'AKCP'
+roi_prefix = 'AND'
 data_dir = './data/roi_shapes/rois/'
 roi_shapes = gpd.read_file(f'{data_dir}{roi_prefix}_sub_rois.shp')
 
 # %% 3.0 
 
-resolution = 60 # meters
+resolution = 30 # meters
 original_crs = roi_shapes.crs
 print(original_crs)
 

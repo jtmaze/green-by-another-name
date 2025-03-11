@@ -11,7 +11,7 @@ import datetime #??
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
-roi_name = 'YKF_sub1'
+roi_name = 'YKD_sub9'
 level = 'toa'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
@@ -20,7 +20,6 @@ est_utm = f'EPSG:{best_image_dates.estimate_utm_crs().to_epsg()}'
 roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
-
 
 # 2.0 %% Helper Functions for the pipeline
 
@@ -687,19 +686,20 @@ def export_undilated_common_mask(
     roi_name:str
 ):  
     export_name = f'CommonMask_RAW_date_{date}_roi_{roi_name}'
-    mask_proj = mask.projection().getInfo()
-    task = ee.batch.Export.image.toDrive(
-        image=mask,
-        description=export_name,
-        fileNamePrefix=export_name,
-        folder='raw_masks',
-        region=polygon,
-        crs=mask_proj['crs'],
-        crsTransform=mask_proj['transform'],
-        maxPixels=1e13
-    )
-    task.start()
-    print("EXPORTING raw common mask")
+    # mask_proj = mask.projection().getInfo()
+    # task = ee.batch.Export.image.toDrive(
+    #     image=mask,
+    #     description=export_name,
+    #     fileNamePrefix=export_name,
+    #     folder='raw_masks',
+    #     region=polygon,
+    #     crs=mask_proj['crs'],
+    #     crsTransform=mask_proj['transform'],
+    #     maxPixels=1e13
+    # )
+    # task.start()
+    # print("EXPORTING raw common mask")
+    pass
 
 
 def generate_common_mask(
