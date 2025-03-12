@@ -223,8 +223,8 @@ def regress_reflectance(
     above_frac = below_frac = None
 
     sample_size = ls_sample.size
-    if sample_size < 10_000:
-        print(f'Error: Insuffcient quality pixels given parameter (less than 10,000)')
+    if sample_size < 500:
+        print(f'Error: Insuffcient quality pixels given parameter (less than 500)')
         model = 'Poor Quality Image Data'
         model_domain = 'Poor Quality Image Data'
         ls_histogram = s2_histogram = 'Poor Quality Image Data'
@@ -415,11 +415,12 @@ def regress_image_pairs(image_info: dict,
     """
     # Image params
     # Extract parameters
-    level, date, roi, band_name = (
+    level, date, roi, band_name, resample_method = (
         image_info['level'], 
         image_info['date'], 
         image_info['roi'],
-        image_info['band_name']
+        image_info['band_name'],
+        image_info['resample_method']
     )
     
     zone, buffer_delim, buffer_delim_outer = (
@@ -434,10 +435,10 @@ def regress_image_pairs(image_info: dict,
     )
     
     # Make file paths
-    # TODO: Swap these around for the new directory structure
-    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images/LandSat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks.tif'
+    s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+    ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
+    res = re.search(r"(\d{2}$)", resample_method).group(1)
+    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
 
     if check_match_imgs(ls8_fp, s2_fp, image_info):
         sample_params = {
@@ -454,13 +455,14 @@ def regress_image_pairs(image_info: dict,
                 ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
             )
         # Run regression function
-        print(f'{level} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
+        print(f'{level} {resample_method} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
         regression_output = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return)
     else: # Return no image data if matching images not found
         valid_pix_cnt = regression_output = "No Image Data"
 
     return {
         'level': level,
+        'resample_method': resample_method,
         'date': date,
         'roi': roi,
         'band_name': band_name,
@@ -519,12 +521,16 @@ def make_ndwi_images(
     Returns two NDWI images as numpy arrays. 
     """
     
-    level = image_info['level']
-    date = image_info['date']
-    roi = image_info['roi']
-    
-    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls8_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
+    level, date, roi, band_name, resample_method = (
+        image_info['level'], 
+        image_info['date'], 
+        image_info['roi'],
+        image_info['band_name'],
+        image_info['resample_method']
+    )
+
+    s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+    ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
     
     # Read the raster data necessary to calculate NDWI
     ls_green, s2_green, image_window_params = rio_get_data_arrays(
@@ -560,10 +566,11 @@ def make_ndwi_images(
 def mask_ndwi_images(
     ndwi: np.array,
     image_window_params: dict,
-    roi: str
+    roi: str,
+    res: int
 ):
 
-    pld_path = f'./data/pld_rasterized/{roi}_lake_masks.tif'
+    pld_path = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
     pld_plus = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
@@ -652,21 +659,23 @@ def otsu_image_wtr_area(
     ls_hist = None
     s2_hist = None
 
-    level, date, roi, band_name = (
+    level, date, roi, band_name, resample_method = (
         image_info['level'], 
         image_info['date'], 
         image_info['roi'],
-        image_info['band_name']
+        image_info['band_name'],
+        image_info['resample_method']
     )
-    # TODO: Swap these around for the new directory structure
-    s2_fp = f'./data/{level}_images/Sentinel2-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
-    ls_fp = f'./data/{level}_images/Landsat8-{level}_date_{date}_roi_{roi}_resampled_bilinear30.tif'
 
-    if check_match_imgs(ls_fp, s2_fp, image_info):
+    s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+    ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
+
+    if check_match_imgs(ls8_fp, s2_fp, image_info):
         print(f"Working {level} for {date} over the {roi} region")
         ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
-        ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi)
-        s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi)
+        res = re.search(r"(\d{2}$)", resample_method).group(1)
+        ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi, res)
+        s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi, res)
 
         # Ensure there's enough quality lake pixels in the image.
         if np.sum(~np.isnan(ls_ndwi_lakes)) < 25_000 or np.sum(~np.isnan(s2_ndwi_lakes)) < 25_000:
@@ -738,6 +747,7 @@ def make_otsu_area_summaries(
     Returns a dataframe with metrics for each image
     """
     area_summaries = []
+    resample_method = image_info['resample_method']
     for level in levels:
         image_info['level'] = level
         for roi in rois:
@@ -768,6 +778,7 @@ def make_otsu_area_summaries(
                     'date': date,
                     'roi': roi,
                     'level': level,
+                    'resample_method': resample_method,
                     'ls_threshold': otsu_items.get('ls_threshold'),
                     'ls_water_frac': otsu_items.get('ls_water_frac'),
                     's2_threshold': otsu_items.get('s2_threshold'),
@@ -790,13 +801,37 @@ def make_reflectance_summaries(
     rois: list,
     dates: list,
     hist_return: bool
-):
+) -> pd.DataFrame:
     """
-    Takes a list of levels, rois and dates to process
-    Returns a dataframe with regression metrics for each pair of images
+    Generates regression summaries for multiple image pairs across different processing levels,
+    regions of interest, and dates.
+    
+    Parameters:
+    -----------
+    image_info : dict
+        Dictionary containing image metadata (band_name, resample_method)
+    mask_params : dict
+        Parameters for masking pixels (zone, buffer_delim, buffer_delim_outer)
+    regression_params : dict
+        Parameters for regression analysis (sample_size, outlier_frac)
+    levels : list
+        List of processing levels to analyze
+    rois : list
+        List of regions of interest to analyze
+    dates : list
+        List of dates to analyze
+    hist_return : bool
+        Whether to return histogram data
+        
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame containing regression metrics for all image pairs
     """
     
     regression_summaries = []
+    
+    # Process each combination of level, ROI, and date
     for level in levels:
         image_info['level'] = level
         for roi in rois:
@@ -804,31 +839,39 @@ def make_reflectance_summaries(
             for date in dates:
                 image_info['date'] = date
 
-                items = regress_image_pairs(
+                # Perform regression analysis on the current image pair
+                regression_result = regress_image_pairs(
                     image_info, mask_params, regression_params, hist_return=hist_return
                 )
-
-                regression_items_str = items['regression_output']
+                # Handle case when no image data is available
+                regression_items_str = regression_result['regression_output']
                 if regression_items_str == 'No Image Data':
                     model = slope = intercept = r_squared = "No Image Data"
                     above_frac = below_frac = model_domain = "No Image Data"
                     ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "No Image Data"
-     
                 else: 
+                    # Convert string representation to dict if needed
                     if isinstance(regression_items_str, str):
                         regression_items = ast.literal_eval(regression_items_str)
                     else:
                         regression_items = regression_items_str
 
                     model = regression_items['model']
+                    
+                    # Extract regression metrics if image quality is sufficient
                     if model != "Poor Quality Image Data":
+                        # Extract model parameters
                         slope = model['slope']
                         intercept = model['intercept']
                         r_squared = model['r_squared']
-                        above_frac = regression_items['above_frac']
-                        below_frac = regression_items['below_frac']
+                        
+                        # Extract additional metrics
+                        above_frac = regression_items['above_frac']  # % pixels above 45° line
+                        below_frac = regression_items['below_frac']  # % pixels below 45° line
                         model_domain = regression_items['model_domain']
-                        if hist_return == True:
+                        
+                        # Handle histogram data if requested
+                        if hist_return:
                             ls_hist_counts = numpy_to_list(regression_items.get('ls_histogram')[0])
                             ls_hist_bins = numpy_to_list(regression_items.get('ls_histogram')[1])
                             s2_hist_counts = numpy_to_list(regression_items.get('s2_histogram')[0])
@@ -836,21 +879,24 @@ def make_reflectance_summaries(
                         else:
                             ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "Histogram Not Returned"
                     else:
+                        # Set default values for poor quality images
                         slope = intercept = r_squared = "Poor Quality Image Data"
                         model_domain = "Poor Quality Image Data"
                         above_frac = below_frac = "Poor Quality Image Data"
                         ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "Poor Quality Image Data"
 
+                # Create summary dictionary for this image pair
                 summary = {
-                    'level': items['level'],
-                    'roi': items['roi'],
-                    'date': items['date'],
-                    'band_name': items['band_name'], 
-                    'buffer_delim': items['buffer_delim'],
-                    'buffer_delim_outer': items['buffer_delim_outer'],
-                    'sample_size': items['sample_size'],
-                    'outlier_frac': items['outlier_frac'], 
-                    'valid_pix_cnt': items['valid_pix_cnt'],
+                    'level': regression_result['level'],
+                    'resample_method': regression_result['resample_method'],
+                    'roi': regression_result['roi'],
+                    'date': regression_result['date'],
+                    'band_name': regression_result['band_name'], 
+                    'buffer_delim': regression_result['buffer_delim'],
+                    'buffer_delim_outer': regression_result['buffer_delim_outer'],
+                    'sample_size': regression_result['sample_size'],
+                    'outlier_frac': regression_result['outlier_frac'], 
+                    'valid_pix_cnt': regression_result['valid_pix_cnt'],
                     'slope': slope,
                     'intercept': intercept,
                     'r_squared': r_squared,
@@ -865,5 +911,7 @@ def make_reflectance_summaries(
 
                 regression_summaries.append(summary)
 
-    return(pd.DataFrame(regression_summaries))
+    return pd.DataFrame(regression_summaries)
 
+
+# %%

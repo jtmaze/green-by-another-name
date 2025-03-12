@@ -9,7 +9,7 @@ import geopandas as gpd
 import rasterio as rio
 from rasterio.features import rasterize
 
-roi_name = 'MRD_sub1'
+roi_name = 'AKCP_sub1'
 res = 30 # or 60 meters
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 
