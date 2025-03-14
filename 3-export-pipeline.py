@@ -11,7 +11,7 @@ import datetime #??
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
-roi_name = 'YKD_sub9'
+roi_name = 'TUK_sub2'
 level = 'toa'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'

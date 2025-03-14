@@ -6,7 +6,7 @@ import pprint as pp
 
 from image_analysis_functions import extract_unique
 from image_analysis_functions import make_reflectance_summaries
-from image_analysis_functions import make_otsu_area_summaries
+
 
 
 toa_files = glob.glob('./data/toa_images/**/*tif')
@@ -19,7 +19,7 @@ resample_pattern = r'/reprojected_(.*?)_'
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
-levels = ['sr', 'toa']
+levels = ['sr']
 resample_method = 'bilinear30'
 regression_summaries = []
 
@@ -337,15 +337,4 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv('./data/regression_summaries_shoreline_0-plus30.csv', index=False)
 
-# %% 4.0 Calculate the Area by Otsu thresholding images
 
-image_info['resample_method'] = resample_method
-
-out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
-out_df = out_df[out_df['ls_s2_percent_diff'] != 'No Image Data']
-
-# %%
-out_df.to_csv('./data/area_data_v2.csv', index=False)
-
-
-# %%
