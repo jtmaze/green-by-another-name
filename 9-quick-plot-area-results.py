@@ -1,0 +1,174 @@
+# %%
+# 
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy import stats
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch1.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch1.csv')
+sr_bilinear60 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear60_area_summaries_batch1.csv')
+toa_bilinear60 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear60_area_summaries_batch1.csv')
+sr_lanczos30 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos30_area_summaries_batch1.csv')
+toa_lanczos30 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos30_area_summaries_batch1.csv')
+sr_lanczos60 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos60_area_summaries_batch1.csv')
+toa_lanczos60 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos60_area_summaries_batch1.csv')
+
+combined = pd.concat(
+    [
+        sr_bilinear30,
+        toa_bilinear30,
+        sr_bilinear60,
+        toa_bilinear60,
+        sr_lanczos30,
+        toa_lanczos30,
+        sr_lanczos60,
+        toa_lanczos60,
+    ],
+    ignore_index=True,
+)
+
+combined_valid = combined[combined['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
+
+total_toa_img_pairs = len(combined_valid[
+    (combined_valid['level'] == 'toa') &
+    (combined_valid['resample_method'] == 'bilinear30')
+])
+print(total_toa_img_pairs)
+
+total_sr_img_pairs = len(combined_valid[
+    (combined_valid['level'] == 'sr') &
+    (combined_valid['resample_method'] == 'bilinear30')
+])
+print(total_sr_img_pairs)
+
+
+# %% A
+
+def area_boxplot_maker(
+    temp: pd.DataFrame, 
+    cols_to_plot: list, 
+    zone_label: str, 
+    resample_label: str
+):
+    if zone_label == 'Total':
+        label_dict = {
+            'total_ls_water_frac_otsu': 'Landsat8 - Otsu',
+            'total_s2_water_frac_otsu': 'Sentinel-2 - Otsu',
+            'total_ls_water_frac_adaptive': 'Landsat8 - Adaptive',
+            'total_s2_water_frac_adaptive': 'Sentinel-2 - Adaptive'
+        }
+    elif zone_label == 'Lake':
+        label_dict = {
+            'lake_ls_water_frac_otsu': 'Landsat8 - Otsu',
+            'lake_s2_water_frac_otsu': 'Sentinel-2 - Otsu',
+            'lake_ls_water_frac_adaptive': 'Landsat8 - Adaptive',
+            'lake_s2_water_frac_adaptive': 'Sentinel-2 - Adaptive'
+        }
+    elif zone_label == 'Shoreline':
+        label_dict = {
+            'shoreline_ls_water_frac_otsu': 'Landsat8 - Otsu',
+            'shoreline_s2_water_frac_otsu': 'Sentinel-2 - Otsu',
+            'shoreline_ls_water_frac_adaptive': 'Landsat8 - Adaptive',
+            'shoreline_s2_water_frac_adaptive': 'Sentinel-2 - Adaptive'
+        }
+    else:
+        print("Invalid zone label. Please use 'Total', 'Lake', or 'Shoreline'.")
+        return
+
+    melted_df = pd.melt(
+        temp,
+        id_vars=['level'],
+        value_vars=cols_to_plot,
+        var_name='measurement',
+        value_name='water_fraction'
+    )
+
+    melted_df['water_fraction'] = melted_df['water_fraction'].astype(float)
+    melted_df['label'] = melted_df['measurement'].map(label_dict)
+    melted_df['display_name'] = melted_df['label'].fillna(melted_df['measurement'])
+
+    plt.figure(figsize=(14, 7))
+    sns.boxplot(
+        data=melted_df,
+        x='display_name',
+        y='water_fraction',
+        hue='level',
+        palette={'sr': '#2ecc71', 'toa': '#3498db'}
+    )
+    plt.title(f'{zone_label} Water % Comparison (resampled {resample_label})')
+    plt.xlabel('Satellite - Classification')
+    plt.ylabel('Water Fraction %')
+    plt.legend(title='Processing Level', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
+# %% Bilinear 30 Total
+cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'bilinear30'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Total',
+    resample_label='Bilinear 30'
+)
+
+cols_to_plot = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'bilinear30'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Lake',
+    resample_label='Bilinear 30'
+)
+cols_to_plot = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'bilinear30'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Shoreline',
+    resample_label='Bilinear 30'
+)
+
+# %%
+cols_to_plot2 = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+cols_to_plot3 = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+
+cols_to_plot = cols_to_plot2
+
+# %% Quick stats
+
+# T-test for otsu thresholding between Landsat and Sentinel-2
+# T-test for Otsu thresholding between Landsat and Sentinel-2
+otsu_ttest = stats.ttest_rel(
+    test[cols_to_plot[0]], 
+    test[cols_to_plot[1]],
+    nan_policy='omit'  # Handle any NaN values
+)
+
+# T-test for Adaptive thresholding between Landsat and Sentinel-2
+adaptive_ttest = stats.ttest_rel(
+    test[cols_to_plot[2]], 
+    test[cols_to_plot[3]],
+    nan_policy='omit'  # Handle any NaN values
+)
+
+# Print results with interpretation
+alpha = 0.05  # Significance level
+
+print("T-test results for Otsu thresholding (Landsat vs Sentinel-2):")
+print(f"  T-statistic: {otsu_ttest.statistic:.4f}")
+print(f"  P-value: {otsu_ttest.pvalue:.4f}")
+print(f"  Interpretation: {'Significantly different' if otsu_ttest.pvalue < alpha else 'Not significantly different'} at α={alpha}")
+print()
+
+print("T-test results for Adaptive thresholding (Landsat vs Sentinel-2):")
+print(f"  T-statistic: {adaptive_ttest.statistic:.4f}")
+print(f"  P-value: {adaptive_ttest.pvalue:.4f}")
+print(f"  Interpretation: {'Significantly different' if adaptive_ttest.pvalue < alpha else 'Not significantly different'} at α={alpha}")
+print()
+
+# %%

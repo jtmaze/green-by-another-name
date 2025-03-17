@@ -17,15 +17,17 @@ resample_pattern = r'/reprojected_(.*?)_'
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
-levels = ['sr', 'toa']
-rois = ['YKF_sub1', 'AKCP_sub1']
-resample_method = 'bilinear30'
-regression_summaries = []
+
+# Specify the level and resample method
+level = 'toa'
+levels = [level]
+resample_method = 'lanczos60'
+
 
 # %% 2.0 Dictionaries to hold image information
 
 image_info = {
-    'level': None,
+    'level': None, # levels will be iterated though, keep at toa or sr for smaller output data chunks. 
     'date': None, # Dates will be itterated through
     'roi': None, # ROIs will be itterated through
     'band_name': None, # Bands will be specified
@@ -37,7 +39,9 @@ image_info = {
 image_info['resample_method'] = resample_method
 
 out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
+print("Area summaries finished")
 # %% 4.0 Write the output to csv
 out_df = out_df[out_df['ls_otsu_threshold'].notna()]
-out_df.to_csv(f'./data/test_area_thresholding_summary.csv', index=False)
+# NOTE: change the batch number if you add more ROIs to the study!
+out_df.to_csv(f'./data/lake_area_results/{level}_resampled_{resample_method}_area_summaries_batch1.csv', index=False)
 # %%
