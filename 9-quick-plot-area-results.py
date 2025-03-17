@@ -1,10 +1,7 @@
-# %%
-# 
+# %% 1.0 Import libraries and data
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy import stats
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
@@ -46,7 +43,7 @@ total_sr_img_pairs = len(combined_valid[
 print(total_sr_img_pairs)
 
 
-# %% A
+# %% Function for lake area boxplots by resampling method and zone ("Total", "Lake", "Shoreline")
 
 def area_boxplot_maker(
     temp: pd.DataFrame, 
@@ -107,6 +104,9 @@ def area_boxplot_maker(
     plt.show()
 
 # %% Bilinear 30 Total
+"""
+Compare bilinear 30m area stats
+"""
 cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
 temp = combined_valid[combined_valid['resample_method'] == 'bilinear30'].copy()
 area_boxplot_maker(
@@ -133,42 +133,93 @@ area_boxplot_maker(
     resample_label='Bilinear 30'
 )
 
-# %%
-cols_to_plot2 = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
-cols_to_plot3 = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+# # %% Bilinear 60 
+# """
+# Compare bilinear 60m area stats
+# """
+# cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'bilinear60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Total',
+#     resample_label='Bilinear 60'
+# )
 
-cols_to_plot = cols_to_plot2
+# cols_to_plot = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'bilinear60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Lake',
+#     resample_label='Bilinear 60'
+# )
+# cols_to_plot = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'bilinear60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Shoreline',
+#     resample_label='Bilinear 60'
+# )
+# # %% Lanczos 30
+# """"
+# Compare lanczos 30m area stats
+# """
+# cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos30'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Total',
+#     resample_label='Lanczos 30'
+# )
 
-# %% Quick stats
+# cols_to_plot = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos30'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Lake',
+#     resample_label='Lanczos 30'
+# )
+# cols_to_plot = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos30'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Shoreline',
+#     resample_label='Lanczos 30'
+# )
 
-# T-test for otsu thresholding between Landsat and Sentinel-2
-# T-test for Otsu thresholding between Landsat and Sentinel-2
-otsu_ttest = stats.ttest_rel(
-    test[cols_to_plot[0]], 
-    test[cols_to_plot[1]],
-    nan_policy='omit'  # Handle any NaN values
-)
+# # %% Lanczos 60
+# """"
+# Compare lanczos 60m area stats
+# """
+# cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Total',
+#     resample_label='Lanczos 60'
+# )
 
-# T-test for Adaptive thresholding between Landsat and Sentinel-2
-adaptive_ttest = stats.ttest_rel(
-    test[cols_to_plot[2]], 
-    test[cols_to_plot[3]],
-    nan_policy='omit'  # Handle any NaN values
-)
+# cols_to_plot = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Lake',
+#     resample_label='Lanczos 60'
+# )
+# cols_to_plot = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+# temp = combined_valid[combined_valid['resample_method'] == 'lanczos60'].copy()
+# area_boxplot_maker(
+#     temp=temp,
+#     cols_to_plot=cols_to_plot,
+#     zone_label='Shoreline',
+#     resample_label='Lanczos 60'
+# )
 
-# Print results with interpretation
-alpha = 0.05  # Significance level
 
-print("T-test results for Otsu thresholding (Landsat vs Sentinel-2):")
-print(f"  T-statistic: {otsu_ttest.statistic:.4f}")
-print(f"  P-value: {otsu_ttest.pvalue:.4f}")
-print(f"  Interpretation: {'Significantly different' if otsu_ttest.pvalue < alpha else 'Not significantly different'} at α={alpha}")
-print()
-
-print("T-test results for Adaptive thresholding (Landsat vs Sentinel-2):")
-print(f"  T-statistic: {adaptive_ttest.statistic:.4f}")
-print(f"  P-value: {adaptive_ttest.pvalue:.4f}")
-print(f"  Interpretation: {'Significantly different' if adaptive_ttest.pvalue < alpha else 'Not significantly different'} at α={alpha}")
-print()
-
-# %%
