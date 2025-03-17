@@ -18,7 +18,7 @@ image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 levels = ['sr', 'toa']
-rois = ['AND_sub1', 'YKF_sub1']
+rois = ['YKF_sub1', 'AKCP_sub1']
 resample_method = 'bilinear30'
 regression_summaries = []
 

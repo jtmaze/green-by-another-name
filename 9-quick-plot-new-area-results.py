@@ -9,15 +9,17 @@ import numpy as np
 area_test = pd.read_csv('./data/test_area_thresholding_summary.csv')
 
 # %%
-
+test = area_test[area_test['level'] == 'toa']
+print(len(test))
 cols_to_plot1 = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
 cols_to_plot2 = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
 cols_to_plot3 = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
 
+cols_to_plot = cols_to_plot2
 # Method 1: Using seaborn's boxplot directly with melted data
 plt.figure(figsize=(12, 6))
 # Melt the dataframe to get it into the right format for seaborn
-melted_df = pd.melt(area_test[cols_to_plot3])
+melted_df = pd.melt(area_test[cols_to_plot])
 sns.boxplot(x='variable', y='value', data=melted_df)
 plt.title('Comparison of Thresholds and Water Fractions')
 plt.xticks(rotation=45)  # Rotate labels if needed
@@ -27,16 +29,17 @@ plt.show()
 # %% Quick stats
 
 # T-test for otsu thresholding between Landsat and Sentinel-2
+# T-test for Otsu thresholding between Landsat and Sentinel-2
 otsu_ttest = stats.ttest_rel(
-    area_test['total_ls_water_frac_otsu'], 
-    area_test['total_s2_water_frac_otsu'],
+    test[cols_to_plot[0]], 
+    test[cols_to_plot[1]],
     nan_policy='omit'  # Handle any NaN values
 )
 
-# T-test for adaptive thresholding between Landsat and Sentinel-2
+# T-test for Adaptive thresholding between Landsat and Sentinel-2
 adaptive_ttest = stats.ttest_rel(
-    area_test['total_ls_water_frac_adaptive'], 
-    area_test['total_s2_water_frac_adaptive'],
+    test[cols_to_plot[2]], 
+    test[cols_to_plot[3]],
     nan_policy='omit'  # Handle any NaN values
 )
 

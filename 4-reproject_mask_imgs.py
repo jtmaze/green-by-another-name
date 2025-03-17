@@ -12,7 +12,7 @@ import numpy as np
 from image_analysis_functions import extract_unique
 
 level = 'sr' # must be 'sr' or 'toa'
-res = 30 # 30 or 60 meters
+res = 60 # 30 or 60 meters
 resample_method = 'lanczos'
 
 band_desc = {

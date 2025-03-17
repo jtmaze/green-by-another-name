@@ -593,22 +593,28 @@ def make_ndwi_images(
     ls_ndwi = calc_ndwi(ls_green, ls_nir)
     s2_ndwi = calc_ndwi(s2_green, s2_nir)
 
+    # Apply common nans values to S2 and LS8 images
+    valid_ls_mask = ~np.isnan(ls_ndwi)
+    valid_s2_mask = ~np.isnan(s2_ndwi)
+    ls_ndwi_out = np.where(valid_s2_mask, ls_ndwi, np.nan)
+    s2_ndwi_out = np.where(valid_ls_mask, s2_ndwi, np.nan)
+
     # Plot the NDWI images
-    green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
-    fig, ax = plt.subplots()
-    ax.set_facecolor('darkgrey')
-    ax.imshow(ls_ndwi, cmap=green_white_blue)
-    ax.set_title('Landsat NDWI')
-    plt.colorbar(ax.images[0], ax=ax)
-    plt.show()
-    fig, ax = plt.subplots()
-    ax.set_facecolor('darkgrey')
-    ax.imshow(s2_ndwi, cmap=green_white_blue)
-    ax.set_title('Sentinel-2 NDWI')
-    plt.colorbar(ax.images[0], ax=ax)
-    plt.show()
+    # green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
+    # fig, ax = plt.subplots()
+    # ax.set_facecolor('darkgrey')
+    # ax.imshow(ls_ndwi_out, cmap=green_white_blue)
+    # ax.set_title('Landsat NDWI')
+    # plt.colorbar(ax.images[0], ax=ax)
+    # plt.show()
+    # fig, ax = plt.subplots()
+    # ax.set_facecolor('darkgrey')
+    # ax.imshow(s2_ndwi_out, cmap=green_white_blue)
+    # ax.set_title('Sentinel-2 NDWI')
+    # plt.colorbar(ax.images[0], ax=ax)
+    # plt.show()
     
-    return ls_ndwi, s2_ndwi, image_window_params
+    return ls_ndwi_out, s2_ndwi_out, image_window_params
 
 def mask_ndwi_images(
     ndwi: np.array,
@@ -653,7 +659,7 @@ def find_otsu_threshold(
     Output: Otsu Threshold for a given NDWI image
     """
     
-    valid_data = clean_ndwi_data(ndwi)
+    valid_data = clean_ndwi_data(ndwi) # NDWI data is now flat
 
     n_bins = 1_000
     hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(-1, 1))
@@ -876,18 +882,32 @@ def image_wtr_area(
         ls_ndwi_lakes = mask_ndwi_images(ls_ndwi, image_window_params, roi, res)
         s2_ndwi_lakes = mask_ndwi_images(s2_ndwi, image_window_params, roi, res)
 
+        if res == '30':
+            valid_threshold = 25_000
+        elif res == '60':
+            valid_threshold = 6_250
+        else:
+            print("ERROR: Invalid resolution, must be 30 or 60")
+
         # Ensure there's enough quality lake pixels in the image.
-        if np.sum(~np.isnan(ls_ndwi_lakes)) < 25_000 or np.sum(~np.isnan(s2_ndwi_lakes)) < 25_000:
+        if np.sum(~np.isnan(ls_ndwi_lakes)) < valid_threshold or np.sum(~np.isnan(s2_ndwi_lakes)) < valid_threshold:
             print('ERROR: Skipping water area calculations -- Bad Image')
+            bad_val = "Poor Quality Image Data"
+            ls_otsu_threshold = ls_adaptive_land = ls_adaptive_water = \
+            s2_otsu_threshold = s2_adaptive_land = s2_adaptive_water = \
+            total_ls_water_frac_otsu = lake_ls_water_frac_otsu = shoreline_ls_water_frac_otsu = \
+            total_s2_water_frac_otsu = lake_s2_water_frac_otsu = shoreline_s2_water_frac_otsu = \
+            total_ls_water_frac_adaptive = lake_ls_water_frac_adaptive = shoreline_ls_water_frac_adaptive = \
+            total_s2_water_frac_adaptive = lake_s2_water_frac_adaptive = shoreline_s2_water_frac_adaptive = bad_val
 
         else:
             # Find otsu and adaptive thresholds
             print("----- LandSat Histogram --------------")
             ls_otsu_threshold, ls_hist = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
-            ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=True)
+            ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=False)
             print("----- Sentinel-2 Histogram --------------")
             s2_otsu_threshold, s2_hist = find_otsu_threshold(s2_ndwi_lakes, show_hist=False)
-            s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=True)
+            s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=False)
 
             # Make binary water masks using the thresholds
             ls_water_otsu = (ls_ndwi > ls_otsu_threshold).astype(int)
@@ -983,7 +1003,7 @@ def make_otsu_area_summaries(
                 area_items = image_wtr_area(image_info, write_mask=False, hist_return=hist_return)
                 # Convert the numpy histogram objects to lists for storage
                 if area_items.get('ls_hist') is None:
-                    ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = 'Poor Quality Image'
+                    ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = None
                 else:
                     ls_hist_counts = numpy_to_list(area_items.get('ls_hist')[0])
                     ls_hist_bins = numpy_to_list(area_items.get('ls_hist')[1])
