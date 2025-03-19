@@ -57,6 +57,11 @@ def create_boxplot(data, x_col, title_prefix, y_lim=None):
         value_name='diff_value'
     )
     
+    month_summary = melt_df.groupby([x_col, 'diff_type']).agg(
+        count = ('diff_value', 'count'),
+        mean = ('diff_value', 'mean')
+    )
+    print(month_summary)
     # Map difference types to labels
     melt_df['diff_type'] = melt_df['diff_type'].map({
         's2_level_diff': 'Sentinel-2',
@@ -72,7 +77,7 @@ def create_boxplot(data, x_col, title_prefix, y_lim=None):
         x=x_col,
         y='diff_value',
         hue='diff_type',
-        palette={'Sentinel-2': '#3498db', 'Landsat8': '#e74c3c'},
+        palette={'Sentinel-2': '#9b59b6', 'Landsat8': '#e74c3c'},
         order=x_order
     )
     plt.axhline(0, color='red', linestyle='--')
@@ -93,33 +98,34 @@ def create_boxplot(data, x_col, title_prefix, y_lim=None):
 lake_data = prepare_data(valid, 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive')
 
 # %% 2.1 PLD 60m+ Boxplot over Months for all sites
-create_boxplot(lake_data, 'month', "PLD +60m")
+create_boxplot(lake_data, 'month', "PLD +60m buffered")
 
 # %% 2.2 PLD 60m+ Boxplot over 1/2 Months for all sites
-create_boxplot(lake_data, 'half_month', "PLD +60m")
+create_boxplot(lake_data, 'half_month', "PLD +60m buffered")
 
 # %% 3.0 Process Shoreline (PLD +-60m) data
 shoreline_data = prepare_data(valid, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
 
 # %% 3.1 Shoreline Boxplot over Months for all sites
-create_boxplot(shoreline_data, 'month', "PLD +-60m", y_lim=(-10, 20))
+create_boxplot(shoreline_data, 'month', "PLD Shoreline +-60m")
 # %% 3.2 Shoreline Boxplot over 1/2 Months for all sites
-create_boxplot(shoreline_data, 'half_month', "PLD +-60m", y_lim=(-10, 30))
+create_boxplot(shoreline_data, 'half_month', "PLD Shoreline +-60m")
 
 # %% 4.0 Select specific regions of interest (YKF and AND)
 
 
 valid.loc[:, 'main_roi'] = valid.apply(lambda row: row['roi'].split('_')[0], axis=1)
 
+
 # %% 4.1 YKF Boxplot over Months for all sites
 region = 'YKF'
 YKF_data = valid[valid['main_roi'] == region]
 shoreline_YKF = prepare_data(YKF_data, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
 lake_YKF = prepare_data(YKF_data, 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive')
-create_boxplot(shoreline_YKF, 'month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_YKF, 'month', f"{region} PLD +60m", y_lim=None)
-create_boxplot(shoreline_YKF, 'half_month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_YKF, 'half_month', f"{region} PLD +60m", y_lim=None)
+create_boxplot(shoreline_YKF, 'month', f"{region} Shoreline PLD +-60m", y_lim=None)
+create_boxplot(lake_YKF, 'month', f"{region} Lake PLD +60m", y_lim=None)
+create_boxplot(shoreline_YKF, 'half_month', f"{region} Shoreline PLD +-60m", y_lim=None)
+create_boxplot(lake_YKF, 'half_month', f"{region} Lake PLD +60m", y_lim=None)
 
 # %% 4.2 AND Boxplot over Months for all sites
 region = 'AND'

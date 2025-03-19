@@ -904,10 +904,10 @@ def image_wtr_area(
             # Find otsu and adaptive thresholds
             print("----- LandSat Histogram --------------")
             ls_otsu_threshold, ls_hist = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
-            ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=False)
+            ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=True)
             print("----- Sentinel-2 Histogram --------------")
             s2_otsu_threshold, s2_hist = find_otsu_threshold(s2_ndwi_lakes, show_hist=False)
-            s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=False)
+            s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=True)
 
             # Make binary water masks using the thresholds
             ls_water_otsu = (ls_ndwi > ls_otsu_threshold).astype(int)

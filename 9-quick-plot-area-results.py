@@ -42,7 +42,6 @@ total_sr_img_pairs = len(combined_valid[
 ])
 print(total_sr_img_pairs)
 
-
 # %% Function for lake area boxplots by resampling method and zone ("Total", "Lake", "Shoreline")
 
 def area_boxplot_maker(
@@ -221,5 +220,9 @@ area_boxplot_maker(
 #     zone_label='Shoreline',
 #     resample_label='Lanczos 60'
 # )
+
+
+
+# %% Compare the TOA vs. SR differences by ROI
 
 
