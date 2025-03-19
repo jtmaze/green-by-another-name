@@ -6,19 +6,21 @@ import pprint as pp
 
 from image_analysis_functions import extract_unique
 from image_analysis_functions import make_reflectance_summaries
-from image_analysis_functions import make_otsu_area_summaries
 
 
-toa_files = glob.glob('./data/toa_images/*tif')
-sr_files = glob.glob('./data/sr_images/*.tif')
+
+toa_files = glob.glob('./data/toa_images/**/*tif')
+sr_files = glob.glob('./data/sr_images/**/*.tif')
 full_files = toa_files + sr_files
 date_pattern = r'_date_(.*?)_roi'
-roi_pattern = r'_roi_(.*?)_resampled'
+roi_pattern = r'_roi_(.*?).tif'
+resample_pattern = r'/reprojected_(.*?)_'
 
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
-levels = ['sr', 'toa']
-
+resample_methods = extract_unique(full_files, resample_pattern)
+levels = ['sr']
+resample_method = 'bilinear30'
 regression_summaries = []
 
 # %% 2.0 Make regressions for PLD 60 meter buffered
@@ -27,7 +29,8 @@ image_info = {
     'level': None,
     'date': None, # Dates will be itterated through
     'roi': None, # ROIs will be itterated through
-    'band_name': None # Bands will be specified
+    'band_name': None, # Bands will be specified
+    'resample_method': None, #
 }
 
 mask_params = {
@@ -37,13 +40,13 @@ mask_params = {
 }
 
 regression_params = {
-    'sample_size': 10_000,
+    'sample_size': 5_000,
     'outlier_frac': 0.0005,
 }
 
 # %% 2.1 Green Band PLD 60 meter buffered
 image_info['band_name'] = 'Green'
-levels = ['toa']
+image_info['resample_method'] = resample_method
 
 green_df = make_reflectance_summaries(
     image_info=image_info,
@@ -52,10 +55,11 @@ green_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False,
 )
 print("Done")
-# 2.2 NIR Band PLD 60 meter buffered
+
+# %% 2.2 NIR Band PLD 60 meter buffered
 
 image_info['band_name'] = 'NIR'
 
@@ -66,7 +70,7 @@ nir_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False,
 )
 print("Done")
 # 2.3 NDWI Band PLD 60 meter buffered
@@ -333,13 +337,4 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv('./data/regression_summaries_shoreline_0-plus30.csv', index=False)
 
-# %% 4.0 Calculate the Area by Otsu thresholding images
 
-out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
-out_df = out_df[out_df['ls_s2_percent_diff'] != 'No Image Data']
-
-# %%
-out_df.to_csv('./data/area_data_v2.csv', index=False)
-
-
-# %%

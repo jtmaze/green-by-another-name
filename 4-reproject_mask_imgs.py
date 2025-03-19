@@ -12,8 +12,8 @@ import numpy as np
 from image_analysis_functions import extract_unique
 
 level = 'sr' # must be 'sr' or 'toa'
-res = 30 # 30 or 60 meters
-resample_method = 'bilinear'
+res = 60 # 30 or 60 meters
+resample_method = 'lanczos'
 
 band_desc = {
     1: 'Blue',
@@ -79,7 +79,9 @@ def reproject_to_ref(
     resamp_methods = {
         'nearest': Resampling.nearest,
         'bilinear': Resampling.bilinear,
-        'cubic': Resampling.cubic
+        'cubic': Resampling.cubic,
+        'lanczos': Resampling.lanczos,
+        'average': Resampling.average
     }
     resamp = resamp_methods.get(resample_method)
 
@@ -115,7 +117,7 @@ def reproject_to_ref(
         with rio.open(out_fp, 'w', **out_meta) as dst:
             dst.write(out_data)
 
-        print(f"Reprojected {out_fp}")
+        #print(f"Reprojected {out_fp}")
 
         return out_fp
 
@@ -193,6 +195,7 @@ def reproj_mask_img_pairs(
 
     pair_paths = check_for_pair_fp(pair, level)
     if pair_paths is not None:
+        print("------------------------")
         roi = extract_unique(pair_paths, roi_pattern)[0]
         date = extract_unique(pair_paths, date_pattern)[0]
         s2_fp = pair_paths[0]
@@ -213,11 +216,12 @@ def reproj_mask_img_pairs(
             ref_fp,
             resample_method
         ) 
+        print("*****")
 
         cloud_temp_fp = reproject_to_ref(
             mask_fp,
             ref_fp, 
-            resample_method
+            'nearest'
         )
 
         # Apply the cloud mask to the images
@@ -248,6 +252,7 @@ for p in pairs:
         res=res,
         band_desc=band_desc
     )
+
 
 
     
