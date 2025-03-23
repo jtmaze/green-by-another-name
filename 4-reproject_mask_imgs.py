@@ -152,7 +152,7 @@ def apply_cloud_river_masks(
         cloud_mask_data = mask.read(1)
         river_mask_data = rivers.read(1)
 
-        s2_valid = np.any(s2_data > 0, axis=0) # Checks for any bands greater than zero
+        s2_valid = np.any(s2_data > 0, axis=0) # Checks for any bands values less than zero
         ls8_valid = np.any(ls8_data > 0, axis=0)
         # Valid pixels for images and cloud mask
         valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0) & (river_mask_data == 0)

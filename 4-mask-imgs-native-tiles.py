@@ -33,7 +33,6 @@ unique_rois = extract_unique(all_ls8_files, roi_pattern)
 unique_dates = extract_unique(all_s2_files, date_pattern)
 
 pairs = list(product(unique_rois, unique_dates))
-pairs = pairs[0:20]
 
 print(pairs)
 
@@ -114,29 +113,28 @@ def reproject_cloud_rivers_masks(
         )
 
         temp_dir = './data/temp/'
-        tgt_basename = os.path.basename(target_fp)
+        satellite = os.path.basename(target_fp).split('_')[0]
         river_basename = os.path.basename(river_mask_fp)
         cloud_basename = os.path.basename(cloud_mask_fp)
-        satellite = tgt_basename.split('_')[0]
 
-        out_river_fp = f'{temp_dir}{satellite}_{river_basename}'
-        out_cloud_fp = f'{temp_dir}{satellite}_{cloud_basename}'
+        temp_river_fp = f'{temp_dir}{satellite}_{river_basename}'
+        temp_cloud_fp = f'{temp_dir}{satellite}_{cloud_basename}'
 
-        print(out_river_fp, out_cloud_fp)
-
-        with rio.open(out_river_fp, 'w', **out_river_meta) as dst_river:
+        with rio.open(temp_river_fp, 'w', **out_river_meta) as dst_river:
             dst_river.write(out_river_data)
 
-        with rio.open(out_cloud_fp, 'w', **out_cloud_meta) as dst_cloud:
+        with rio.open(temp_cloud_fp, 'w', **out_cloud_meta) as dst_cloud:
             dst_cloud.write(out_cloud_data)
+
+    return temp_cloud_fp, temp_river_fp
 
 def make_img_valid_footprint_mask(
     primary_img_path: str,
     secondary_img_path: str
 ):
     """
-    Due to different tile coverages accross the roi, 
-    the LS8 and S2 images often have different valid footprints.
+    Due to different tile coverages across the regions of interest, 
+    the LS8 and S2 images often have different valid footprints and even utm zones.
     Furthermore, Atmospheric Correction can introduce negative values, 
     which should be removed (identically) from both images in the set
     """
@@ -149,7 +147,7 @@ def make_img_valid_footprint_mask(
         secondary_data = secondary.read()
         secondary_reproj = np.zeros(
             (primary.count, primary.height, primary.width), 
-            dtype=primary.dtypes
+            dtype=primary.dtypes[0]
         )
         secondary_meta.update({
             'crs': primary_meta['crs'],
@@ -169,9 +167,72 @@ def make_img_valid_footprint_mask(
         )
 
         primary_valid_mask = np.any(primary_data > 0, axis=0)
-        print(primary_valid_mask.shape)
         secondary_valid_mask = np.any(secondary_reproj > 0, axis=0)
-        print(secondary_valid_mask.shape)
+        
+        valid_pixels_mask = primary_valid_mask & secondary_valid_mask
+
+        temp_dir = './data/temp/'
+        primary_basename = os.path.basename(primary_img_path)
+        primary_satellite = primary_basename.split('_')[0]
+        temp_parts = primary_basename.split('_')[1:]
+        temp_path = f"{temp_dir}{primary_satellite}_CommonInvalids_{'_'.join(temp_parts)}"
+
+        primary_meta.update({
+            'count': 1,
+            'dtype': 'uint8'
+        })
+
+        with rio.open(temp_path, 'w', **primary_meta) as dst_valid:
+            dst_valid.write(valid_pixels_mask.astype('uint8')[np.newaxis, :, :])
+        
+    return temp_path
+    
+def apply_masks_to_image_write_out(
+    img_fp: str,
+    cloud_mask_fp: str,
+    river_mask_fp: str,
+    valid_mask_fp: str,
+    level: str,
+    roi: str,
+    band_dict: dict
+):
+    with (
+        rio.open(img_fp) as src,
+        rio.open(cloud_mask_fp) as cld,
+        rio.open(river_mask_fp) as riv,
+        rio.open(valid_mask_fp) as val
+    ):
+        # Read the image and mask data
+        img_data = src.read()
+        img_meta = src.meta
+        cloud_mask = cld.read()
+        river_mask = riv.read()
+        valid_mask = val.read()
+
+        # Make the comprehensive mask to apply to the image
+        mask = (cloud_mask == 0) & (river_mask == 0) & (valid_mask == 1)
+        mask = mask.squeeze() # Need to remove dimension from mask to make 2-D array
+        print(mask.shape)
+        # Apply the mask to the image
+        img_masked = img_data.copy()
+        print(f"img_masked shape: {img_masked.shape}")
+        for i in range(src.count):
+            img_masked[i, ~mask] = 0
+
+        # Write the masked image
+        out_dir = f'./data/{level}_images/roi_{roi}_noresample/'
+        os.makedirs(out_dir, exist_ok=True)
+
+        img_basename = os.path.basename(img_fp)
+        img_out_fp = f'{out_dir}{img_basename}'
+
+        out_meta = img_meta.copy()
+        with rio.open(img_out_fp, 'w', **out_meta) as dst:
+            dst.write(img_masked)
+            for idx, band_name in band_dict.items():
+                dst.set_band_description(idx, band_name)
+        print(f'Image Processed to {img_out_fp}')
+
 
 def mask_tiles_at_native_trans(
     pair: tuple,
@@ -194,29 +255,61 @@ def mask_tiles_at_native_trans(
         river_mask_fp = f'./data/river_files/{roi}_binary_rivers_dilated180_res30.tif' 
 
         # Reproject masks into LS8
-        reproject_cloud_rivers_masks(
+        cloud_mask_ls8_fp, river_mask_ls8_fp = reproject_cloud_rivers_masks(
             cloud_mask_fp=cloud_mask_fp,
             river_mask_fp=river_mask_fp,
             target_fp=ls_fp
         )
 
         # Reproject masks into S2
-        reproject_cloud_rivers_masks(
+        cloud_mask_s2_fp, river_mask_s2_fp = reproject_cloud_rivers_masks(
             cloud_mask_fp=cloud_mask_fp,
             river_mask_fp=river_mask_fp, 
             target_fp=s2_fp
         )
 
-        # Reproject the Sentinel-2 valid footprint to LS8 Resolution
-        make_img_valid_footprint_mask(
-            primary_img_path=s2_fp,
-            secondary_img_path=ls_fp
-        )
-        # Reproject the Landsat8 valid footprint to S2 Resolution
-        make_img_valid_footprint_mask(
+        # Reproject the common valid footprint to LS8 grid
+        common_valid_ls8_fp = make_img_valid_footprint_mask(
             primary_img_path=ls_fp,
             secondary_img_path=s2_fp
         )
+
+        # Reproject the common valid footprint to S2 grid
+        common_valid_s2_fp = make_img_valid_footprint_mask(
+            primary_img_path=s2_fp,
+            secondary_img_path=ls_fp
+        )
+
+        # Write the masked Landsat8
+        apply_masks_to_image_write_out(
+            img_fp=ls_fp,
+            cloud_mask_fp=cloud_mask_ls8_fp,
+            river_mask_fp=river_mask_ls8_fp,
+            valid_mask_fp=common_valid_ls8_fp,
+            level=level,
+            roi=roi,
+            band_dict=band_desc
+        )
+        # Write the masked Sentinel-2
+        apply_masks_to_image_write_out(
+            img_fp=s2_fp,
+            cloud_mask_fp=cloud_mask_s2_fp,
+            river_mask_fp=river_mask_s2_fp,
+            valid_mask_fp=common_valid_s2_fp,
+            level=level,
+            roi=roi,
+            band_dict=band_desc
+        )
+
+        # Clean the temp folder
+        os.remove(cloud_mask_ls8_fp)
+        os.remove(cloud_mask_s2_fp)
+        os.remove(river_mask_ls8_fp)
+        os.remove(river_mask_s2_fp)
+        os.remove(common_valid_ls8_fp)
+        os.remove(common_valid_s2_fp)
+
+        print('-----------------------------')
 
 
 
