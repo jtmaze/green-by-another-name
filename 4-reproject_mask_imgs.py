@@ -43,6 +43,9 @@ def check_for_pair_fp(
     pair_info: tuple,
     level: str
 ):
+    """
+    This checks to see if the combination of date and roi from pair_info exists in image downloads
+    """
     roi = pair_info[0]
     date = pair_info[1]
     download_dir = f'./data/{level}_image_downloads/'
@@ -63,7 +66,7 @@ def reproject_to_ref(
     resample_method: str
 ):
     """
-    Reads the images and or common masks and reprojects them to match the reference raster.
+    Reads the images or common masks and reprojects them to match the reference raster.
     Writes the data to the "temp" folder
     
     Parameters:
@@ -149,13 +152,13 @@ def apply_cloud_river_masks(
         cloud_mask_data = mask.read(1)
         river_mask_data = rivers.read(1)
 
-        s2_valid = np.any(s2_data != 0, axis=0) # Checks for any bands not equal to zero
-        ls8_valid = np.any(ls8_data != 0, axis=0)
+        s2_valid = np.any(s2_data > 0, axis=0) # Checks for any bands greater than zero
+        ls8_valid = np.any(ls8_data > 0, axis=0)
         # Valid pixels for images and cloud mask
         valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0) & (river_mask_data == 0)
 
         s2_masked = s2_data.copy()
-        for i in range(s2.count):
+        for i in range(s2.count): # Applies mask to each band
             s2_masked[i, ~valid_pixels_mask] = 0
 
         ls8_masked = ls8_data.copy()

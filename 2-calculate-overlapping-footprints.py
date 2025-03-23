@@ -69,6 +69,7 @@ for r in unique_rois:
     print(f'Found {len(top_dates)} overlapping dates')
     top_dates.drop(columns=['geometry_ls8', 'geometry_s2'], inplace=True)
     top_dates['per_cover'] = (top_dates['int_sqkm'] / roi_area * 100).round(0)
+
     top_dates = top_dates[top_dates['per_cover'] > 25]
     top_dates['date'] = top_dates['date'].astype(str)
     top_dates['date'] = pd.to_datetime(top_dates['date']).dt.date

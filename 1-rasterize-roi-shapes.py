@@ -7,7 +7,7 @@ import rasterio as rio
 from rasterio.features import rasterize
 from rasterio.transform import from_bounds
 
-roi_prefix = 'AND'
+roi_prefix = 'YKF'
 data_dir = './data/roi_shapes/rois/'
 roi_shapes = gpd.read_file(f'{data_dir}{roi_prefix}_sub_rois.shp')
 
