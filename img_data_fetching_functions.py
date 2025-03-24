@@ -321,7 +321,7 @@ def make_ndwi_images(
     elif resample_method == 'noresample': 
         image_window_params = None # Don't need image window params, becuase PLD mask needs to be reprojected to image's native tile
         s2_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
-        ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+        ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
 
         ls_green, s2_green = rio_get_data_arrays_native_trans(
             ls_fp=ls8_fp, s2_fp=s2_fp, band_name='Green'

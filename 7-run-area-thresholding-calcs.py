@@ -32,7 +32,7 @@ image_info = {
     'band_name': None, # Bands will be specified
     'resample_method': None, #
 }
-rois = ['YKF_sub3', 'AKCP_sub1']
+rois = ['YKD_sub2']
 # %% 3.0 Run area calculations
 
 image_info['resample_method'] = resample_method
