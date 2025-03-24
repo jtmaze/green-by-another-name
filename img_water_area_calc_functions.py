@@ -511,7 +511,7 @@ def image_wtr_area(
     # Noresample requires bringing PLD into the Landsat8 and Sentinel-2 tiles grid.
     else: 
         s2_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
-        ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+        ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
         res = 'native'
         ls_valid_threshold = 25_000
         s2_valid_threshold = 225_000
