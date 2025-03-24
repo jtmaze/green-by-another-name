@@ -4,10 +4,8 @@ import glob
 import pandas as pd
 import pprint as pp
 
-from image_analysis_functions import extract_unique
-from image_analysis_functions import make_reflectance_summaries
-
-
+from img_data_fetching_functions import extract_unique
+from img_pixel_regression_functions import make_reflectance_summaries
 
 toa_files = glob.glob('./data/toa_images/**/*tif')
 sr_files = glob.glob('./data/sr_images/**/*.tif')

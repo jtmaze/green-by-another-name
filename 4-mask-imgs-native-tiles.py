@@ -8,7 +8,7 @@ import rasterio as rio
 from rasterio.warp import reproject, Resampling
 import numpy as np
 
-from image_analysis_functions import extract_unique
+from img_data_fetching_functions import extract_unique
 
 level = 'sr'
 
@@ -220,7 +220,7 @@ def apply_masks_to_image_write_out(
             img_masked[i, ~mask] = 0
 
         # Write the masked image
-        out_dir = f'./data/{level}_images/roi_{roi}_noresample/'
+        out_dir = f'./data/{level}_images/roi_{roi}_noresample'
         os.makedirs(out_dir, exist_ok=True)
 
         img_basename = os.path.basename(img_fp)

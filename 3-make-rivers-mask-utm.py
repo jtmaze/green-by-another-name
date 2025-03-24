@@ -8,7 +8,7 @@ import rasterio as rio
 from rasterio import features
 
 
-roi_name = 'MRD_sub3'
+roi_name = 'YKF_sub6'
 out_res = 60 # ensure this matches the resolution of your analysis (e.g. 30m or 60m)
 buffer_dist = 180 # The distance in meters to dilate/buffer the rivers
 
@@ -62,7 +62,6 @@ def clip_dilate_rivers(
 
 def make_river_mask(
     rivers_dilated: gpd.GeoDataFrame, 
-    out_res: int,
     roi_mask_fp: str,
     out_path: str,
 ):
@@ -91,6 +90,6 @@ def make_river_mask(
 
 rivers_dilated = clip_dilate_rivers(rivers, roi, buffer_dist)
 roi_mask_fp = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res{out_res}.tif'
-make_river_mask(rivers_dilated, out_res, roi_mask_fp, out_path)
+make_river_mask(rivers_dilated, roi_mask_fp, out_path)
 
 # %%

@@ -1,3 +1,8 @@
+"""
+Functions to plot 4 histograms (LS8-SR, LS8-TOA, S2-SR, S2-TOA) images.
+Not really used, but keeping around. 
+"""
+
 import ast
 import pandas as pd
 import numpy as np
@@ -8,7 +13,8 @@ def plot_otsu_histograms(
     sr: pd.Series,
     toa: pd.Series,
     date: str,
-    roi: str):
+    roi: str
+):
     
     """
     Plots the NDWI histograms for Landsat and Sentinel-2 images
@@ -128,7 +134,7 @@ def plot_reflectance_histograms(
     date: str, 
     roi: str,
     hist_range: tuple[float, float] = (0.0, 0.1)
-    ):
+):
 
     """
     Plots the Green or NIR histograms for Landsat and Sentinel-2 TOA/SR images

@@ -3,8 +3,8 @@ import glob
 import pandas as pd
 import pprint as pp
 
-from image_analysis_functions import extract_unique
-from image_analysis_functions import make_otsu_area_summaries
+from img_data_fetching_functions import extract_unique
+from img_water_area_calc_functions import make_area_thresholding_summaries
 
 
 toa_files = glob.glob('./data/toa_images/**/*tif')
@@ -19,10 +19,9 @@ rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 
 # Specify the level and resample method
-level = 'toa'
+level = 'sr'
 levels = [level]
-resample_method = 'lanczos60'
-
+resample_method = 'noresample'
 
 # %% 2.0 Dictionaries to hold image information
 
@@ -33,12 +32,12 @@ image_info = {
     'band_name': None, # Bands will be specified
     'resample_method': None, #
 }
-
+rois = ['YKF_sub3', 'AKCP_sub1']
 # %% 3.0 Run area calculations
 
 image_info['resample_method'] = resample_method
 
-out_df = make_otsu_area_summaries(image_info, levels, rois, image_dates, hist_return=True)
+out_df = make_area_thresholding_summaries(image_info, levels, rois, image_dates, hist_return=True)
 print("Area summaries finished")
 # %% 4.0 Write the output to csv
 out_df = out_df[out_df['ls_otsu_threshold'].notna()]

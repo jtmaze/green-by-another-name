@@ -9,11 +9,11 @@ import rasterio as rio
 from rasterio.warp import reproject, Resampling
 import numpy as np
 
-from image_analysis_functions import extract_unique
+from img_data_fetching_functions import extract_unique
 
-level = 'sr' # must be 'sr' or 'toa'
-res = 60 # 30 or 60 meters
-resample_method = 'lanczos'
+level = 'toa' # must be 'sr' or 'toa'
+res = 30 # 30 or 60 meters
+resample_method = 'bilinear'
 
 band_desc = {
     1: 'Blue',

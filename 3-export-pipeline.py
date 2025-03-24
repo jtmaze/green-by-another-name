@@ -6,8 +6,6 @@ import geopandas as gpd
 import pandas as pd
 import pprint as pp
 
-import datetime #??
-
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
