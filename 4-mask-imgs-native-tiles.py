@@ -10,7 +10,7 @@ import numpy as np
 
 from img_data_fetching_functions import extract_unique
 
-level = 'toa'
+level = 'sr'
 
 download_dir = f'./data/{level}_image_downloads/'
 roi_dir = f'./data/roi_shapes/rois/'
@@ -35,7 +35,7 @@ unique_dates = extract_unique(all_s2_files, date_pattern)
 pairs = list(product(unique_rois, unique_dates))
 
 print(pairs)
-
+pairs = [('AND_sub1', '2023-09-17')]
 # %% 2.0 Functions
 
 def check_for_pair_fp(
@@ -141,23 +141,18 @@ def make_img_valid_footprint_mask(
 
     with rio.open(primary_img_path) as primary, rio.open(secondary_img_path) as secondary:
 
-        primary_meta = primary.meta
+        primary_meta = primary.meta.copy()
         primary_data = primary.read()
-        secondary_meta = secondary.meta
         secondary_data = secondary.read()
+        # NOTE: Best to make the Secondary < 0 mask prior to reprojecting into primary
+        secondary_valid_mask = np.all(secondary_data > 0, axis=0).astype('uint8')
         secondary_reproj = np.zeros(
-            (primary.count, primary.height, primary.width), 
-            dtype=primary.dtypes[0]
+            (primary.height, primary.width), 
+            dtype='uint8'
         )
-        secondary_meta.update({
-            'crs': primary_meta['crs'],
-            'transform': primary_meta['transform'],
-            'width': primary_meta['width'],
-            'height': primary_meta['height']
-        })
-
+        
         reproject(
-            source=secondary_data,
+            source=secondary_valid_mask,
             destination=secondary_reproj,
             src_transform=secondary.transform,
             src_crs=secondary.crs,
@@ -166,10 +161,9 @@ def make_img_valid_footprint_mask(
             resampling=Resampling.nearest
         )
 
-        primary_valid_mask = np.any(primary_data > 0, axis=0)
-        secondary_valid_mask = np.any(secondary_reproj > 0, axis=0)
+        primary_valid_mask = np.all(primary_data > 0, axis=0).astype('uint8')
         
-        valid_pixels_mask = primary_valid_mask & secondary_valid_mask
+        valid_pixels_mask = (primary_valid_mask & secondary_reproj[0])
 
         temp_dir = './data/temp/'
         primary_basename = os.path.basename(primary_img_path)
