@@ -10,7 +10,7 @@ import numpy as np
 
 from img_data_fetching_functions import extract_unique
 
-level = 'sr'
+level = 'toa'
 
 download_dir = f'./data/{level}_image_downloads/'
 roi_dir = f'./data/roi_shapes/rois/'
@@ -220,7 +220,7 @@ def apply_masks_to_image_write_out(
             img_masked[i, ~mask] = 0
 
         # Write the masked image
-        out_dir = f'./data/{level}_images/roi_{roi}_noresample'
+        out_dir = f'./data/{level}_images/roi_{roi}_noresample/'
         os.makedirs(out_dir, exist_ok=True)
 
         img_basename = os.path.basename(img_fp)
