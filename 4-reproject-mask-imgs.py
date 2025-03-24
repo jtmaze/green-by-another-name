@@ -2,7 +2,6 @@
 
 import os
 import glob
-import re
 from itertools import product
 
 import rasterio as rio
@@ -12,7 +11,7 @@ import numpy as np
 from img_data_fetching_functions import extract_unique
 
 level = 'toa' # must be 'sr' or 'toa'
-res = 30 # 30 or 60 meters
+res = 60 # 30 or 60 meters
 resample_method = 'bilinear'
 
 band_desc = {
@@ -36,6 +35,7 @@ unique_rois = extract_unique(all_ls8_files, roi_pattern)
 unique_dates = extract_unique(all_s2_files, date_pattern)
 
 pairs = list(product(unique_rois, unique_dates))
+pairs = pairs = [('AND_sub1', '2023-09-17')]
 
 # %% 2.0 Functions
 
@@ -123,12 +123,95 @@ def reproject_to_ref(
         #print(f"Reprojected {out_fp}")
 
         return out_fp
+    
+def make_invalid_mask_for_other_level(
+    other_level_s2_fp: str,
+    other_level_ls8_fp: str,
+    ref_fp: str,
+    resample_method: str
+):
+    """
+    Creates a mask for the other level (sr or toa) images. This ensures both AC and 
+    data without AC have the exact same mask applied to them for water fraction comparisons
+    across AC levels.
+    """
+    resamp_methods = {
+        'nearest': Resampling.nearest,
+        'bilinear': Resampling.bilinear,
+        'cubic': Resampling.cubic,
+        'lanczos': Resampling.lanczos,
+        'average': Resampling.average
+    }
+    resamp = resamp_methods.get(resample_method)
 
-def apply_cloud_river_masks(
+    if not os.path.exists(other_level_s2_fp) or not os.path.exists(other_level_ls8_fp):
+        return None
+    
+    else:
+        with (
+            rio.open(other_level_s2_fp) as lvl_s2, 
+            rio.open(other_level_ls8_fp) as lvl_ls8,
+            rio.open(ref_fp) as ref
+        ):
+            
+            other_level_s2_data = lvl_s2.read()
+            other_level_ls8_data = lvl_ls8.read()
+
+            out_s2_other_lvl = np.zeros((lvl_s2.count, ref.height, ref.width), dtype=other_level_s2_data.dtype)
+            out_ls8_other_lvl = np.zeros((lvl_ls8.count, ref.height, ref.width), dtype=other_level_ls8_data.dtype)
+            
+            # Repoject the Sentinel-2 data from the alternate level
+            reproject(
+                source=other_level_s2_data,
+                destination=out_s2_other_lvl,
+                src_transform=lvl_s2.transform,
+                src_crs=lvl_s2.crs,
+                dst_transform=ref.transform,
+                dst_crs=ref.crs,
+                resampling=resamp
+            )
+            # Reproject the Landsat-8 data from the alternate level
+            reproject(
+                source=other_level_ls8_data,
+                destination=out_ls8_other_lvl,
+                src_transform=lvl_ls8.transform,
+                src_crs=lvl_ls8.crs,
+                dst_transform=ref.transform,
+                dst_crs=ref.crs,
+                resampling=resamp
+            )
+
+            # Create a mask for valid pixels in the other level data
+            other_level_valid = np.all(out_s2_other_lvl > 0, axis=0) & np.all(out_ls8_other_lvl > 0, axis=0)
+            other_level_valid = other_level_valid.astype('uint8') # Convert to uint8 for writing to temp
+            other_level_valid = other_level_valid[np.newaxis, :, :] # Add a new axis to match the number of bands
+
+            temp_dir = './data/temp/'
+            basename = os.path.basename(other_level_s2_fp)
+            basename = basename.replace('Sentinel2', 'OtherLevel_Invalids')
+            ref_res = round(ref.transform[0])
+            out_fp = f'{temp_dir}/{basename}_reprojected_{resample_method}{ref_res}.tif'
+
+            out_meta = lvl_s2.meta.copy()
+            out_meta.update({
+                'crs': ref.crs,
+                'transform': ref.transform,
+                'width': ref.width,
+                'height': ref.height,
+                'count': 1,
+                'dtype': 'uint8'
+            })
+            with rio.open(out_fp, 'w', **out_meta) as dst:
+                dst.write(other_level_valid)
+
+            return out_fp
+
+def apply_cloud_river_valid_masks(
     s2_temp_fp: str,
     ls8_temp_fp: str,
     cloud_mask_fp: str,
     rivers_fp: str,
+    other_level_valid_fp: str,
     band_dict: dict,
     level: str, 
     roi: str,
@@ -142,7 +225,8 @@ def apply_cloud_river_masks(
         rio.open(s2_temp_fp) as s2, 
         rio.open(ls8_temp_fp) as ls8, 
         rio.open(cloud_mask_fp) as mask, 
-        rio.open(rivers_fp) as rivers
+        rio.open(rivers_fp) as rivers,
+        rio.open(other_level_valid_fp) as other_level_valid
     ):
 
         s2_data = s2.read()
@@ -151,11 +235,12 @@ def apply_cloud_river_masks(
         ls8_meta = ls8.meta
         cloud_mask_data = mask.read(1)
         river_mask_data = rivers.read(1)
+        other_level_valid_data = other_level_valid.read(1)
 
-        s2_valid = np.any(s2_data > 0, axis=0) # Checks for any bands values less than zero
-        ls8_valid = np.any(ls8_data > 0, axis=0)
+        s2_valid = np.all(s2_data > 0, axis=0) # Checks for any bands values less than zero
+        ls8_valid = np.all(ls8_data > 0, axis=0)
         # Valid pixels for images and cloud mask
-        valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0) & (river_mask_data == 0)
+        valid_pixels_mask = s2_valid & ls8_valid & (cloud_mask_data == 0) & (river_mask_data == 0) & (other_level_valid_data == 1)
 
         s2_masked = s2_data.copy()
         for i in range(s2.count): # Applies mask to each band
@@ -188,6 +273,7 @@ def apply_cloud_river_masks(
                 dst_ls8.set_band_description(idx, band_name)
 
 
+
 def reproj_mask_img_pairs(
     pair: tuple,
     level: str,
@@ -203,6 +289,17 @@ def reproj_mask_img_pairs(
         date = extract_unique(pair_paths, date_pattern)[0]
         s2_fp = pair_paths[0]
         ls8_fp = pair_paths[1]
+        if level == 'sr':
+            other_level = 'toa'
+            other_level_s2_fp = f'./data/toa_image_downloads/Sentinel2_toa_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/toa_image_downloads/Landsat8_toa_date_{date}_roi_{roi}.tif'
+        elif level == 'toa':
+            other_level = 'sr'
+            other_level_s2_fp = f'./data/sr_image_downloads/Sentinel2_sr_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/sr_image_downloads/Landsat8_sr_date_{date}_roi_{roi}.tif'
+        else:
+            raise ValueError("Level must be 'sr' or 'toa'")
+        
         ref_fp = f'./data/roi_shapes/rois/rasterized_{roi}_shape_res{res}.tif'
         mask_fp = f'./data/{level}_masks/CommonMask_date_{date}_roi_{roi}.tif'
         river_mask_fp = f'./data/river_files/{roi}_binary_rivers_dilated180_res{res}.tif'
@@ -227,24 +324,41 @@ def reproj_mask_img_pairs(
             'nearest'
         )
 
-        # Apply the cloud mask to the images
-        apply_cloud_river_masks(
-            s2_temp_fp,
-            ls8_temp_fp,
-            cloud_temp_fp,
-            river_mask_fp,
-            band_desc,
-            level,
-            roi,
-            resample_method,
-            res
+        other_level_valid_mask_fp = make_invalid_mask_for_other_level(
+            other_level_s2_fp=other_level_s2_fp,
+            other_level_ls8_fp=other_level_ls8_fp,
+            ref_fp=ref_fp,
+            resample_method=resample_method
         )
-        print(roi, date)
-        os.remove(s2_temp_fp)
-        os.remove(ls8_temp_fp)
-        os.remove(cloud_temp_fp)
 
-# %%
+        if other_level_valid_mask_fp is None:
+            print(f'Missing {other_level} images for {roi} on {date}. Skipping...')
+            os.remove(s2_temp_fp)
+            os.remove(ls8_temp_fp)
+            os.remove(cloud_temp_fp)
+
+        else:
+            # Apply the cloud mask to the images
+            apply_cloud_river_valid_masks(
+                s2_temp_fp,
+                ls8_temp_fp,
+                cloud_temp_fp,
+                river_mask_fp,
+                other_level_valid_mask_fp,
+                band_desc,
+                level,
+                roi,
+                resample_method,
+                res
+            )
+
+            print(roi, date, level)
+            # os.remove(s2_temp_fp)
+            # os.remove(ls8_temp_fp)
+            # os.remove(cloud_temp_fp)
+            # os.remove(other_level_valid_mask_fp)
+
+# %% Process the pairs
 
 for p in pairs:
 
