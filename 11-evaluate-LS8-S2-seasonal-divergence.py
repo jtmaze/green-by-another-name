@@ -24,7 +24,7 @@ for col in cols_to_make_float:
 
 
 toa.loc[:, 'main_roi'] = toa.apply(lambda row: row['roi'].split('_')[0], axis=1)
-
+sr.loc[:, 'main_roi'] = sr.apply(lambda row: row['roi'].split('_')[0], axis=1)
 # %% Define month orders and apply to data
 
 month_order = ['May','Jun','Jul','Aug','Sep']
@@ -52,7 +52,7 @@ toa['relative_lake_diff_toa'] = toa['lake_diff_toa'] / toa['lake_ls_water_frac_a
 toa['relative_shoreline_diff_toa'] = toa['shoreline_diff_toa'] / toa['shoreline_ls_water_frac_adaptive']
 
 # %%
-plot_df = toa[['date', 'month', 'half_month', 'roi', 'main_roi',
+plot_df = sr[['date', 'month', 'half_month', 'roi', 'main_roi',
            'total_diff_toa', 'relative_total_diff_toa',
            'lake_diff_toa', 'relative_lake_diff_toa',
            'shoreline_diff_toa', 'relative_shoreline_diff_toa']].copy()
@@ -105,12 +105,29 @@ plot_df = plot_df[plot_df['diff_type'].isin(
 )]
 print(len(plot_df))
 plt.figure(figsize=(12, 8))
-sns.boxplot(x='half_month', y='diff_value', hue='diff_type', data=plot_df)
+sns.boxplot(x='month', y='diff_value', hue='diff_type', data=plot_df)
 plt.title('YKF Absolute Differences in Water Fraction (TOA) (LS8% - S2%)')
 plt.axhline(0, color='red', linestyle='--')
 plt.xlabel('Month')
 plt.ylabel('Difference Value %')
 plt.ylabel('Difference Value')
 
+
+# %%
+
+plot_df = melt_df[melt_df['main_roi'] == 'YKF']
+print(len(plot_df))
+
+plot_df = plot_df[plot_df['diff_type'].isin(
+    ['relative_total_diff_toa', 'relative_lake_diff_toa', 'relative_shoreline_diff_toa']
+)]
+print(len(plot_df))
+plt.figure(figsize=(12, 8))
+sns.boxplot(x='half_month', y='diff_value', hue='diff_type', data=plot_df)
+plt.title('YKF Relative Differences in Water Fraction (TOA) (LS8% - S2% / LS8%')
+plt.axhline(0, color='red', linestyle='--')
+plt.xlabel('Month')
+plt.ylabel('Difference Value %')
+plt.ylim(-0.8, 0.2)
 
 # %%

@@ -6,7 +6,7 @@ import seaborn as sns
 from scipy import stats
 import numpy as np
 
-resample_methods = ['bilinear30', 'lanczos30', 'bilinear60', 'lanczos60']
+resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'noresample']
 
 # %% 2.0 Explore differences in water fraction by satellite.
 

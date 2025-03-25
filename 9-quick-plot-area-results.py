@@ -13,6 +13,8 @@ sr_lanczos30 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos30_area
 toa_lanczos30 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos30_area_summaries_batch1.csv')
 sr_lanczos60 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos60_area_summaries_batch1.csv')
 toa_lanczos60 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos60_area_summaries_batch1.csv')
+sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch1.csv')
+toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch1.csv')
 
 combined = pd.concat(
     [
@@ -24,6 +26,8 @@ combined = pd.concat(
         toa_lanczos30,
         sr_lanczos60,
         toa_lanczos60,
+        sr_noresample,
+        toa_noresample
     ],
     ignore_index=True,
 )
@@ -130,6 +134,36 @@ area_boxplot_maker(
     cols_to_plot=cols_to_plot,
     zone_label='Shoreline',
     resample_label='Bilinear 30'
+)
+
+# %% Unresampled
+"""
+Compare bilinear unresampled area stats
+"""
+cols_to_plot = ['total_ls_water_frac_otsu', 'total_s2_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'noresample'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Total',
+    resample_label='Un-resampled (native resolution)'
+)
+
+cols_to_plot = ['lake_ls_water_frac_otsu', 'lake_s2_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'noresample'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Lake',
+    resample_label='Unresampled (native resolution)'
+)
+cols_to_plot = ['shoreline_ls_water_frac_otsu', 'shoreline_s2_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']
+temp = combined_valid[combined_valid['resample_method'] == 'noresample'].copy()
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Shoreline',
+    resample_label='Unresampled (native resolution)'
 )
 
 # # %% Bilinear 60 

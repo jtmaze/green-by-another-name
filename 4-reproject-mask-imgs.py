@@ -10,9 +10,9 @@ import numpy as np
 
 from img_data_fetching_functions import extract_unique
 
-level = 'toa' # must be 'sr' or 'toa'
+level = 'sr' # must be 'sr' or 'toa'
 res = 30 # 30 or 60 meters
-resample_method = 'bilinear'
+resample_method = 'lanczos'
 
 band_desc = {
     1: 'Blue',

@@ -17,8 +17,8 @@ resample_pattern = r'/reprojected_(.*?)_'
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
-levels = ['sr']
 resample_method = 'bilinear30'
+levels = ['sr', 'toa']
 regression_summaries = []
 
 # %% 2.0 Make regressions for PLD 60 meter buffered
@@ -72,7 +72,6 @@ nir_df = make_reflectance_summaries(
 )
 print("Done")
 # 2.3 NDWI Band PLD 60 meter buffered
-# %%
 
 image_info['band_name'] = 'NDWI'
 regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
@@ -95,7 +94,7 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 print(len(out_df))
 # %%
-out_df.to_csv('./data/regression_summaries_60m_lake.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries_60m_lake_{resample_method}.csv', index=False)
 
 
 # %% 3.0 Make regression summaries for land (PLD 120 meter buffered)
@@ -121,6 +120,8 @@ regression_params = {
 # 3.1 Green Band PLD 120 meter buffered
 
 image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
 green_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -143,14 +144,25 @@ nir_df = make_reflectance_summaries(
     hist_return=True
 )
 
+image_info['band_name'] = 'NDWI'
+ndwi_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=True
+)
+
 print("Done")
 
 # %% 3.3 Write PLD 120m buffered regressions to a csv
-out_df = pd.concat([green_df, nir_df])
+out_df = pd.concat([green_df, nir_df, ndwi_df])
 print(len(out_df))
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv('./data/regression_summaries_120m_land.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries_120m_land_{resample_method}.csv', index=False)
 
 
 # %% 4.0 Green, NIR, NDWI on conservative lakes -60 buffer
@@ -175,6 +187,7 @@ regression_params = {
 # 4.1 Green band PLD -60 meter buffered
 
 image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
 green_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -214,7 +227,7 @@ out_df = pd.concat([green_df, nir_df, ndwi_df])
 print(len(out_df))
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv('./data/regression_summaries_neg60m_lake.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries_neg60m_lake_{resample_method}.csv', index=False)
 
 # %% 5.0 Green, NIR, NDWI on shorelines -30m to 0m
 image_info = {
@@ -236,6 +249,8 @@ regression_params = {
 }
 # 5.1 Green band PLD -30 to 0 meter buffered
 image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
 green_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -247,6 +262,7 @@ green_df = make_reflectance_summaries(
 )
 # 5.2 NIR band PLD -30 to 0 meter buffered
 image_info['band_name'] = 'NIR'
+
 nir_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -273,7 +289,7 @@ print('Done')
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv('./data/regression_summaries_shoreline_neg30-0.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries_shoreline_neg30-0_{resample_method}.csv', index=False)
 
 # %% 6.0 Green, NIR, NDWI on shorelines 0 to +30m buffer
 
@@ -295,7 +311,10 @@ regression_params = {
     'outlier_frac': 0.0005,
 }
 # 6.1 Green band PLD 0 to 30 meter buffered
+
 image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
 green_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -333,6 +352,8 @@ ndwi_df = make_reflectance_summaries(
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv('./data/regression_summaries_shoreline_0-plus30.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries_shoreline_0-plus30_{resample_method}.csv', index=False)
 
 
+
+# %%

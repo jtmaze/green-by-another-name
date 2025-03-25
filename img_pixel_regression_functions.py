@@ -276,7 +276,7 @@ def regress_reflectance(
             np.max([ls_modeled.max(), s2_modeled.max()])
         )
 
-        regression_vis(ls_modeled, s2_modeled, model)
+        #regression_vis(ls_modeled, s2_modeled, model)
 
         if hist_return == True:
             ls_histogram = np.histogram(ls_modeled, bins=100)
@@ -285,10 +285,9 @@ def regress_reflectance(
         # Find the portion of pixels above/below the 45 degree line   
         below_frac = np.mean(ls_modeled > s2_modeled) * 100  # The mean of boolean array gives proportion
         above_frac = np.mean(ls_modeled < s2_modeled) * 100
-        equal_frac = np.mean(ls_modeled == s2_modeled) * 100
+
         print(f'Pixels above 45 degree line: {above_frac:.2f}%')
         print(f'Pixels below 45 degree line: {below_frac:.2f}%')
-        print(f'Pixels equal: {equal_frac:.2f}%')
 
     return {'model': model, 
             'above_frac': above_frac,

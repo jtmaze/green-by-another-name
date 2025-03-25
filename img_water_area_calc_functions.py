@@ -248,8 +248,7 @@ def calc_lake_wtr_frac_common_grid(
     """
     Calculates the water fraction inside the PLD lake mask
     """
-    print("----- Showing Window Params --------")
-    print(image_window_params)
+
     pld_mask = make_measure_mask(
         f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif', 
         image_window_params, 
