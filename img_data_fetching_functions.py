@@ -337,6 +337,6 @@ def make_ndwi_images(
         raise ValueError('ERROR: need to specify proper resampling method')
 
     # Quick plot of NDWI images
-    ndwi_images_vis(s2_ndwi_out, ls_ndwi_out)
+    #ndwi_images_vis(s2_ndwi_out, ls_ndwi_out)
     
     return ls_ndwi_out, s2_ndwi_out, image_window_params

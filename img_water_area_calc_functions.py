@@ -488,7 +488,6 @@ def image_wtr_area(
         image_info['band_name'],
         image_info['resample_method']
     )
-    print(f"Working {level} for {date} over the {roi} region")
     
     # Images are resampled to a common grid with PLD
     if resample_method != 'noresample':
@@ -656,6 +655,9 @@ def make_area_thresholding_summaries(
                     ls_hist_bins = numpy_to_list(area_items.get('ls_hist')[1])
                     s2_hist_counts = numpy_to_list(area_items.get('s2_hist')[0])
                     s2_hist_bins = numpy_to_list(area_items.get('s2_hist')[1])
+
+                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive')}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive')}')
+                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive')}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive')}')
 
                 summary = {
                     'date': date,
