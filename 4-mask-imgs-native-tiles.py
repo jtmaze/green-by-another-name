@@ -327,9 +327,10 @@ def mask_tiles_at_native_trans(
         # Reproject the common valid footprint to LS8 grid
         if not os.path.exists(other_level_ls8_fp) or not os.path.exists(other_level_s2_fp):
             print(f'Missing {other_level} images for {roi} on {date}. Skipping...')
-            os.remove(s2_temp_fp)
-            os.remove(ls8_temp_fp)
-            os.remove(cloud_temp_fp)
+            os.remove(cloud_mask_ls8_fp)
+            os.remove(cloud_mask_s2_fp)
+            os.remove(river_mask_ls8_fp)
+            os.remove(river_mask_s2_fp)
         
         else:
             common_valid_ls8_fp = make_img_valid_footprint_mask(
@@ -377,8 +378,6 @@ def mask_tiles_at_native_trans(
             os.remove(common_valid_s2_fp)
 
             print('-----------------------------')
-
-
 
 # %% 
 
