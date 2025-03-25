@@ -11,7 +11,7 @@ import numpy as np
 from img_data_fetching_functions import extract_unique
 
 level = 'toa' # must be 'sr' or 'toa'
-res = 60 # 30 or 60 meters
+res = 30 # 30 or 60 meters
 resample_method = 'bilinear'
 
 band_desc = {
@@ -35,7 +35,7 @@ unique_rois = extract_unique(all_ls8_files, roi_pattern)
 unique_dates = extract_unique(all_s2_files, date_pattern)
 
 pairs = list(product(unique_rois, unique_dates))
-pairs = pairs = [('AND_sub1', '2023-09-17')]
+
 
 # %% 2.0 Functions
 
@@ -289,16 +289,6 @@ def reproj_mask_img_pairs(
         date = extract_unique(pair_paths, date_pattern)[0]
         s2_fp = pair_paths[0]
         ls8_fp = pair_paths[1]
-        if level == 'sr':
-            other_level = 'toa'
-            other_level_s2_fp = f'./data/toa_image_downloads/Sentinel2_toa_date_{date}_roi_{roi}.tif'
-            other_level_ls8_fp = f'./data/toa_image_downloads/Landsat8_toa_date_{date}_roi_{roi}.tif'
-        elif level == 'toa':
-            other_level = 'sr'
-            other_level_s2_fp = f'./data/sr_image_downloads/Sentinel2_sr_date_{date}_roi_{roi}.tif'
-            other_level_ls8_fp = f'./data/sr_image_downloads/Landsat8_sr_date_{date}_roi_{roi}.tif'
-        else:
-            raise ValueError("Level must be 'sr' or 'toa'")
         
         ref_fp = f'./data/roi_shapes/rois/rasterized_{roi}_shape_res{res}.tif'
         mask_fp = f'./data/{level}_masks/CommonMask_date_{date}_roi_{roi}.tif'
@@ -324,6 +314,18 @@ def reproj_mask_img_pairs(
             'nearest'
         )
 
+        # Paths to corresponding images with alternate atmospheric correction
+        if level == 'sr':
+            other_level = 'toa'
+            other_level_s2_fp = f'./data/toa_image_downloads/Sentinel2_toa_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/toa_image_downloads/Landsat8_toa_date_{date}_roi_{roi}.tif'
+        elif level == 'toa':
+            other_level = 'sr'
+            other_level_s2_fp = f'./data/sr_image_downloads/Sentinel2_sr_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/sr_image_downloads/Landsat8_sr_date_{date}_roi_{roi}.tif'
+        else:
+            raise ValueError("Level must be 'sr' or 'toa'")
+        
         other_level_valid_mask_fp = make_invalid_mask_for_other_level(
             other_level_s2_fp=other_level_s2_fp,
             other_level_ls8_fp=other_level_ls8_fp,
@@ -353,10 +355,10 @@ def reproj_mask_img_pairs(
             )
 
             print(roi, date, level)
-            # os.remove(s2_temp_fp)
-            # os.remove(ls8_temp_fp)
-            # os.remove(cloud_temp_fp)
-            # os.remove(other_level_valid_mask_fp)
+            os.remove(s2_temp_fp)
+            os.remove(ls8_temp_fp)
+            os.remove(cloud_temp_fp)
+            os.remove(other_level_valid_mask_fp)
 
 # %% Process the pairs
 

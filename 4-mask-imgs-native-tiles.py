@@ -31,11 +31,10 @@ roi_pattern = r'roi_(.*?).tif'
 date_pattern = r'date_(.*?)_roi'
 unique_rois = extract_unique(all_ls8_files, roi_pattern)
 unique_dates = extract_unique(all_s2_files, date_pattern)
-
 pairs = list(product(unique_rois, unique_dates))
 
 print(pairs)
-pairs = [('AND_sub1', '2023-09-17')]
+
 # %% 2.0 Functions
 
 def check_for_pair_fp(
@@ -130,40 +129,93 @@ def reproject_cloud_rivers_masks(
 
 def make_img_valid_footprint_mask(
     primary_img_path: str,
-    secondary_img_path: str
+    primary_alt_lvl_path: str,
+    secondary_img_path: str,
+    secondary_alt_lvl_path: str
 ):
     """
     Due to different tile coverages across the regions of interest, 
     the LS8 and S2 images often have different valid footprints and even utm zones.
     Furthermore, Atmospheric Correction can introduce negative values, 
-    which should be removed (identically) from both images in the set
+    which should be removed (identically) from ALL the images in the set
+
+    Defintionally:
+    - The primary image is the one not being reprojected
+    - The secondary image is the one being reprojected to the primary image's grid
+    - The alt_lvl is the alternative level (SR/TOA or TOA/SR). This ensures a common 
+      invalid pixel mask for different levels of Atmospheric correction
     """
 
-    with rio.open(primary_img_path) as primary, rio.open(secondary_img_path) as secondary:
-
+    with (
+        rio.open(primary_img_path) as primary, 
+        rio.open(primary_alt_lvl_path) as primary_alt_lvl,
+        rio.open(secondary_img_path) as secondary, 
+        rio.open(secondary_alt_lvl_path) as secondary_alt_lvl
+    ):
         primary_meta = primary.meta.copy()
         primary_data = primary.read()
+        primary_alt_lvl_data = primary_alt_lvl.read()
         secondary_data = secondary.read()
-        # NOTE: Best to make the Secondary < 0 mask prior to reprojecting into primary
-        secondary_valid_mask = np.all(secondary_data > 0, axis=0).astype('uint8')
+        secondary_alt_lvl_data = secondary_alt_lvl.read()
+
+        # BUG: Interestingly, the TOA and SR data can have different shapes for the same satellite.
+        #     They might be off by one pixel. I reproject to get around this...
+        # NOTE: I use average resampling and float32 data types for a more conservative invalid pixel masking.
+        #      This ensures any contributing invalid pixels durring resampling are flagged. 
+        #      I do this to not have 'partial' coverage and edge effects. 
+        secondary_mask = np.all(secondary_data > 0, axis=0)
         secondary_reproj = np.zeros(
             (primary.height, primary.width), 
-            dtype='uint8'
+            dtype='float32'
         )
-        
+        secondary_mask_alt_lvl = np.all(secondary_alt_lvl_data > 0, axis = 0)
+        secondary_alt_lvl_reproj = np.zeros(
+            (primary.height, primary.width),
+            dtype='float32'
+        )
+
+        # Reproject both of the TOA and SR invalid pixel masks for the secondary image
         reproject(
-            source=secondary_valid_mask,
+            source=secondary_mask.astype('float32'),
             destination=secondary_reproj,
             src_transform=secondary.transform,
             src_crs=secondary.crs,
             dst_transform=primary.transform,
             dst_crs=primary.crs,
-            resampling=Resampling.nearest
+            resampling=Resampling.average
+        )
+        reproject(
+            source=secondary_mask_alt_lvl.astype('float32'),
+            destination=secondary_alt_lvl_reproj,
+            src_transform=secondary.transform,
+            src_crs=secondary.crs,
+            dst_transform=primary.transform,
+            dst_crs=primary.crs,
+            resampling=Resampling.average
         )
 
-        primary_valid_mask = np.all(primary_data > 0, axis=0).astype('uint8')
+        # Reproject the alternate atmospheric correction for the primary image. 
+        primary_mask_alt_lvl = np.all(primary_alt_lvl_data > 0, axis=0)
+        primary_alt_lvl_reproj = np.zeros((primary.height, primary.width), dtype='float32')
+        reproject(
+            source=primary_mask_alt_lvl.astype('float32'),
+            destination=primary_alt_lvl_reproj,
+            src_transform=primary_alt_lvl.transform,
+            src_crs=primary_alt_lvl.crs,
+            dst_transform=primary.transform,
+            dst_crs=primary.crs,
+            resampling=Resampling.average
+        )
+
+        # Convert to binary arrays with most conservative masking of invalid pixels
+        secondary_reproj_binary = (secondary_reproj == 1.0).astype('uint8')
+        secondary_alt_lvl_reproj_binary = (secondary_alt_lvl_reproj == 1.0).astype('uint8')
+        primary_alt_lvl_reproj_binary = (primary_alt_lvl_reproj == 1.0).astype('uint8')
+        primary_mask = np.all(primary_data > 0, axis=0).astype('uint8')
         
-        valid_pixels_mask = (primary_valid_mask & secondary_reproj[0])
+        valid_pixels_mask = (
+            primary_mask & primary_alt_lvl_reproj_binary & secondary_reproj_binary & secondary_alt_lvl_reproj_binary
+        )
 
         temp_dir = './data/temp/'
         primary_basename = os.path.basename(primary_img_path)
@@ -206,10 +258,8 @@ def apply_masks_to_image_write_out(
         # Make the comprehensive mask to apply to the image
         mask = (cloud_mask == 0) & (river_mask == 0) & (valid_mask == 1)
         mask = mask.squeeze() # Need to remove dimension from mask to make 2-D array
-        print(mask.shape)
         # Apply the mask to the image
         img_masked = img_data.copy()
-        print(f"img_masked shape: {img_masked.shape}")
         for i in range(src.count):
             img_masked[i, ~mask] = 0
 
@@ -262,49 +312,71 @@ def mask_tiles_at_native_trans(
             target_fp=s2_fp
         )
 
+        # Paths to corresponding images with alternate atmospheric correction
+        if level == 'sr':
+            other_level = 'toa'
+            other_level_s2_fp = f'./data/toa_image_downloads/Sentinel2_toa_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/toa_image_downloads/Landsat8_toa_date_{date}_roi_{roi}.tif'
+        elif level == 'toa':
+            other_level = 'sr'
+            other_level_s2_fp = f'./data/sr_image_downloads/Sentinel2_sr_date_{date}_roi_{roi}.tif'
+            other_level_ls8_fp = f'./data/sr_image_downloads/Landsat8_sr_date_{date}_roi_{roi}.tif'
+        else:
+            raise ValueError("Level must be 'sr' or 'toa'")
+
         # Reproject the common valid footprint to LS8 grid
-        common_valid_ls8_fp = make_img_valid_footprint_mask(
-            primary_img_path=ls_fp,
-            secondary_img_path=s2_fp
-        )
+        if not os.path.exists(other_level_ls8_fp) or not os.path.exists(other_level_s2_fp):
+            print(f'Missing {other_level} images for {roi} on {date}. Skipping...')
+            os.remove(s2_temp_fp)
+            os.remove(ls8_temp_fp)
+            os.remove(cloud_temp_fp)
+        
+        else:
+            common_valid_ls8_fp = make_img_valid_footprint_mask(
+                primary_img_path=ls_fp,
+                primary_alt_lvl_path=other_level_ls8_fp,
+                secondary_img_path=s2_fp,
+                secondary_alt_lvl_path=other_level_s2_fp
+            )
 
-        # Reproject the common valid footprint to S2 grid
-        common_valid_s2_fp = make_img_valid_footprint_mask(
-            primary_img_path=s2_fp,
-            secondary_img_path=ls_fp
-        )
+            # Reproject the common valid footprint to S2 grid
+            common_valid_s2_fp = make_img_valid_footprint_mask(
+                primary_img_path=s2_fp,
+                primary_alt_lvl_path=other_level_s2_fp,
+                secondary_img_path=ls_fp,
+                secondary_alt_lvl_path=other_level_ls8_fp
+            )
 
-        # Write the masked Landsat8
-        apply_masks_to_image_write_out(
-            img_fp=ls_fp,
-            cloud_mask_fp=cloud_mask_ls8_fp,
-            river_mask_fp=river_mask_ls8_fp,
-            valid_mask_fp=common_valid_ls8_fp,
-            level=level,
-            roi=roi,
-            band_dict=band_desc
-        )
-        # Write the masked Sentinel-2
-        apply_masks_to_image_write_out(
-            img_fp=s2_fp,
-            cloud_mask_fp=cloud_mask_s2_fp,
-            river_mask_fp=river_mask_s2_fp,
-            valid_mask_fp=common_valid_s2_fp,
-            level=level,
-            roi=roi,
-            band_dict=band_desc
-        )
+            # Write the masked Landsat8
+            apply_masks_to_image_write_out(
+                img_fp=ls_fp,
+                cloud_mask_fp=cloud_mask_ls8_fp,
+                river_mask_fp=river_mask_ls8_fp,
+                valid_mask_fp=common_valid_ls8_fp,
+                level=level,
+                roi=roi,
+                band_dict=band_desc
+            )
+            # Write the masked Sentinel-2
+            apply_masks_to_image_write_out(
+                img_fp=s2_fp,
+                cloud_mask_fp=cloud_mask_s2_fp,
+                river_mask_fp=river_mask_s2_fp,
+                valid_mask_fp=common_valid_s2_fp,
+                level=level,
+                roi=roi,
+                band_dict=band_desc
+            )
 
-        # Clean the temp folder
-        os.remove(cloud_mask_ls8_fp)
-        os.remove(cloud_mask_s2_fp)
-        os.remove(river_mask_ls8_fp)
-        os.remove(river_mask_s2_fp)
-        os.remove(common_valid_ls8_fp)
-        os.remove(common_valid_s2_fp)
+            # Clean the temp folder
+            os.remove(cloud_mask_ls8_fp)
+            os.remove(cloud_mask_s2_fp)
+            os.remove(river_mask_ls8_fp)
+            os.remove(river_mask_s2_fp)
+            os.remove(common_valid_ls8_fp)
+            os.remove(common_valid_s2_fp)
 
-        print('-----------------------------')
-
+            print('-----------------------------')
 
 
 

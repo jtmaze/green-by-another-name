@@ -21,7 +21,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 # Specify the level and resample method
 level = 'sr'
 levels = [level]
-resample_method = 'noresample'
+resample_method = 'bilinear60'
 
 # %% 2.0 Dictionaries to hold image information
 
@@ -32,7 +32,7 @@ image_info = {
     'band_name': None, # Bands will be specified
     'resample_method': None, #
 }
-rois = ['YKD_sub2']
+rois = ['AND_sub1']
 # %% 3.0 Run area calculations
 
 image_info['resample_method'] = resample_method
