@@ -18,6 +18,17 @@ from img_data_fetching_functions import (
     make_ndwi_images
 )
 
+# Small helper function
+def numpy_to_list(data):
+    """
+    Converts numpy arrays to lists for storage in a dataframe
+    Useful for storing image NDWI histograms
+    """
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    else:
+        return data
+
 """
 -----------------------------------------
 Functions to collect data
@@ -155,6 +166,9 @@ def find_adaptive_thresholds(
     otsu_threshold: float,
     show_hist: bool
 ):
+    """
+    Uses the Otsu threshold and histograms to calculate the adpative threshold
+    """
     
     # STEP 1: Divide the NDWI histogram into Land and Water classes based on Otsu threshold
     counts, bin_edges = hist
@@ -241,19 +255,23 @@ def calc_total_wtr_frac(
 def calc_lake_wtr_frac_common_grid(
     water_mask: np.array, # Binary water mask from an image
     ndwi: float, # The original NDWI image (to check for valid pixels)
-    roi: str,
-    res: int, # Resolution to ensure we read the correct PLD mask
-    image_window_params: dict # The window parameters for reading the PLD mask (georeferenced properly)
+    pld_fp: str, 
+    image_window_params: dict, # The window parameters for reading the PLD mask (georeferenced properly)
+    buff_lake: bool
 ):
     """
     Calculates the water fraction inside the PLD lake mask
     """
+    if buff_lake:
+        buffer_delim = 60
+    else:
+        buffer_delim = 0
 
     pld_mask = make_measure_mask(
-        f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif', 
+        pld_fp, 
         image_window_params, 
         zone='lake', 
-        buffer_delim=60, 
+        buffer_delim=buffer_delim, 
         buffer_delim_outer=None
     )
 
@@ -267,16 +285,22 @@ def calc_lake_wtr_frac_native_tile(
     img_fp: str,
     water_mask: np.array, # Binary water mask from an image
     ndwi: float, # The original NDWI image (to check for valid pixels)
-    roi: str
+    pld_fp: str,
+    buff_lake: bool
 ):
     """
     Calculates the water fraction inside the PLD lake mask
     First reprojects the PLD mask into the native grid of the image
     """
+    # NOTE: Hard-coded the band index for lakes (PLD + 0 meters)
+    if buff_lake:
+        band_idx = 6 # PLD + 60 meters
+    else:
+        band_idx = 4 # PLD + 0 meters
 
-    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res30.tif'
+    # Reproject the PLD mask into the native grid of the image
     with rio.open(img_fp) as tgt, rio.open(pld_fp) as src:
-        src_data = src.read(6) # NOTE: Hard-coded the band index for lakes (PLD + 60 meters)
+        src_data = src.read(band_idx) 
         pld_lake_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
 
         reproject(
@@ -299,15 +323,14 @@ def calc_lake_wtr_frac_native_tile(
 def calc_shoreline_wtr_frac_common_grid(
     water_mask: np.array, # Binary water mask from an image
     ndwi: np.array, # The original NDWI image (to check for valid pixels)
-    roi: str,
-    res: int, # Resolution to ensure we read the correct PLD mask
-    image_window_params: dict # The window parameters for reading the PLD mask (georeferenced properly)
+    pld_fp: str, 
+    image_window_params: dict, # The window parameters for reading the PLD mask (georeferenced properly)
 ):
     """
     Calculates the water fraction inside the shoreline zone (-60m to +60m)
     """
     shoreline_mask = make_measure_mask(
-        f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif', 
+        pld_fp, 
         image_window_params, 
         zone='shoreline', 
         buffer_delim=-60, 
@@ -333,8 +356,8 @@ def calc_shoreline_wtr_frac_native_tile(
     """
     pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res30.tif'
     with rio.open(img_fp) as tgt, rio.open(pld_fp) as src:
-        src_lakes_outer = src.read(6) # NOTE: Hard-coded the band index for lakes (PLD + 60 meters)
-        src_lakes_inner = src.read(3) # NOTE: Hard-coded the band index for lakes (PLD - 60 meters)
+        src_lakes_outer = src.read(6) # NOTE: Hard-coded the band index 
+        src_lakes_inner = src.read(3) 
         pld_outer_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
         pld_inner_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
         # Reproject the shoreline's outer band
@@ -366,6 +389,13 @@ def calc_shoreline_wtr_frac_native_tile(
 
     return water_frac
 
+"""
+-----------------------------------------
+Functions to gather water fractions for different parts of the landscape
+Using different functions for resampled images vs. native tiles
+Could refactor to reduce redundancy if there's time
+-----------------------------------------
+"""
 def lake_and_shoreline_frac_native_tile(
     # Binary water masks
     ls_water_otsu: np.array, 
@@ -380,18 +410,50 @@ def lake_and_shoreline_frac_native_tile(
     s2_fp: str,
     ls8_fp: str
 ):
-    
+
+    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res30.tif'
     # # Calculate the lake water fractions
-    lake_ls_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_otsu, ndwi=ls_ndwi, roi=roi)
-    lake_s2_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_otsu, ndwi=s2_ndwi, roi=roi)
-    lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, roi=roi)
-    lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, roi=roi)
+    lake_ls_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_otsu, ndwi=ls_ndwi, pld_fp=pld_fp, buff_lake=False)
+    lake_s2_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_otsu, ndwi=s2_ndwi, pld_fp=pld_fp, buff_lake=False)
+    lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp, buff_lake=False)
+    lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp, buff_lake=False)
+
+    # Calculate buffered lake water fraction (+ 60 meters)
+    buff_lake_ls_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_otsu, ndwi=ls_ndwi, pld_fp=pld_fp, buff_lake=True)
+    buff_lake_s2_water_frac_otsu = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_otsu, ndwi=s2_ndwi, pld_fp=pld_fp, buff_lake=True)
+    buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp, buff_lake=True)
+    buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp, buff_lake=True)
 
     # Calculate the shoreline water fractions
     shoreline_ls_water_frac_otsu = calc_shoreline_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_otsu, ndwi=ls_ndwi, roi=roi)
     shoreline_s2_water_frac_otsu = calc_shoreline_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_otsu, ndwi=s2_ndwi, roi=roi)
     shoreline_ls_water_frac_adaptive = calc_shoreline_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, roi=roi)
     shoreline_s2_water_frac_adaptive = calc_shoreline_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, roi=roi)
+
+    # Calculate the fractions over "smallest" lakes
+    pld_fp_smallest = f'./data/pld_rasterized/{roi}_lake_masks_res30_smallest.tif'
+    smallest_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_smallest, buff_lake=False)
+    smallest_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_smallest, buff_lake=True)
+    smallest_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_smallest, buff_lake=False)
+    smallest_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_smallest, buff_lake=True)
+
+    pld_fp_small = f'./data/pld_rasterized/{roi}_lake_masks_res30_small.tif'
+    small_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_small, buff_lake=False)
+    small_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_small, buff_lake=True)
+    small_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_small, buff_lake=False)
+    small_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_small, buff_lake=True)
+
+    pld_fp_medium = f'./data/pld_rasterized/{roi}_lake_masks_res30_medium.tif'
+    medium_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_medium, buff_lake=False)
+    medium_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_medium, buff_lake=True)
+    medium_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_medium, buff_lake=False)
+    medium_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_medium, buff_lake=True)
+
+    pld_fp_large = f'./data/pld_rasterized/{roi}_lake_masks_res30_large.tif'
+    large_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_large, buff_lake=False)
+    large_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=ls8_fp, water_mask=ls_water_adaptive, ndwi=ls_ndwi, pld_fp=pld_fp_large, buff_lake=True)
+    large_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_large, buff_lake=False)
+    large_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_native_tile(img_fp=s2_fp, water_mask=s2_water_adaptive, ndwi=s2_ndwi, pld_fp=pld_fp_large, buff_lake=True)
 
 
     return {
@@ -402,7 +464,32 @@ def lake_and_shoreline_frac_native_tile(
         'shoreline_ls_water_frac_otsu': shoreline_ls_water_frac_otsu,
         'shoreline_s2_water_frac_otsu': shoreline_s2_water_frac_otsu,
         'shoreline_ls_water_frac_adaptive': shoreline_ls_water_frac_adaptive,
-        'shoreline_s2_water_frac_adaptive': shoreline_s2_water_frac_adaptive
+        'shoreline_s2_water_frac_adaptive': shoreline_s2_water_frac_adaptive,
+        # Buffered lake water fractions
+        'buff_lake_ls_water_frac_otsu': buff_lake_ls_water_frac_otsu,
+        'buff_lake_s2_water_frac_otsu': buff_lake_s2_water_frac_otsu,
+        'buff_lake_ls_water_frac_adaptive': buff_lake_ls_water_frac_adaptive,
+        'buff_lake_s2_water_frac_adaptive': buff_lake_s2_water_frac_adaptive,
+        # Smallest lakes
+        'smallest_lake_ls_water_frac_adaptive': smallest_lake_ls_water_frac_adaptive,
+        'smallest_buff_lake_ls_water_frac_adaptive': smallest_buff_lake_ls_water_frac_adaptive,
+        'smallest_lake_s2_water_frac_adaptive': smallest_lake_s2_water_frac_adaptive,
+        'smallest_buff_lake_s2_water_frac_adaptive': smallest_buff_lake_s2_water_frac_adaptive,
+        # Small lakes
+        'small_lake_ls_water_frac_adaptive': small_lake_ls_water_frac_adaptive,
+        'small_buff_lake_ls_water_frac_adaptive': small_buff_lake_ls_water_frac_adaptive,
+        'small_lake_s2_water_frac_adaptive': small_lake_s2_water_frac_adaptive,
+        'small_buff_lake_s2_water_frac_adaptive': small_buff_lake_s2_water_frac_adaptive,
+        # Medium lakes
+        'medium_lake_ls_water_frac_adaptive': medium_lake_ls_water_frac_adaptive,
+        'medium_buff_lake_ls_water_frac_adaptive': medium_buff_lake_ls_water_frac_adaptive,
+        'medium_lake_s2_water_frac_adaptive': medium_lake_s2_water_frac_adaptive,
+        'medium_buff_lake_s2_water_frac_adaptive': medium_buff_lake_s2_water_frac_adaptive,
+        # Large lakes
+        'large_lake_ls_water_frac_adaptive': large_lake_ls_water_frac_adaptive,
+        'large_buff_lake_ls_water_frac_adaptive': large_buff_lake_ls_water_frac_adaptive,
+        'large_lake_s2_water_frac_adaptive': large_lake_s2_water_frac_adaptive,
+        'large_buff_lake_s2_water_frac_adaptive': large_buff_lake_s2_water_frac_adaptive
     }
 
 
@@ -420,18 +507,55 @@ def lake_and_shoreline_frac_common_grid(
     res: int, 
     image_window_params: dict
 ):
+    """
+    Calculates the water fractions for different parts of the landscape and lake sizes. 
+    Only intended common grid images (i.e., resampled), doesn't work on native tiles.
+    ?Maybe worth refactoring for less reducdancy?
+    """
 
+    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
     # # Calculate the lake water fractions
-    lake_ls_water_frac_otsu = calc_lake_wtr_frac_common_grid(ls_water_otsu, ls_ndwi, roi, res, image_window_params)
-    lake_s2_water_frac_otsu = calc_lake_wtr_frac_common_grid(s2_water_otsu, s2_ndwi, roi, res, image_window_params)
-    lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, roi, res, image_window_params)
-    lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, roi, res, image_window_params)
+    lake_ls_water_frac_otsu = calc_lake_wtr_frac_common_grid(ls_water_otsu, ls_ndwi, pld_fp, image_window_params, buff_lake=False)
+    lake_s2_water_frac_otsu = calc_lake_wtr_frac_common_grid(s2_water_otsu, s2_ndwi, pld_fp, image_window_params, buff_lake=False)
+    lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp, image_window_params, buff_lake=False)
+    lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp, image_window_params, buff_lake=False)
+    # Calculate buffered lake water fraction (+ 60 meters)
+    buff_lake_ls_water_frac_otsu = calc_lake_wtr_frac_common_grid(ls_water_otsu, ls_ndwi, pld_fp, image_window_params, buff_lake=True)
+    buff_lake_s2_water_frac_otsu = calc_lake_wtr_frac_common_grid(s2_water_otsu, s2_ndwi, pld_fp, image_window_params, buff_lake=True)
+    buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp, image_window_params, buff_lake=True)
+    buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp, image_window_params, buff_lake=True)
 
     # Calculate the shoreline water fractions
-    shoreline_ls_water_frac_otsu = calc_shoreline_wtr_frac_common_grid(ls_water_otsu, ls_ndwi, roi, res, image_window_params)
-    shoreline_s2_water_frac_otsu = calc_shoreline_wtr_frac_common_grid(s2_water_otsu, s2_ndwi, roi, res, image_window_params)
-    shoreline_ls_water_frac_adaptive = calc_shoreline_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, roi, res, image_window_params)
-    shoreline_s2_water_frac_adaptive = calc_shoreline_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, roi, res, image_window_params)
+    shoreline_ls_water_frac_otsu = calc_shoreline_wtr_frac_common_grid(ls_water_otsu, ls_ndwi, pld_fp, image_window_params)
+    shoreline_s2_water_frac_otsu = calc_shoreline_wtr_frac_common_grid(s2_water_otsu, s2_ndwi, pld_fp, image_window_params)
+    shoreline_ls_water_frac_adaptive = calc_shoreline_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp, image_window_params)
+    shoreline_s2_water_frac_adaptive = calc_shoreline_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp, image_window_params)
+
+    # Calculate the fractions over "smallest" lakes
+    pld_fp_smallest = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_smallest.tif'
+    smallest_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_smallest, image_window_params, buff_lake=False)
+    smallest_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_smallest, image_window_params, buff_lake=True)
+    smallest_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_smallest, image_window_params, buff_lake=False)
+    smallest_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_smallest, image_window_params, buff_lake=True)
+
+    pld_fp_small = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_smallest.tif'
+    small_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_small, image_window_params, buff_lake=False)
+    small_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_small, image_window_params, buff_lake=True)
+    small_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_small, image_window_params, buff_lake=False)
+    small_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_small, image_window_params, buff_lake=True)
+
+    pld_medium = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_medium.tif'
+    medium_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_medium, image_window_params, buff_lake=False)
+    medium_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_medium, image_window_params, buff_lake=True)
+    medium_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_medium, image_window_params, buff_lake=False)
+    medium_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_medium, image_window_params, buff_lake=True)
+
+    pld_large = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_large.tif'
+    large_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_large, image_window_params, buff_lake=False)
+    large_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_large, image_window_params, buff_lake=True)
+    large_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_large, image_window_params, buff_lake=False)
+    large_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_large, image_window_params, buff_lake=True)
+
     
     return {
         'lake_ls_water_frac_otsu': lake_ls_water_frac_otsu,
@@ -441,13 +565,43 @@ def lake_and_shoreline_frac_common_grid(
         'shoreline_ls_water_frac_otsu': shoreline_ls_water_frac_otsu,
         'shoreline_s2_water_frac_otsu': shoreline_s2_water_frac_otsu,
         'shoreline_ls_water_frac_adaptive': shoreline_ls_water_frac_adaptive,
-        'shoreline_s2_water_frac_adaptive': shoreline_s2_water_frac_adaptive
+        'shoreline_s2_water_frac_adaptive': shoreline_s2_water_frac_adaptive,
+        # Buffered lake water fractions
+        'buff_lake_ls_water_frac_otsu': buff_lake_ls_water_frac_otsu,
+        'buff_lake_s2_water_frac_otsu': buff_lake_s2_water_frac_otsu,
+        'buff_lake_ls_water_frac_adaptive': buff_lake_ls_water_frac_adaptive,
+        'buff_lake_s2_water_frac_adaptive': buff_lake_s2_water_frac_adaptive,
+        # Smallest lakes
+        'smallest_lake_ls_water_frac_adaptive': smallest_lake_ls_water_frac_adaptive,
+        'smallest_buff_lake_ls_water_frac_adaptive': smallest_buff_lake_ls_water_frac_adaptive,
+        'smallest_lake_s2_water_frac_adaptive': smallest_lake_s2_water_frac_adaptive,
+        'smallest_buff_lake_s2_water_frac_adaptive': smallest_buff_lake_s2_water_frac_adaptive,
+        # Small lakes
+        'small_lake_ls_water_frac_adaptive': small_lake_ls_water_frac_adaptive,
+        'small_buff_lake_ls_water_frac_adaptive': small_buff_lake_ls_water_frac_adaptive,
+        'small_lake_s2_water_frac_adaptive': small_lake_s2_water_frac_adaptive,
+        'small_buff_lake_s2_water_frac_adaptive': small_buff_lake_s2_water_frac_adaptive,
+        # Medium lakes
+        'medium_lake_ls_water_frac_adaptive': medium_lake_ls_water_frac_adaptive,
+        'medium_buff_lake_ls_water_frac_adaptive': medium_buff_lake_ls_water_frac_adaptive,
+        'medium_lake_s2_water_frac_adaptive': medium_lake_s2_water_frac_adaptive,
+        'medium_buff_lake_s2_water_frac_adaptive': medium_buff_lake_s2_water_frac_adaptive,
+        # Large lakes
+        'large_lake_ls_water_frac_adaptive': large_lake_ls_water_frac_adaptive,
+        'large_buff_lake_ls_water_frac_adaptive': large_buff_lake_ls_water_frac_adaptive,
+        'large_lake_s2_water_frac_adaptive': large_lake_s2_water_frac_adaptive,
+        'large_buff_lake_s2_water_frac_adaptive': large_buff_lake_s2_water_frac_adaptive
     }
     
 
 """
 -----------------------------------------
-Function calculates water fractions for different parts of the landscape
+Function contains the following steps:
+1) Determine if calculations are on common resampled grid or the native tiles
+2) Check if the images are valid (enough pixels)
+3) Calculate the Otsu and adaptive thresholds for each image pair
+4) Make binary water masks using the thresholds
+5) Calculates the water fractions for each image pair along different PLD zones
 -----------------------------------------
 """
 
@@ -473,8 +627,6 @@ def image_wtr_area(
     # Adaptive water fractions
     total_ls_water_frac_adaptive = None
     total_s2_water_frac_adaptive = None
-    # Lake and Shoreline water fractions
-    lake_ls_water_frac_otsu = None
 
     # Histograms
     ls_hist = None
@@ -552,16 +704,17 @@ def image_wtr_area(
         total_s2_water_frac_otsu = calc_total_wtr_frac(s2_water_otsu, s2_ndwi)
         total_ls_water_frac_adaptive = calc_total_wtr_frac(ls_water_adaptive, ls_ndwi)
         total_s2_water_frac_adaptive = calc_total_wtr_frac(s2_water_adaptive, s2_ndwi)
-        # Calculate the lake and shoreline water fractions
+
+        # Calculate the water fractions in relation to the PLD mask (1. Lake, 2. Lake Buffered, 3. Shoreline)
         if resample_method != 'noresample':
-            lake_shoreline_fracs = lake_and_shoreline_frac_common_grid(
+            pld_zone_wtr_fracs = lake_and_shoreline_frac_common_grid(
                 ls_water_otsu, s2_water_otsu,
                 ls_water_adaptive, s2_water_adaptive,
                 ls_ndwi, s2_ndwi,
                 roi, res, image_window_params
             )
         else:
-            lake_shoreline_fracs = lake_and_shoreline_frac_native_tile(
+            pld_zone_wtr_fracs = lake_and_shoreline_frac_native_tile(
                 ls_water_otsu, s2_water_otsu,
                 ls_water_adaptive, s2_water_adaptive,
                 ls_ndwi, s2_ndwi,
@@ -573,7 +726,7 @@ def image_wtr_area(
 
         if hist_return == False:
             ls_hist = s2_hist = None
-
+    
     partial_results = {
         # Thresholds
         'ls_otsu_threshold': ls_otsu_threshold,
@@ -592,24 +745,16 @@ def image_wtr_area(
         's2_hist': s2_hist
     }
     # Combine partial results with lake and shoreline fractions
-    results = {**partial_results, **lake_shoreline_fracs}
+    results = {**partial_results, **pld_zone_wtr_fracs}
 
     return results
-
+    
 """
 -----------------------------------------
-Function calculates water fractions for different parts of the landscape
+This function iterates through all the rois, processing levels (SR & TOA), and image dates
+Generates a dataframe with image info, thresholds, and water fractions
 -----------------------------------------
 """
-
-def numpy_to_list(data):
-    """
-    Converts numpy arrays to lists for storage in a dataframe
-    """
-    if isinstance(data, np.ndarray):
-        return data.tolist()
-    else:
-        return data
     
 def make_area_thresholding_summaries(
     image_info: dict, 
@@ -638,15 +783,9 @@ def make_area_thresholding_summaries(
                     continue
                 if area_items == "Poor Quality Image Data":
                     continue
-                    # summary = {
-                    #     'date': date,
-                    #     'roi': roi,
-                    #     'level': level,
-                    #     'resample_method': resample_method,
-                    #     'ls_otsu_threshold': "Poor Quality Image Data",
-                    #     'ls_adaptive_land': "Poor Quality Image Data",
-                    # }
-                # Convert the numpy histogram objects to lists for storage
+
+                # Convert the numpy histogram objects to lists for storage in .csv
+                # NOTE: The NDWI histograms are not always returned, so check for None
                 if area_items.get('ls_hist') is None:
                     ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = None
                 else:
@@ -655,6 +794,7 @@ def make_area_thresholding_summaries(
                     s2_hist_counts = numpy_to_list(area_items.get('s2_hist')[0])
                     s2_hist_bins = numpy_to_list(area_items.get('s2_hist')[1])
 
+                # Print the total water fractions for each image
                 print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive')}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive')}')
                 print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive')}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive')}')
 
@@ -670,26 +810,57 @@ def make_area_thresholding_summaries(
                     's2_otsu_threshold': area_items.get('s2_otsu_threshold'),
                     's2_adaptive_land': area_items.get('s2_adaptive_land'),
                     's2_adaptive_water': area_items.get('s2_adaptive_water'),
-                    # Otsu Water Fractions
+
+                    # Total Water Fractions
                     'total_ls_water_frac_otsu': area_items.get('total_ls_water_frac_otsu'),
+                    'total_s2_water_frac_otsu': area_items.get('total_s2_water_frac_otsu'),
+                    'total_ls_water_frac_adaptive': area_items.get('total_ls_water_frac_adaptive'),
+                    'total_s2_water_frac_adaptive': area_items.get('total_s2_water_frac_adaptive'),
+
+                    # Otsu Lake and Shoreline Water Fractions
                     'lake_ls_water_frac_otsu': area_items.get('lake_ls_water_frac_otsu'),
                     'shoreline_ls_water_frac_otsu': area_items.get('shoreline_ls_water_frac_otsu'),
-                    'total_s2_water_frac_otsu': area_items.get('total_s2_water_frac_otsu'),
+                    'buff_lake_ls_water_frac_otsu': area_items.get('buff_lake_ls_water_frac_otsu'),                    
                     'lake_s2_water_frac_otsu': area_items.get('lake_s2_water_frac_otsu'),
                     'shoreline_s2_water_frac_otsu': area_items.get('shoreline_s2_water_frac_otsu'),
-                    # Adaptive Water Fractions
-                    'total_ls_water_frac_adaptive': area_items.get('total_ls_water_frac_adaptive'),
+                    'buff_lake_s2_water_frac_otsu': area_items.get('buff_lake_s2_water_frac_otsu'),  
+
+                    # Adaptive Lake and Shoreline Water Fractions
                     'lake_ls_water_frac_adaptive': area_items.get('lake_ls_water_frac_adaptive'),
                     'shoreline_ls_water_frac_adaptive': area_items.get('shoreline_ls_water_frac_adaptive'),
-                    'total_s2_water_frac_adaptive': area_items.get('total_s2_water_frac_adaptive'),
+                    'buff_lake_ls_water_frac_adaptive': area_items.get('buff_lake_ls_water_frac_adaptive'),                    
                     'lake_s2_water_frac_adaptive': area_items.get('lake_s2_water_frac_adaptive'),
                     'shoreline_s2_water_frac_adaptive': area_items.get('shoreline_s2_water_frac_adaptive'),
+                    'buff_lake_s2_water_frac_adaptive': area_items.get('buff_lake_s2_water_frac_adaptive'),                    
+                    # Smallest lakes (Adaptive)
+                    'smallest_lake_ls_water_frac_adaptive': area_items.get('smallest_lake_ls_water_frac_adaptive'),
+                    'smallest_buff_lake_ls_water_frac_adaptive': area_items.get('smallest_buff_lake_ls_water_frac_adaptive'),
+                    'smallest_lake_s2_water_frac_adaptive': area_items.get('smallest_lake_s2_water_frac_adaptive'),
+                    'smallest_buff_lake_s2_water_frac_adaptive': area_items.get('smallest_buff_lake_s2_water_frac_adaptive'),                    
+                    # Small lakes (Adaptive)
+                    'small_lake_ls_water_frac_adaptive': area_items.get('small_lake_ls_water_frac_adaptive'),
+                    'small_buff_lake_ls_water_frac_adaptive': area_items.get('small_buff_lake_ls_water_frac_adaptive'),
+                    'small_lake_s2_water_frac_adaptive': area_items.get('small_lake_s2_water_frac_adaptive'),
+                    'small_buff_lake_s2_water_frac_adaptive': area_items.get('small_buff_lake_s2_water_frac_adaptive'),                    
+                    # Medium lakes (Adaptive)
+                    'medium_lake_ls_water_frac_adaptive': area_items.get('medium_lake_ls_water_frac_adaptive'),
+                    'medium_buff_lake_ls_water_frac_adaptive': area_items.get('medium_buff_lake_ls_water_frac_adaptive'),
+                    'medium_lake_s2_water_frac_adaptive': area_items.get('medium_lake_s2_water_frac_adaptive'),
+                    'medium_buff_lake_s2_water_frac_adaptive': area_items.get('medium_buff_lake_s2_water_frac_adaptive'),                    
+                    # Large lakes (Adaptive)
+                    'large_lake_ls_water_frac_adaptive': area_items.get('large_lake_ls_water_frac_adaptive'),
+                    'large_buff_lake_ls_water_frac_adaptive': area_items.get('large_buff_lake_ls_water_frac_adaptive'),
+                    'large_lake_s2_water_frac_adaptive': area_items.get('large_lake_s2_water_frac_adaptive'),
+                    'large_buff_lake_s2_water_frac_adaptive': area_items.get('large_buff_lake_s2_water_frac_adaptive'),                    
                     # Histograms
                     'ls_hist_counts': ls_hist_counts,
                     'ls_hist_bins': ls_hist_bins,
                     's2_hist_counts': s2_hist_counts,
                     's2_hist_bins': s2_hist_bins
                 }
+
+                # Append the summary to the list
+
                 area_summaries.append(summary)
 
     return pd.DataFrame(area_summaries)
