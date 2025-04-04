@@ -13,9 +13,9 @@ import rasterio as rio
 from rasterio.features import rasterize
 
 out_dir = './data/pld_rasterized/'
-roi_name = 'YKF_sub1'
+roi_name = 'YKD_sub5'
 roi_prefix = roi_name.split('_')[0]
-res = 30 # 30 or 60 meters
+res = 60 # 30 or 60 meters
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 
 if res == 60:
@@ -43,7 +43,7 @@ print(est_utm, est_utm_roi)
 pld_utm = pld.to_crs(est_utm)
 roi_utm = roi.to_crs(est_utm) 
 
-# %% 2.0 Define functions
+
 
 def pld_buffer_img_clip(
     gdf_utm: gpd.GeoDataFrame, 
@@ -119,7 +119,6 @@ def rasterize_buffers(
     #print(f'{band_name} rasterized to {img_meta['crs']}')
     
 
-# %% Rasterize the new shapes as bands
 
 img_path = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res{res}.tif'
 
@@ -149,7 +148,6 @@ for size, (min_area, max_area) in lake_size_bins.items():
         pld_buffered, band_name = pld_buffer_img_clip(lakes_in_category, buffer, roi_utm)
         rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
 
-# %% Add the sub_rois lake sizes to lake_size_summary.csv
 
 summary_df = pd.DataFrame(lake_size_summaries)
 

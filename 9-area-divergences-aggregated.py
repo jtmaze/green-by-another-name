@@ -6,7 +6,7 @@ import seaborn as sns
 from scipy import stats
 import numpy as np
 
-resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'noresample']
+resample_methods = ['bilinear30', 'noresample', 'bilinear60']
 
 # %% 2.0 Explore differences in water fraction by satellite.
 
@@ -18,9 +18,9 @@ creates boxplots to visualize them, and performs t-tests to assess statistical s
 test_results = []
 for i in resample_methods:
 
-    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch1.csv')
+    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch2.csv')
     sr = sr[sr['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
-    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch1.csv')
+    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch2.csv')
     toa = toa[toa['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
 
     cols_to_make_float = [
@@ -34,15 +34,21 @@ for i in resample_methods:
         toa[col] = toa[col].astype(float)
 
     # SR Boxplot and t-tests
+    # Total Landscape
     sr['total_diff_sr'] = sr['total_ls_water_frac_adaptive'] - sr['total_s2_water_frac_adaptive'] 
     sr['relative_total_diff_sr'] = sr['total_diff_sr'] / sr['total_ls_water_frac_adaptive']
+    # Lake Difference
     sr['lake_diff_sr'] = sr['lake_ls_water_frac_adaptive'] - sr['lake_s2_water_frac_adaptive']
     sr['relative_lake_diff_sr'] = sr['lake_diff_sr'] / sr['lake_ls_water_frac_adaptive']
+    # Shoreline Difference
     sr['shoreline_diff_sr'] = sr['shoreline_ls_water_frac_adaptive'] - sr['shoreline_s2_water_frac_adaptive']
     sr['relative_shoreline_diff_sr'] = sr['shoreline_diff_sr'] / sr['shoreline_ls_water_frac_adaptive']
+    # Lake plus shoreline difference
+    sr['lake_shoreline_diff_sr'] = sr['buff_lake_ls_water_frac_adaptive'] - sr['buff_lake_s2_water_frac_adaptive']
+    sr['relative_lake_shoreline_diff_sr'] = sr['lake_shoreline_diff_sr'] / sr['buff_lake_ls_water_frac_adaptive']
 
-    abs_plot_data = sr[['total_diff_sr', 'lake_diff_sr', 'shoreline_diff_sr']].copy()
-    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline']  # Rename columns
+    abs_plot_data = sr[['total_diff_sr', 'lake_diff_sr', 'shoreline_diff_sr', 'lake_shoreline_diff_sr']].copy()
+    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
@@ -50,8 +56,8 @@ for i in resample_methods:
     plt.ylabel('LS8% - S2% Water Fraction')
     plt.xlabel('Landscape Zone')
 
-    rel_plot_data = sr[['relative_total_diff_sr', 'relative_lake_diff_sr', 'relative_shoreline_diff_sr']].copy()
-    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline']  # Rename columns
+    rel_plot_data = sr[['relative_total_diff_sr', 'relative_lake_diff_sr', 'relative_shoreline_diff_sr', 'relative_lake_shoreline_diff_sr']].copy()
+    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
@@ -90,21 +96,35 @@ for i in resample_methods:
         't_statistic': shoreline_ttest.statistic,
         'p_value': shoreline_ttest.pvalue
     }
+    lake_shoreline_ttest = stats.ttest_1samp(sr['relative_lake_shoreline_diff_sr'].dropna(), 0)
+    lake_shoreline_result = {
+        'level': 'sr', 
+        'resample_method': i, 
+        'zone': 'shoreline and lake',
+        't_statistic': lake_shoreline_ttest.statistic,
+        'p_value': lake_shoreline_ttest.pvalue
+    }
+
     test_results.append(total_result)
     test_results.append(lake_result)
     test_results.append(shoreline_result)
+    test_results.append(lake_shoreline_result)
 
     # TOA Boxplot and t-tests
     toa['total_diff_toa'] = toa['total_ls_water_frac_adaptive'] - toa['total_s2_water_frac_adaptive']
     toa['lake_diff_toa'] = toa['lake_ls_water_frac_adaptive'] - toa['lake_s2_water_frac_adaptive']
     toa['shoreline_diff_toa'] = toa['shoreline_ls_water_frac_adaptive'] - toa['shoreline_s2_water_frac_adaptive']
+    # Lake plus shoreline difference
+    toa['lake_shoreline_diff_toa'] = toa['buff_lake_ls_water_frac_adaptive'] - toa['buff_lake_s2_water_frac_adaptive']
+    
     toa['relative_total_diff_toa'] = toa['total_diff_toa'] / toa['total_ls_water_frac_adaptive']
     toa['relative_lake_diff_toa'] = toa['lake_diff_toa'] / toa['lake_ls_water_frac_adaptive']
     toa['relative_shoreline_diff_toa'] = toa['shoreline_diff_toa'] / toa['shoreline_ls_water_frac_adaptive']
+    toa['relative_lake_shoreline_diff_toa'] = toa['lake_shoreline_diff_toa'] / toa['buff_lake_ls_water_frac_adaptive']
 
     # TOA Boxplot with renamed columns for absolute differences
-    abs_plot_data = toa[['total_diff_toa', 'lake_diff_toa', 'shoreline_diff_toa']].copy()
-    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline']  # Rename columns
+    abs_plot_data = toa[['total_diff_toa', 'lake_diff_toa', 'shoreline_diff_toa', 'lake_shoreline_diff_toa']].copy()
+    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
 
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
@@ -114,8 +134,8 @@ for i in resample_methods:
     plt.xlabel('Landscape Zone')
 
     # TOA Boxplot with renamed columns for relative differences
-    rel_plot_data = toa[['relative_total_diff_toa', 'relative_lake_diff_toa', 'relative_shoreline_diff_toa']].copy()
-    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline']  # Rename columns
+    rel_plot_data = toa[['relative_total_diff_toa', 'relative_lake_diff_toa', 'relative_shoreline_diff_toa', 'relative_lake_shoreline_diff_toa']].copy()
+    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
 
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
@@ -156,9 +176,19 @@ for i in resample_methods:
         't_statistic': shoreline_ttest.statistic,
         'p_value': shoreline_ttest.pvalue
     }
+    lake_shoreline_ttest = stats.ttest_1samp(toa['relative_lake_shoreline_diff_toa'].dropna(), 0)
+    lake_shoreline_result = {
+        'level': 'toa', 
+        'resample_method': i, 
+        'zone': 'shoreline and lake',
+        't_statistic': lake_shoreline_ttest.statistic,
+        'p_value': lake_shoreline_ttest.pvalue
+    }
+    
     test_results.append(total_result)
     test_results.append(lake_result)
     test_results.append(shoreline_result)
+    test_results.append(lake_shoreline_result)
 
 
 # %% Concatonate the t-test results into a single dataframe

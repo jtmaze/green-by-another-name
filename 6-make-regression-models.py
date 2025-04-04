@@ -129,7 +129,7 @@ green_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 
 # 3.2 NIR Band PLD 120 meter buffered
@@ -141,7 +141,7 @@ nir_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 
 image_info['band_name'] = 'NDWI'
@@ -152,7 +152,7 @@ ndwi_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 
 print("Done")
@@ -195,7 +195,7 @@ green_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 4.2 NIR band PLD -60 meter buffered
 image_info['band_name'] = 'NIR'
@@ -206,7 +206,7 @@ nir_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 4.3 NDWI band PLD -60 meter buffered
 image_info['band_name'] = 'NDWI'
@@ -258,7 +258,7 @@ green_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 5.2 NIR band PLD -30 to 0 meter buffered
 image_info['band_name'] = 'NIR'
@@ -270,7 +270,7 @@ nir_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 5.3 NDWI band PLD -30 to 0 meter buffered
 image_info['band_name'] = 'NDWI'
@@ -322,7 +322,7 @@ green_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 6.2 NIR band PLD 0 to 30 meter buffered
 image_info['band_name'] = 'NIR'
@@ -333,7 +333,7 @@ nir_df = make_reflectance_summaries(
     levels=levels,
     rois=rois,
     dates=image_dates,
-    hist_return=True
+    hist_return=False
 )
 # 6.3 NDWI band PLD 0 to 30 meter buffered
 image_info['band_name'] = 'NDWI'
@@ -354,6 +354,190 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv(f'./data/regression_summaries_shoreline_0-plus30_{resample_method}.csv', index=False)
 
+# %% 7.0 Green, NIR, NDWI over lakes with 0 meter buffer
 
+image_info = {
+    'level': None,
+    'date': None, # Dates will be itterated through
+    'roi': None, # ROIs will be itterated through
+    'band_name': None # Bands will be specified
+}
 
-# %%
+mask_params = {
+    'zone': 'lake',
+    'buffer_delim': 0,
+    'buffer_delim_outer': None,
+}
+
+regression_params = {
+    'sample_size': 10_000,
+    'outlier_frac': 0.0005,
+}
+# 7.1 Green band PLD 0 meter buffered
+
+image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
+green_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+# 7.2 NIR band PLD 0 meter buffered
+image_info['band_name'] = 'NIR'
+nir_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+# 7.3 NDWI band PLD 0 meter buffered
+image_info['band_name'] = 'NDWI'
+regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
+ndwi_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+out_df = pd.concat([green_df, nir_df, ndwi_df])
+out_df = out_df[out_df['slope'] != 'No Image Data']
+out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
+out_df.to_csv(f'./data/regression_summaries_0m_lake_{resample_method}.csv', index=False)
+
+# %% 8.0 Green, NIR, NDWI over shoreline with -60 meter and +60 meter
+
+image_info = {
+    'level': None,
+    'date': None, # Dates will be itterated through
+    'roi': None, # ROIs will be itterated through
+    'band_name': None # Bands will be specified
+}
+
+mask_params = {
+    'zone': 'shoreline',
+    'buffer_delim': -60,
+    'buffer_delim_outer': 60,
+}
+
+regression_params = {
+    'sample_size': 10_000,
+    'outlier_frac': 0.0005,
+}
+# 8.1 Green band PLD -60 to 60 meter buffered
+
+image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
+green_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+# 8.2 NIR band PLD -60 to 60 meter buffered
+image_info['band_name'] = 'NIR'
+nir_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+# 8.3 NDWI band PLD -60 to 60 meter buffered
+image_info['band_name'] = 'NDWI'
+regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
+ndwi_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+out_df = pd.concat([green_df, nir_df, ndwi_df])
+out_df = out_df[out_df['slope'] != 'No Image Data']
+out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
+out_df.to_csv(f'./data/regression_summaries_shoreline_neg60-60_{resample_method}.csv', index=False)
+
+# %% 9.0 Green, NIR, NDWI over land with a 60 buffer
+
+image_info = {
+    'level': None,
+    'date': None, # Dates will be itterated through
+    'roi': None, # ROIs will be itterated through
+    'band_name': None # Bands will be specified
+}
+
+mask_params = {
+    'zone': 'land',
+    'buffer_delim': 60,
+    'buffer_delim_outer': None,
+}
+
+regression_params = {
+    'sample_size': 10_000,
+    'outlier_frac': 0.0005,
+}
+# 8.1 Green band land 60 meter buffered
+
+image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+
+green_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+# 8.2 NIR band land 60 meter buffered
+image_info['band_name'] = 'NIR'
+nir_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+# 8.3 NDWI band land 60 meter buffered
+image_info['band_name'] = 'NDWI'
+regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
+ndwi_df = make_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+out_df = pd.concat([green_df, nir_df, ndwi_df])
+out_df = out_df[out_df['slope'] != 'No Image Data']
+out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
+out_df.to_csv(f'./data/regression_summaries_60m_land_{resample_method}.csv', index=False)
