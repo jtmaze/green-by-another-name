@@ -229,7 +229,7 @@ def make_ls8_mask_col(
     level: str
 ): 
     """
-    BUG: Ensure qa_pixel value is the same different for ls8 products.
+    Generates the LS8 data mask from the QA_PIXEL band
     """
     if level == 'sr':
         asset_string = "LANDSAT/LC08/C02/T1_L2"

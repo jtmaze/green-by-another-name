@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch1.csv')
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch1.csv')
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch2.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
 sr_bilinear60 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear60_area_summaries_batch1.csv')
 toa_bilinear60 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear60_area_summaries_batch1.csv')
 sr_lanczos30 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos30_area_summaries_batch1.csv')
