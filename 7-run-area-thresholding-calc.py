@@ -20,7 +20,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 # Specify the level and resample method
 level = 'toa'
 levels = [level]
-resample_method = 'noresample'
+resample_method = 'bilinear30'
 rois = ['YKF_sub1']
 
 # %% 2.0 Dictionaries to hold image information
@@ -36,7 +36,15 @@ image_info = {
 
 image_info['resample_method'] = resample_method
 
-out_df = make_area_thresholding_summaries(image_info, levels, rois, image_dates, hist_return=False)
+out_df = make_area_thresholding_summaries(
+    image_info, 
+    levels, 
+    rois, 
+    image_dates, 
+    hist_return=False, 
+    write_rasters=False
+)
+
 print("Area summaries finished")
 # %% 4.0 Write the output to csv
 out_df = out_df[out_df['ls_otsu_threshold'].notna()]

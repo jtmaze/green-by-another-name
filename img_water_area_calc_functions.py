@@ -592,6 +592,38 @@ def lake_and_shoreline_frac_common_grid(
         'large_lake_s2_water_frac_adaptive': large_lake_s2_water_frac_adaptive,
         'large_buff_lake_s2_water_frac_adaptive': large_buff_lake_s2_water_frac_adaptive
     }
+
+def write_mask_rasters(
+    ls_water: np.array,
+    s2_water: np.array,
+    image_info: dict
+):
+    """
+    Writes the binary water masks to disk
+
+    """
+    roi_name = image_info['roi']
+    level = image_info['level']
+    date = image_info['date']
+    resample_method = image_info['resample_method']
+
+    out_dir = './data/processed_water_masks/'
+    ref_fp = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res30.tif'
+    ls_out_fp = f'{out_dir}LS8_water_mask_{level}_{roi_name}_{date}_{resample_method}.tif'
+    s2_out_fp = f'{out_dir}S2_water_mask_{level}_{roi_name}_{date}_{resample_method}.tif'
+
+    with rio.open(ref_fp) as ref:
+        meta = ref.meta.copy()
+
+    with rio.open(ls_out_fp, 'w', **meta) as dst:
+        dst.write(ls_water.astype(rio.uint8), 1)
+    
+    with rio.open(s2_out_fp, 'w', **meta) as dst:
+        dst.write(s2_water.astype(rio.uint8), 1)
+
+    print(f'Wrote {ls_out_fp}')
+    print(f'Wrote {s2_out_fp}')
+
     
 
 """
@@ -609,6 +641,7 @@ def image_wtr_area(
     image_info: dict,
     write_mask: bool,
     hist_return: bool, 
+    write_rasters: bool,
 ):
     """
     Returns a dictionary with the otsu threshold, and water fraction from each image
@@ -721,8 +754,12 @@ def image_wtr_area(
                 roi, s2_fp, ls8_fp
             )
 
-        if write_mask == True:
-            print("No code to export the water masks, yet...")
+        if write_rasters == True:
+            write_mask_rasters(
+                ls_water=ls_water_adaptive,
+                s2_water=s2_water_adaptive, 
+                image_info=image_info
+            )
 
         if hist_return == False:
             ls_hist = s2_hist = None
@@ -761,7 +798,8 @@ def make_area_thresholding_summaries(
     levels: list, 
     rois: list, 
     dates: list,
-    hist_return: bool
+    hist_return: bool,
+    write_rasters: bool = False,
 ):
 
     """
@@ -778,7 +816,13 @@ def make_area_thresholding_summaries(
                 image_info['date'] = date
 
                 # Calculate the Otsu thresholds and water fractions for each image
-                area_items = image_wtr_area(image_info, write_mask=False, hist_return=hist_return)
+                area_items = image_wtr_area(
+                    image_info, 
+                    write_mask=False, 
+                    hist_return=hist_return, 
+                    write_rasters=write_rasters
+                )
+
                 if area_items is None:
                     continue
                 if area_items == "Poor Quality Image Data":
