@@ -6,7 +6,7 @@ lake_areas_dir = './data/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_bilinear30_area_summaries_batch2.csv')
 sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_bilinear30_area_summaries_batch2.csv')
 
-# %% 1.1 Select the relevant columns
+# 1.1 Select the relevant columns
 
 water_frac_cols = [
     'smallest_buff_lake_ls_water_frac_adaptive', 'smallest_buff_lake_s2_water_frac_adaptive',
@@ -42,4 +42,4 @@ def filter_data_calc_satellite_differences(
 
 # %%
 
-toa_plot = filter_data_calc_satellite_differences(toa_data, water_frac_cols)
+toa_plot = filter_data_calc_satellite_differences(sr_data, water_frac_cols)

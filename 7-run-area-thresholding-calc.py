@@ -18,9 +18,9 @@ rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 
 # Specify the level and resample method
-level = 'sr'
+level = 'toa'
 levels = [level]
-resample_method = 'bilinear60'
+resample_method = 'bilinear30'
 
 # %% 2.0 Dictionaries to hold image information
 
