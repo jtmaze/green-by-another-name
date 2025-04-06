@@ -7,14 +7,14 @@ import seaborn as sns
 
 sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch2.csv')
 toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
-sr_bilinear60 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear60_area_summaries_batch1.csv')
-toa_bilinear60 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear60_area_summaries_batch1.csv')
-sr_lanczos30 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos30_area_summaries_batch1.csv')
-toa_lanczos30 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos30_area_summaries_batch1.csv')
-sr_lanczos60 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos60_area_summaries_batch1.csv')
-toa_lanczos60 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos60_area_summaries_batch1.csv')
-sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch1.csv')
-toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch1.csv')
+sr_bilinear60 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear60_area_summaries_batch2.csv')
+toa_bilinear60 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear60_area_summaries_batch2.csv')
+# sr_lanczos30 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos30_area_summaries_batch2.csv')
+# toa_lanczos30 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos30_area_summaries_batch2.csv')
+# sr_lanczos60 = pd.read_csv('./data/lake_area_results/sr_resampled_lanczos60_area_summaries_batch2.csv')
+# toa_lanczos60 = pd.read_csv('./data/lake_area_results/toa_resampled_lanczos60_area_summaries_batch2.csv')
+sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch2.csv')
+toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch2.csv')
 
 combined = pd.concat(
     [
@@ -22,10 +22,6 @@ combined = pd.concat(
         toa_bilinear30,
         sr_bilinear60,
         toa_bilinear60,
-        sr_lanczos30,
-        toa_lanczos30,
-        sr_lanczos60,
-        toa_lanczos60,
         sr_noresample,
         toa_noresample
     ],
@@ -74,6 +70,13 @@ def area_boxplot_maker(
             'shoreline_s2_water_frac_otsu': 'Sentinel-2 - Otsu',
             'shoreline_ls_water_frac_adaptive': 'Landsat8 - Adaptive',
             'shoreline_s2_water_frac_adaptive': 'Sentinel-2 - Adaptive'
+        }
+    elif zone_label == 'Lake + Shoreline':
+        label_dict = {
+            'buff_lake_ls_water_frac_otsu': 'Landsat8 - Otsu',
+            'buff_lake_s2_water_frac_otsu': 'Sentinel-2 - Otsu',
+            'buff_lake_ls_water_frac_adaptive': 'Landsat8 - Adaptive',
+            'buff_lake_s2_water_frac_adaptive': 'Sentinel-2 - Adaptive'
         }
     else:
         print("Invalid zone label. Please use 'Total', 'Lake', or 'Shoreline'.")
@@ -136,6 +139,14 @@ area_boxplot_maker(
     resample_label='Bilinear 30'
 )
 
+cols_to_plot = ['buff_lake_ls_water_frac_otsu', 'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_otsu', 'buff_lake_s2_water_frac_adaptive']
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Lake + Shoreline', 
+    resample_label='Bilinear 30'
+)
+
 # %% Unresampled
 """
 Compare bilinear unresampled area stats
@@ -163,6 +174,14 @@ area_boxplot_maker(
     temp=temp,
     cols_to_plot=cols_to_plot,
     zone_label='Shoreline',
+    resample_label='Unresampled (native resolution)'
+)
+
+cols_to_plot = ['buff_lake_ls_water_frac_otsu', 'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_otsu', 'buff_lake_s2_water_frac_adaptive']
+area_boxplot_maker(
+    temp=temp,
+    cols_to_plot=cols_to_plot,
+    zone_label='Lake + Shoreline', 
     resample_label='Unresampled (native resolution)'
 )
 

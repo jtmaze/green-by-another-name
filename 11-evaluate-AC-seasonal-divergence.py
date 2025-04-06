@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Load data
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch1.csv')
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch1.csv')
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch2.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
 combined = pd.concat([sr_bilinear30, toa_bilinear30], ignore_index=True)
 valid = combined[combined['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
 
@@ -94,14 +94,14 @@ def create_boxplot(data, x_col, title_prefix, y_lim=None):
     plt.tight_layout()
     plt.show()
 
-# %% 2.0 Process PLD +60m data
+# %% 2.0 Process PLD +0m data
 lake_data = prepare_data(valid, 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive')
 
-# %% 2.1 PLD 60m+ Boxplot over Months for all sites
-create_boxplot(lake_data, 'month', "PLD +60m buffered")
+# %% 2.1 PLD 0m+ Boxplot over Months for all sites
+create_boxplot(lake_data, 'month', "PLD 0m buffered")
 
-# %% 2.2 PLD 60m+ Boxplot over 1/2 Months for all sites
-create_boxplot(lake_data, 'half_month', "PLD +60m buffered")
+# %% 2.2 PLD 0m+ Boxplot over 1/2 Months for all sites
+create_boxplot(lake_data, 'half_month', "PLD 0m buffered")
 
 # %% 3.0 Process Shoreline (PLD +-60m) data
 shoreline_data = prepare_data(valid, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
@@ -110,6 +110,17 @@ shoreline_data = prepare_data(valid, 'shoreline_ls_water_frac_adaptive', 'shorel
 create_boxplot(shoreline_data, 'month', "PLD Shoreline +-60m")
 # %% 3.2 Shoreline Boxplot over 1/2 Months for all sites
 create_boxplot(shoreline_data, 'half_month', "PLD Shoreline +-60m")
+
+# %% 4.0 Boxplot of PLD Shoreline and Lake (buffered 60 meters)
+
+buff_lake_data = prepare_data(valid, 'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_adaptive')
+
+# %% Boxplot over Months for all sites
+create_boxplot(buff_lake_data, 'month', 'PLD Buffered Lakes +60 meters')
+
+# %% Boxplot for 1/2 Months for all sites
+
+create_boxplot(buff_lake_data, 'half_month', 'PLD Buffered Lakes +60 meters')
 
 # %% 4.0 Select specific regions of interest (YKF and AND)
 
@@ -127,32 +138,6 @@ create_boxplot(lake_YKF, 'month', f"{region} Lake PLD +60m", y_lim=None)
 create_boxplot(shoreline_YKF, 'half_month', f"{region} Shoreline PLD +-60m", y_lim=None)
 create_boxplot(lake_YKF, 'half_month', f"{region} Lake PLD +60m", y_lim=None)
 
-# %% 4.2 AND Boxplot over Months for all sites
-region = 'AND'
-AND_data = valid[valid['main_roi'] == region]
-shoreline_AND = prepare_data(AND_data, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
-lake_AND = prepare_data(AND_data, 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive')
-create_boxplot(shoreline_AND, 'month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_AND, 'month', f"{region} PLD +60m", y_lim=None)
-create_boxplot(shoreline_AND, 'half_month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_AND, 'half_month', f"{region} PLD +60m", y_lim=None)
-
-# %% 4.3 MRD Boxplot over Months for all sites
-region = 'MRD'
-MRD_data = valid[valid['main_roi'] == region]
-shoreline_MRD = prepare_data(MRD_data, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
-create_boxplot(shoreline_MRD, 'month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(shoreline_MRD, 'half_month', f"{region} PLD +-60m", y_lim=None)
-
-# %% 4.4 YKD Boxplot over Months for all sites
-region = 'YKD'
-YKD_data = valid[valid['main_roi'] == region]
-shoreline_YKD = prepare_data(YKD_data, 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive')
-lake_YKD = prepare_data(YKD_data, 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive')
-create_boxplot(shoreline_YKD, 'month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_YKD, 'month', f"{region} PLD +60m", y_lim=None)
-create_boxplot(shoreline_YKD, 'half_month', f"{region} PLD +-60m", y_lim=None)
-create_boxplot(lake_YKD, 'half_month', f"{region} PLD +60m", y_lim=None)
 
 
 # %%

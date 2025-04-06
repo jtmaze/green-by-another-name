@@ -13,8 +13,8 @@ import seaborn as sns
 mask_solar_stats_dir = './data/img_mask_solar_stats/'
 mask_solar_stats_files = glob.glob(f'{mask_solar_stats_dir}/*.csv')
 
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch1.csv')
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch1.csv')
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch2.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
 combined = pd.concat([sr_bilinear30, toa_bilinear30], ignore_index=True)
 valid = combined[combined['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
 
@@ -62,7 +62,7 @@ df_wide_lake = df_wide_lake.rename({'date_': 'date', 'roi_': 'roi'}, axis=1)
 df_wide_lake['ls_toa_sr_diff'] = df_wide_lake['lake_ls_water_frac_adaptive_toa'].astype(float) - df_wide_lake['lake_ls_water_frac_adaptive_sr'].astype(float)
 df_wide_lake['s2_toa_sr_diff'] = df_wide_lake['lake_s2_water_frac_adaptive_toa'].astype(float) - df_wide_lake['lake_s2_water_frac_adaptive_sr'].astype(float)
 
-# %% Calculate shoreline differences
+# Calculate shoreline differences
 
 shoreline = valid[['date', 'roi', 'level', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_adaptive']]
 df_wide_shoreline = shoreline.pivot(
@@ -278,48 +278,5 @@ sns.lmplot(
 plt.ylabel("Adjusted TOA-SR Difference (TOA% - SR% / TOA%)")
 plt.title("Shoreline PLD +-60 meters Sentinel-2")
 plt.show()
-
-# %% See if there's a relationship between toa_sr_diff and total water fraction
-"""
-This chunk of analysis is probably a wash, 
-because the composition of rois, and thus water fraction changes with tile combos and cloud cover. 
-Means a given date's water fraction doesn't mean wetnessed changed. 
-"""
-# temp = df_wide.copy()
-# temp = temp[['s2_toa_sr_diff', 'lake_s2_water_frac_adaptive_toa', 'date', 'roi']]
-# temp['roi_main'] = temp['roi'].str.split('_').str[0]
-# temp['lake_s2_water_frac_adaptive_toa'] = temp['lake_s2_water_frac_adaptive_toa'].astype(float)
-# temp['adj_s2_toa_sr_diff'] = temp['s2_toa_sr_diff'] / temp['lake_s2_water_frac_adaptive_toa']
-
-
-# sns.lmplot(
-#     data=temp,
-#     x='lake_s2_water_frac_adaptive_toa',
-#     y='adj_s2_toa_sr_diff',
-#     hue='roi_main',
-#     ci=None,
-#     aspect=1.2
-# )
-# plt.title("Adjusted S2 TOA%-SR% Difference vs. TOA Water Fraction by ROI")
-# plt.xlabel("TOA Water Fraction")
-# plt.ylabel("Adjusted TOA-SR Difference (TOA% - SR% / TOA%)")
-# plt.show()
-
-# results = {}
-# for roi in temp['roi_main'].unique():
-#     subset = temp[temp['roi_main'] == roi]
-#     subset = subset.dropna()
-#     x = subset['lake_s2_water_frac_adaptive_toa']
-#     y = subset['adj_s2_toa_sr_diff']
-#     reg = linregress(x, y)
-#     results[roi] = {
-#         'slope': reg.slope,
-#         'r_squared': reg.rvalue**2,
-#         'p_val': reg.pvalue
-#     }
-
-# for roi, stats in results.items():
-#     print(f"{roi}: slope={stats['slope']:.4f}, R2={stats['r_squared']:.4f}, p={stats['p_val']:.4g}")
-
 
 

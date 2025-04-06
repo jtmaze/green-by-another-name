@@ -78,7 +78,8 @@ for i in resample_methods:
         'resample_method': i,
         'zone': 'total_landscape',
         't_statistic': total_ttest.statistic,
-        'p_value': total_ttest.pvalue
+        'p_value': total_ttest.pvalue,
+        'mean_diff': np.mean(sr['relative_total_diff_sr'])
     }
     lake_ttest = stats.ttest_1samp(sr['relative_lake_diff_sr'].dropna(), 0)
     lake_result = {

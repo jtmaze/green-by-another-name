@@ -5,9 +5,9 @@ from pandas.api.types import CategoricalDtype
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-toa = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch1.csv')
+toa = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
 toa = toa[toa['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
-sr = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch1.csv')
+sr = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch2.csv')
 sr = sr[sr['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
 
 # %% 2.0 Prepare the data
@@ -52,7 +52,7 @@ toa['relative_lake_diff_toa'] = toa['lake_diff_toa'] / toa['lake_ls_water_frac_a
 toa['relative_shoreline_diff_toa'] = toa['shoreline_diff_toa'] / toa['shoreline_ls_water_frac_adaptive']
 
 # %%
-plot_df = sr[['date', 'month', 'half_month', 'roi', 'main_roi',
+plot_df = toa[['date', 'month', 'half_month', 'roi', 'main_roi',
            'total_diff_toa', 'relative_total_diff_toa',
            'lake_diff_toa', 'relative_lake_diff_toa',
            'shoreline_diff_toa', 'relative_shoreline_diff_toa']].copy()
