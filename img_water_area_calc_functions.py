@@ -538,7 +538,7 @@ def lake_and_shoreline_frac_common_grid(
     smallest_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_smallest, image_window_params, buff_lake=False)
     smallest_buff_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_smallest, image_window_params, buff_lake=True)
 
-    pld_fp_small = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_smallest.tif'
+    pld_fp_small = f'./data/pld_rasterized/{roi}_lake_masks_res{res}_small.tif'
     small_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_small, image_window_params, buff_lake=False)
     small_buff_lake_ls_water_frac_adaptive = calc_lake_wtr_frac_common_grid(ls_water_adaptive, ls_ndwi, pld_fp_small, image_window_params, buff_lake=True)
     small_lake_s2_water_frac_adaptive = calc_lake_wtr_frac_common_grid(s2_water_adaptive, s2_ndwi, pld_fp_small, image_window_params, buff_lake=False)
