@@ -1,0 +1,83 @@
+# %% 1.0 Libraries and file paths
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.stats import pearsonr
+
+lake_size_summaries = pd.read_csv('./data/lake_size_summaries.csv')
+resample_method = 'bilinear30'
+
+sat_diff_path = f'./data/lake_area_results/toa_resampled_{resample_method}_area_summaries_batch2.csv'
+
+# %% 2.0 Format the satellite difference data
+
+sat_diff = pd.read_csv(sat_diff_path)
+sat_diff = sat_diff[
+    ['roi', 'date', 'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_adaptive']
+]
+
+sat_diff['rel_ls_s2_diff'] = (
+    (sat_diff['buff_lake_ls_water_frac_adaptive'] - sat_diff['buff_lake_s2_water_frac_adaptive']
+     ) / sat_diff['buff_lake_ls_water_frac_adaptive'] * 100
+)
+
+sat_mean_diff = sat_diff.groupby(['roi'])['rel_ls_s2_diff'].mean().reset_index()
+sat_mean_diff = sat_mean_diff.rename(columns={'roi': 'roi_name'})
+
+# %% 3.0 Format the lake size summaries
+
+lake_size_summaries = lake_size_summaries[
+    (lake_size_summaries['lake_size'] == 'smallest') |
+    (lake_size_summaries['lake_size'] == 'small')
+].copy()
+
+
+
+# %% 4.0 Merge the dataframes
+
+merged_df = pd.merge(
+    sat_mean_diff,
+    below_small_frac,
+    how='inner',
+    on=['roi_name']
+)
+
+rho, pval = pearsonr(
+    merged_df['rel_ls_s2_diff'],
+    merged_df['area_proportion']
+)
+print(f'Pearson correlation: {rho:.3f}, p-value: {pval:.3f}')
+
+# %% 5.0 Plot the data with linear regression
+
+plt.figure(figsize=(10, 6))
+ax = sns.regplot(
+    x='area_proportion', 
+    y='rel_ls_s2_diff',
+    data=merged_df,
+    scatter_kws={'alpha':0.7, 's':60, 'edgecolor':'k'},
+    line_kws={'color':'red', 'lw':2}
+)
+
+# Add labels and title
+plt.xlabel('Proportion of Small Lakes (< 0.5 km²)', fontsize=12)
+plt.ylabel('Relative LS8-S2 Difference (%)', fontsize=12)
+plt.title(f'Relationship Between Small Lake Proportion and Satellite Differences\nPearson r: {rho:.3f} (p-value: {pval:.3f})', fontsize=14)
+
+# Add text annotations for each point (ROI names)
+for i, row in merged_df.iterrows():
+    plt.annotate(
+        row['roi_name'], 
+        xy=(row['area_proportion'], row['rel_ls_s2_diff']),
+        xytext=(5, 5),
+        textcoords='offset points',
+        fontsize=9
+    )
+
+# Add gridlines
+plt.grid(True, linestyle='--', alpha=0.7)
+
+# Adjust layout
+plt.tight_layout()
+plt.show()
