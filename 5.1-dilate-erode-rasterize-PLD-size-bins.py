@@ -128,7 +128,10 @@ print(f'Total lake area: {total_lake_area:.2f} km^2')
 for size, (min_area, max_area) in lake_size_bins.items(): 
     # Designate out_path for the lake
     out_path = f'{out_dir}/{roi_name}_lake_masks_res{res}_{size}.tif'
-    # Filter lakes by size category
+    
+    # Clip the pld_utm lakes to the roi boundary
+    pld_utm = gpd.clip(pld_utm, roi_utm)
+    
     # caluculate the total lake_area
     total_lake_area = pld_utm.area.sum() / 1_000_000
     print(f'Total lake area: {total_lake_area:.2f} km^2')
@@ -152,12 +155,13 @@ for size, (min_area, max_area) in lake_size_bins.items():
     }
     lake_size_summaries.append(summary)
 
-    for i, buffer in enumerate(buffers):
-        pld_buffered, band_name = pld_buffer_img_clip(lakes_in_category, buffer, roi_utm)
-        rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
+    # for i, buffer in enumerate(buffers):
+    #     pld_buffered, band_name = pld_buffer_img_clip(lakes_in_category, buffer, roi_utm)
+    #     rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
 
 
 summary_df = pd.DataFrame(lake_size_summaries)
+pp.pprint(summary_df)
 
 lake_summary_path = './data/lake_size_summaries.csv'
 
