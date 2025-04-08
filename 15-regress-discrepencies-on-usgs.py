@@ -36,18 +36,18 @@ gauge_dis = df.groupby('date')['1716_00060'].mean().reset_index()
 
 
 # %% 2.0 Read the area data
-
-toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_bilinear30_area_summaries_batch2.csv')
-sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_bilinear30_area_summaries_batch2.csv')
+resample_method = 'noresample'
+toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
+sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
 combined = pd.concat([toa_data_resamp, sr_data_resamp])
 
-cols_to_keep = ['date', 'roi', 'level', 'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_adaptive']
+cols_to_keep = ['date', 'roi', 'level', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
 sr = sr_data_resamp[cols_to_keep].copy()
 
 sr = sr.rename(
     columns={
-        'buff_lake_ls_water_frac_adaptive': 'sr_ls', 
-        'buff_lake_s2_water_frac_adaptive': 'sr_s2'
+        'lake_ls_water_frac_adaptive': 'sr_ls', 
+        'lake_s2_water_frac_adaptive': 'sr_s2'
     }
 )
 
@@ -59,8 +59,8 @@ toa = toa_data_resamp[cols_to_keep].copy()
 
 toa = toa.rename(
     columns={
-        'buff_lake_ls_water_frac_adaptive': 'toa_ls', 
-        'buff_lake_s2_water_frac_adaptive': 'toa_s2'
+        'lake_ls_water_frac_adaptive': 'toa_ls', 
+        'lake_s2_water_frac_adaptive': 'toa_s2'
     }
 )
 
@@ -166,7 +166,7 @@ sns.scatterplot(
 )
 
 # Add title and labels
-plt.title('TOA-SR Relative Difference vs. Yukon River Discharge (USGS @ Stevens Village)', fontsize=14)
+plt.title('LS8-S2 Relative Difference vs. Yukon River Discharge (USGS @ Stevens Village)', fontsize=14)
 plt.ylim((-0.7, 0.7))
 plt.xlabel('Gauge Discharge (cfs)', fontsize=12)
 plt.ylabel('Relative LS8-S2 Difference (LS8% - S2% / LS8%)', fontsize=12)

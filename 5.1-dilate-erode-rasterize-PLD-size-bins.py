@@ -13,9 +13,9 @@ import rasterio as rio
 from rasterio.features import rasterize
 
 out_dir = './data/pld_rasterized/'
-roi_name = 'YKD_sub5'
+roi_name = 'YKD_sub2'
 roi_prefix = roi_name.split('_')[0]
-res = 60 # 30 or 60 meters
+res = 30 # 30 or 60 meters
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
 
 if res == 60:
@@ -42,7 +42,6 @@ print(est_utm, est_utm_roi)
 
 pld_utm = pld.to_crs(est_utm)
 roi_utm = roi.to_crs(est_utm) 
-
 
 
 def pld_buffer_img_clip(
@@ -119,15 +118,20 @@ def rasterize_buffers(
     #print(f'{band_name} rasterized to {img_meta['crs']}')
     
 
-
 img_path = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res{res}.tif'
 
 lake_size_summaries = []
+
+total_lake_area = pld_utm.area.sum() / 1_000_000
+print(f'Total lake area: {total_lake_area:.2f} km^2')
 
 for size, (min_area, max_area) in lake_size_bins.items(): 
     # Designate out_path for the lake
     out_path = f'{out_dir}/{roi_name}_lake_masks_res{res}_{size}.tif'
     # Filter lakes by size category
+    # caluculate the total lake_area
+    total_lake_area = pld_utm.area.sum() / 1_000_000
+    print(f'Total lake area: {total_lake_area:.2f} km^2')
     if max_area != inf:
         lakes_in_category = pld_utm[
             (pld_utm.area/1_000_000 >= min_area) &
@@ -136,11 +140,15 @@ for size, (min_area, max_area) in lake_size_bins.items():
     else:
         lakes_in_category = pld_utm[pld_utm.area/1_000_000 >= min_area]
 
+    # Calculate the size categories total lake area    
+    category_lake_area = lakes_in_category.area.sum() / 1_000_000
+
     # Summary dataframe to track roi's 
     summary = {
         'roi_name': roi_name,
         'lake_size': size,
-        'count': len(lakes_in_category)
+        'count': len(lakes_in_category),
+        'area_proportion': (category_lake_area / total_lake_area * 100)
     }
     lake_size_summaries.append(summary)
 
