@@ -29,6 +29,7 @@ with open(path_gauge_dis, 'r') as file:
 data_str = ''.join(lines)
 
 df = pd.read_csv(StringIO(data_str), delimiter='\t', skiprows=[1])
+#df = df[df['1716_00060_cd'] == 'A']
 df['1716_00060'] = pd.to_numeric(df['1716_00060'], errors='coerce')
 df['date'] = pd.to_datetime(df['datetime']).dt.date
 gauge_dis = df.groupby('date')['1716_00060'].mean().reset_index()
