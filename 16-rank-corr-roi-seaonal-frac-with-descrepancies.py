@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
+from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -93,3 +94,24 @@ plt.legend(title='Metric', bbox_to_anchor=(1.05, 1), loc='upper left')
 # Adjust layout to prevent label cutoff
 plt.tight_layout()
 plt.show()
+
+# %% 5.0 Linear regression on the data
+
+slope, intercept, r_value, p_value, std_err = linregress(
+    merged_df['net_lake_sn_frac'],
+    merged_df['rel_ls_s2_diff']
+)
+print(f'Linear regression: slope = {slope:.3f}, r-squared = {r_value**2:.3f}, p-value = {p_value:.3f}')
+
+sns.regplot(
+    x='net_lake_sn_frac',
+    y='rel_ls_s2_diff',
+    data=merged_df,
+    scatter_kws={'alpha':0.7, 's':60, 'edgecolor':'k'},
+    line_kws={'color':'red', 'lw':2},
+    ci=None
+)
+
+plt.title(f'Relating mean(GSWO, GLAD, S2) seasonal fractions to LS8-S2 differences')
+plt.xlabel('Net Lake Seasonal Fraction (%)', fontsize=12)
+plt.ylabel('Relative LS8-S2 Difference (%)', fontsize=12)

@@ -87,7 +87,7 @@ def create_boxplot(data, x_col, title_prefix, y_lim=None):
         plt.ylim(y_lim)
     
     period = "Monthly" if x_col == 'month' else "1/2 Monthly"
-    plt.title(f"{title_prefix} {period} Difference in Adaptive Water Fraction (SR vs TOA) for All Sites (bilinear 30)")
+    plt.title(f"{title_prefix} {period} Difference in Adaptive Water Fraction (SR vs TOA) bilinear 30")
     plt.xlabel("Month")
     plt.ylabel("Water Frac Difference (%TOA - %SR)")
     plt.legend(title="Satellite")

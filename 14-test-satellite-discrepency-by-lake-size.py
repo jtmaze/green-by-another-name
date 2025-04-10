@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-resample_method = 'bilinear30'
+resample_method = 'noresample'
 lake_areas_dir = './data/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
 sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
@@ -44,13 +44,13 @@ def filter_data_calc_satellite_differences(
     out_df[water_frac_cols] = df[water_frac_cols].replace(0, np.nan)
 
     out_df['rel_smallest_sat_diff'] = ((out_df['smallest_buff_lake_ls_water_frac_adaptive'] - out_df['smallest_buff_lake_s2_water_frac_adaptive']) 
-                             / out_df['smallest_buff_lake_ls_water_frac_adaptive'])
+                             / (out_df['smallest_buff_lake_ls_water_frac_adaptive']) * 100)
     out_df['rel_small_sat_diff'] = ((out_df['small_buff_lake_ls_water_frac_adaptive'] - out_df['small_buff_lake_s2_water_frac_adaptive'])
-                            / out_df['small_buff_lake_ls_water_frac_adaptive'])
+                            / (out_df['small_buff_lake_ls_water_frac_adaptive']) * 100)
     out_df['rel_medium_sat_diff'] = ((out_df['medium_buff_lake_ls_water_frac_adaptive'] - out_df['medium_buff_lake_s2_water_frac_adaptive'])
-                            / out_df['medium_buff_lake_ls_water_frac_adaptive'])
+                            / (out_df['medium_buff_lake_ls_water_frac_adaptive']) * 100)
     out_df['rel_large_sat_diff'] = ((out_df['large_buff_lake_ls_water_frac_adaptive'] - out_df['large_buff_lake_s2_water_frac_adaptive'])
-                            / out_df['large_buff_lake_ls_water_frac_adaptive'])
+                            / (out_df['large_buff_lake_ls_water_frac_adaptive']) * 100)
     
     return out_df
 
@@ -84,17 +84,90 @@ sns.boxplot(
     x='lake_size',
     y='satellite_difference',
     hue='level',
-    palette={'sr': '#4C72B0', 'toa': '#55A868'},  
+    palette={'sr': '#88c999', 'toa': '#6a9ecf'},  
     width=0.7
 )
 plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
 plt.title(f'Satellite Differences by Lake Size for {resample_method}', fontsize=14)
 plt.xlabel('Lake Size Category', fontsize=12)
 plt.ylabel('Relative Satellite Difference (LS8% - S2%) / LS8%', fontsize=12)
-plt.ylim(-4, 1.25) # NOTE: Adjust this, because the plot is a little messy
+plt.ylim(-400, 125) # NOTE: Adjust this, because the plot is a little messy
 
 plt.tight_layout()
 plt.show()
-# %%
+# %% Do the same analysis, but use absolute % differences
+
+# %% 2.0 Define the function to filter and calculate satellite differences
+def filter_data_calc_absolute_differences(
+    df: pd.DataFrame,
+    water_frac_cols: list
+):
+    # If there's no lakes for a size bin within the image pair, the water fraction is marked 0
+    # I replace these invalid zeros with 'na' values
+
+    for idx, row in df.iterrows():
+        for col in water_frac_cols:
+            if row[col] == 0:
+                print(f'No lakes for size = {col} for {row["roi"]} on {row["date"]}')
+
+    print(f'Making missing size data as NA')
+
+    out_df = df.copy()
+    out_df[water_frac_cols] = df[water_frac_cols].replace(0, np.nan)
+
+    # Calculate absolute differences
+    out_df['abs_smallest_sat_diff'] = (out_df['smallest_buff_lake_ls_water_frac_adaptive'] - 
+                                          out_df['smallest_buff_lake_s2_water_frac_adaptive'])
+    out_df['abs_small_sat_diff'] = (out_df['small_buff_lake_ls_water_frac_adaptive'] - 
+                                       out_df['small_buff_lake_s2_water_frac_adaptive'])
+    out_df['abs_medium_sat_diff'] = (out_df['medium_buff_lake_ls_water_frac_adaptive'] - 
+                                        out_df['medium_buff_lake_s2_water_frac_adaptive'])
+    out_df['abs_large_sat_diff'] = (out_df['large_buff_lake_ls_water_frac_adaptive'] - 
+                                       out_df['large_buff_lake_s2_water_frac_adaptive'])
+    
+    return out_df
+
+# Run the absolute difference analysis
+toa_abs_plot = filter_data_calc_absolute_differences(toa_data, water_frac_cols)
+sr_abs_plot = filter_data_calc_absolute_differences(sr_data, water_frac_cols)
+
+abs_plot_df = pd.concat([toa_abs_plot, sr_abs_plot])
+
+# Create plot data for absolute differences
+abs_plot_data = abs_plot_df.melt(
+    id_vars=['date', 'roi', 'level'],
+    value_vars=[
+        'abs_smallest_sat_diff', 'abs_small_sat_diff', 'abs_medium_sat_diff', 'abs_large_sat_diff'
+    ],
+    var_name='lake_size',
+    value_name='absolute_satellite_difference'
+)
+
+abs_plot_data['lake_size'] = abs_plot_data['lake_size'].map({
+    'abs_smallest_sat_diff': 'Smallest (0.01-0.5 km²)',
+    'abs_small_sat_diff': 'Small (0.05-0.5 km²)',
+    'abs_medium_sat_diff': 'Medium (0.5-10 km²)',
+    'abs_large_sat_diff': 'Large (> 1 km²)'
+})
+
+# Create plot for absolute differences
+plt.figure(figsize=(12, 5))
+sns.boxplot(
+    data=abs_plot_data,
+    x='lake_size',
+    y='absolute_satellite_difference',
+    hue='level',
+    palette={'sr': '#88c999', 'toa': '#6a9ecf'},
+    width=0.7
+)
+plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+plt.title(f'Absolute Satellite Differences by Lake Size for {resample_method}', fontsize=14)
+plt.xlabel('Lake Size Category', fontsize=12)
+plt.ylabel('Absolute Difference LS8% - S2%', fontsize=12)
+plt.ylim(-30, 30)  # Adjust as needed for your data
+
+plt.tight_layout()
+plt.show()
+
 
 
