@@ -3,12 +3,15 @@
 import glob
 import pandas as pd
 import matplotlib.pyplot as plt
-#import seaborn as sns
+import seaborn as sns
+from week_dt_converters import year_week_to_datetime, add_year_week
 
 ts_dir = './data/s2_weekly_timeseries'
+area_dir = './data/lake_area_results'
 
 ts_files = glob.glob(f'{ts_dir}/*.csv')
-# %%
+# %% 2.0 Read and format the timeseries data
+
 dfs = []
 for f in ts_files:
     df = pd.read_csv(f)
@@ -19,8 +22,10 @@ for f in ts_files:
 
     df['year'] = df['mosaic_id'].apply(lambda x: x.split('_')[-2])
     df['week'] = df['mosaic_id'].apply(lambda x: x.split('_')[-1])
-
+    df['year_week'] = df['year'].astype(str) + '_' + df['week'].astype(str).str.zfill(2)
     df['week'] = pd.to_numeric(df['week'], errors='coerce').astype('Int64')
+    df['date_for_plot'] = df.apply(lambda row: year_week_to_datetime(row['year'], row['week']), axis=1)
+
     df['valid_fraction'] = ((df['total_lake_pixels'] - df['invalid_pixels'])
                             / df['total_lake_pixels'] * 100)
     df['lake_water_fraction'] = (df['water_pixels'] / 
@@ -41,7 +46,12 @@ for f in ts_files:
     # plt.ylabel('Water Fraction of ALPOD pixels')
     # plt.show()
 
-    df_clean = df[(df['valid_fraction'] >= 40)]
+    # NOTE: I'm messing around with this ALOT
+    df_clean = df[(df['valid_fraction'] >= 80)]
+    df_clean = df_clean[(df_clean['week'] >= 23) &
+                        (df_clean['week'] <= 34)
+    ]
+
     print("------------------------------------------------")
     plt.figure(figsize=(12, 6))
     scatter = plt.scatter(
@@ -56,32 +66,76 @@ for f in ts_files:
     plt.ylabel('Water Fraction of ALPOD pixels')
     plt.show()
 
+    df_clean = df_clean[
+        ['year_week', 'date_for_plot', 'roi_name', 'valid_fraction', 'lake_water_fraction', 'week']
+    ].copy()
+    max_weekly_wtr_frac = df_clean['lake_water_fraction'].max()
+    print(max_weekly_wtr_frac)
+    df_clean['wtr_frac_perc_max'] = df_clean['lake_water_fraction'] / max_weekly_wtr_frac * 100
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(df_clean['date_for_plot'], df_clean['wtr_frac_perc_max'], 'o-')
+    plt.title(f'Water Fraction Timeseries for {df_clean['roi_name'].iloc[0]}')
+    plt.xlabel('Date')
+    plt.ylabel('ALPOD Water Fraction (%) of max observed')
+    plt.show()
 
     dfs.append(df_clean)
 
 timeseries = pd.concat(dfs, ignore_index=True)
 rois = timeseries['roi_name'].unique()
 
-# %%
-
-
 # %% 2.0 Read and format the lake area data
 
-def add_year_week(df, datetime_col='datetime'):
-    """
-    Add a new series 'year_week' to the DataFrame with .isocalendar()
-    """    
-    iso_calendar = df[datetime_col].dt.isocalendar()
-    # Create the year_week column by combining the year and week number as a string (e.g. "2025-14")
-    df['year_week'] = iso_calendar['year'].astype(str) + '-' + iso_calendar['week'].astype(str).str.zfill(2)
-    return df
+resample_method = 'bilinear30'
+toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
+sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
 
-def datetime_to_yrweek():
-    pass
+cols_to_keep =['date', 'roi', 'buff_lake_ls_water_frac_adaptive',
+               'buff_lake_s2_water_frac_adaptive']
 
+toa_data = toa_data[cols_to_keep].rename(
+    columns={
+        'buff_lake_ls_water_frac_adaptive': 'toa_ls_water_frac',
+        'buff_lake_s2_water_frac_adaptive': 'toa_s2_water_frac',
+        'roi': 'roi_name'
+    }
+).copy()
 
+sr_data = sr_data[cols_to_keep].rename(
+    columns={
+        'buff_lake_ls_water_frac_adaptive': 'sr_ls_water_frac',
+        'buff_lake_s2_water_frac_adaptive': 'sr_s2_water_frac',
+        'roi': 'roi_name'
+    }
+).copy()
 
-# %% 
+combined = pd.merge(left=toa_data, right=sr_data, on=['date', 'roi_name'], how='inner')
+combined['abs_ls_ac_diff'] = combined['toa_ls_water_frac'] - combined['sr_ls_water_frac']
+combined['rel_ls_ac_diff'] = combined['abs_ls_ac_diff'] / combined['toa_ls_water_frac'] * 100
+combined['abs_s2_ac_diff'] = combined['toa_s2_water_frac'] - combined['sr_s2_water_frac']
+combined['rel_s2_ac_diff'] = combined['abs_s2_ac_diff'] / combined['toa_s2_water_frac'] * 100
 
+combined = add_year_week(combined, datetime_col='date')
+
+print(len(combined))
+# %% 3.0 Merge the weekly timeseries with the area discrepances
+
+combined = pd.merge(combined, timeseries, how='left', on=['roi_name', 'year_week'])
+print(len(combined))
 
 # %%
+
+plot_data = combined.copy()
+plot_data['roi_main'] = plot_data['roi_name'].apply(lambda x: x.split('_')[0])
+plot_data = plot_data[plot_data['roi_main'] == 'AND']
+
+plt.figure(figsize=(8, 8))
+sns.scatterplot(
+    data=plot_data,
+    x='lake_water_fraction',
+    y='rel_s2_ac_diff',
+    hue='roi_main'
+)
+plt.title('Relative Sentinel-2 AC Difference vs. ALPOD Lake Water Fraction')
+
