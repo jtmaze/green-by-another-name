@@ -42,8 +42,8 @@ combined['rel_s2_ac_diff'] = combined['abs_s2_ac_diff'] / combined['toa_s2_water
 
 # %% 3.0 
 
-highest_ls_ac_diff = combined.sort_values(by='abs_ls_ac_diff', ascending=True).head(5).copy()
-highest_s2_ac_diff = combined.sort_values(by='abs_s2_ac_diff', ascending=True).head(5).copy()
+highest_ls_ac_diff = combined.sort_values(by='abs_ls_ac_diff', ascending=False).head(5).copy()
+highest_s2_ac_diff = combined.sort_values(by='abs_s2_ac_diff', ascending=False).head(5).copy()
 
 ls_image_info_dicts = []
 
@@ -118,7 +118,7 @@ agree_img_info_dicts = [dict1, dict2, dict3]
 
 # %% 3.0 Run area calculations
 
-for d in agree_img_info_dicts:
+for d in ls_image_info_dicts:
     print(d)
     rois = [d.get('roi')]
     image_dates = [d.get('date')]
