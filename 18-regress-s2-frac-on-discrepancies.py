@@ -4,6 +4,7 @@ import glob
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import linregress
 from week_dt_converters import year_week_to_datetime, add_year_week
 
 ts_dir = './data/s2_weekly_timeseries'
@@ -48,9 +49,9 @@ for f in ts_files:
 
     # NOTE: I'm messing around with this ALOT
     df_clean = df[(df['valid_fraction'] >= 80)]
-    df_clean = df_clean[(df_clean['week'] >= 23) &
-                        (df_clean['week'] <= 34)
-    ]
+    # df_clean = df_clean[(df_clean['week'] >= 25) &
+    #                     (df_clean['week'] <= 31)
+    # ]
 
     print("------------------------------------------------")
     plt.figure(figsize=(12, 6))
@@ -123,19 +124,113 @@ print(len(combined))
 
 combined = pd.merge(combined, timeseries, how='left', on=['roi_name', 'year_week'])
 print(len(combined))
+print(combined['wtr_frac_perc_max'].isna().sum())
+combined['roi_main'] = combined['roi_name'].apply(lambda x: x.split('_')[0])
+
+# %% Plot Sentinel-2's absolute buffered PLD% for both TOA and SR vs. Elizabeth's classifacation.
+plot_data = combined.copy()
+plot_data = combined[['date', 'roi_name', 'toa_s2_water_frac', 'sr_s2_water_frac', 'lake_water_fraction']]
+
+plot_data_long = pd.melt(
+    plot_data,
+    id_vars=['roi_name', 'date', 'lake_water_fraction'],
+    value_vars=['toa_s2_water_frac', 'sr_s2_water_frac'],
+    var_name='s2_ac_level',
+    value_name='coincident_wtr_frac'
+)
+label_map = {
+    'toa_s2_water_frac': 'TOA',
+    'sr_s2_water_frac': 'SR'
+}
+plot_data_long['s2_ac_level'] = plot_data_long['s2_ac_level'].map(label_map)
+
+p = plt.figure(figsize=(8, 8))
+p = sns.lmplot(
+    data=plot_data_long,
+    x='lake_water_fraction',
+    y='coincident_wtr_frac',
+    hue='s2_ac_level',
+    ci=None
+)
+p.legend.set_title('S2 AC Level')
+plt.xlabel('Weekly S2 ALPOD Water Fraction (%)')
+plt.ylabel('PLD Water Fraction (%) (from overlap area)')
+plt.title('S2 Footprint Water Fractions vs. ALPOD Lake Water Fraction')
+
+toa = plot_data_long[plot_data_long['s2_ac_level'] == 'TOA']
+toa = toa.dropna().copy()
+toa_model = linregress(
+    x=toa['lake_water_fraction'],
+    y=toa['coincident_wtr_frac']
+)
+
+sr = plot_data_long[plot_data_long['s2_ac_level'] == 'SR']
+sr = sr.dropna().copy()
+sr_model = linregress(
+    x=sr['lake_water_fraction'],
+    y=sr['coincident_wtr_frac']
+)
+print(f'TOA r-squared: {toa_model.rvalue ** 2:.2f}, slope: {toa_model.slope:.2f}')
+print(f'SR r-squared: {sr_model.rvalue ** 2:.2f}, slope: {sr_model.slope:.2f}')
+# %%
+
+plot_data = combined.copy()
+plot_data = combined[['date', 'roi_name', 'toa_ls_water_frac', 'sr_ls_water_frac', 'lake_water_fraction']]
+
+plot_data_long = pd.melt(
+    plot_data,
+    id_vars=['roi_name', 'date', 'lake_water_fraction'],
+    value_vars=['toa_ls_water_frac', 'sr_ls_water_frac'],
+    var_name='ls_ac_level',
+    value_name='coincident_wtr_frac'
+)
+label_map = {
+    'toa_ls_water_frac': 'TOA',
+    'sr_ls_water_frac': 'SR'
+}
+plot_data_long['ls_ac_level'] = plot_data_long['ls_ac_level'].map(label_map)
+
+p = plt.figure(figsize=(8, 8))
+p = sns.lmplot(
+    data=plot_data_long,
+    x='lake_water_fraction',
+    y='coincident_wtr_frac',
+    hue='ls_ac_level',
+    ci=None
+)
+p.legend.set_title('LS8 AC Level')
+plt.xlabel('Weekly S2 ALPOD Water Fraction (%) of Maximum Observed')
+plt.ylabel('LS8 PLD Water Fraction (from overlap area)')
+plt.title('Relative LS8 AC Difference vs. ALPOD Lake Water Fraction')
+
+toa = plot_data_long[plot_data_long['ls_ac_level'] == 'TOA']
+toa = toa.dropna().copy()
+toa_model = linregress(
+    x=toa['lake_water_fraction'],
+    y=toa['coincident_wtr_frac']
+)
+
+sr = plot_data_long[plot_data_long['ls_ac_level'] == 'SR']
+sr = sr.dropna().copy()
+sr_model = linregress(
+    x=sr['lake_water_fraction'],
+    y=sr['coincident_wtr_frac']
+)
+print(f'TOA r-squared: {toa_model.rvalue ** 2:.2f}, slope: {toa_model.slope:.2f}')
+print(f'SR r-squared: {sr_model.rvalue ** 2:.2f}, slope: {sr_model.slope:.2f}')
 
 # %%
 
 plot_data = combined.copy()
 plot_data['roi_main'] = plot_data['roi_name'].apply(lambda x: x.split('_')[0])
-plot_data = plot_data[plot_data['roi_main'] == 'AND']
 
 plt.figure(figsize=(8, 8))
 sns.scatterplot(
     data=plot_data,
-    x='lake_water_fraction',
+    x='wtr_frac_perc_max',
     y='rel_s2_ac_diff',
     hue='roi_main'
 )
 plt.title('Relative Sentinel-2 AC Difference vs. ALPOD Lake Water Fraction')
-
+plt.xlabel('(%) water fraction of maxed obseved over ALPOD')
+plt.ylabel('Sentinel-2 (TOA-SR) / TOA * 100')

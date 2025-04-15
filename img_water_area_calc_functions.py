@@ -624,6 +624,36 @@ def write_mask_rasters(
     print(f'Wrote {ls_out_fp}')
     print(f'Wrote {s2_out_fp}')
 
+def write_ndwi_rasters(
+    ls_ndwi: np.array,
+    s2_ndwi: np.array,
+    image_info: dict
+):
+    roi_name = image_info['roi']
+    level = image_info['level']
+    date = image_info['date']
+    resample_method = image_info['resample_method']
+
+    out_dir = './data/ndwi_rasters/'
+    ref_fp = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res30.tif'
+    ls_out_fp = f'{out_dir}LS8_ndwi_{level}_{roi_name}_{date}_{resample_method}.tif'
+    s2_out_fp = f'{out_dir}S2_ndwi_{level}_{roi_name}_{date}_{resample_method}.tif'
+
+    with rio.open(ref_fp) as ref:
+        meta = ref.meta.copy()
+        meta.update({
+            'dtype': 'float32'
+        })
+
+    with rio.open(ls_out_fp, 'w', **meta) as dst:
+        dst.write(ls_ndwi.astype(rio.float32), 1)
+
+    with rio.open(s2_out_fp, 'w', **meta) as dst:
+        dst.write(s2_ndwi.astype(rio.float32), 1)
+
+    print(f'Wrote {s2_out_fp}')
+    print(f'Wrote {ls_out_fp}')
+
     
 
 """
@@ -758,6 +788,12 @@ def image_wtr_area(
             write_mask_rasters(
                 ls_water=ls_water_adaptive,
                 s2_water=s2_water_adaptive, 
+                image_info=image_info
+            )
+
+            write_ndwi_rasters(
+                ls_ndwi=ls_ndwi,
+                s2_ndwi=s2_ndwi,
                 image_info=image_info
             )
 
