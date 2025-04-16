@@ -53,9 +53,6 @@ def get_mask_frac(
     return fraction
 
 
-
-
-
 def add_scl_join_key(img):
     """
     Turns the SCL collection's PRODUCT_ID attribute into key that can be joined 

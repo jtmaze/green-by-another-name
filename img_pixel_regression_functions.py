@@ -276,7 +276,7 @@ def regress_reflectance(
             np.max([ls_modeled.max(), s2_modeled.max()])
         )
 
-        #regression_vis(ls_modeled, s2_modeled, model)
+        regression_vis(ls_modeled, s2_modeled, model)
 
         if hist_return == True:
             ls_histogram = np.histogram(ls_modeled, bins=100)

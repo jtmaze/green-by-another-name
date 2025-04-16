@@ -498,7 +498,7 @@ regression_params = {
     'sample_size': 10_000,
     'outlier_frac': 0.0005,
 }
-# 8.1 Green band land 60 meter buffered
+# %% 8.1 Green band land 60 meter buffered
 
 image_info['band_name'] = 'Green'
 image_info['resample_method'] = resample_method
@@ -512,8 +512,10 @@ green_df = make_reflectance_summaries(
     dates=image_dates,
     hist_return=False
 )
-# 8.2 NIR band land 60 meter buffered
+# %% 8.2 NIR band land 60 meter buffered
+image_info['resample_method'] = resample_method
 image_info['band_name'] = 'NIR'
+levels = ['toa']
 nir_df = make_reflectance_summaries(
     image_info=image_info,
     mask_params=mask_params,
@@ -524,7 +526,7 @@ nir_df = make_reflectance_summaries(
     hist_return=False
 )
 
-# 8.3 NDWI band land 60 meter buffered
+# %% 8.3 NDWI band land 60 meter buffered
 image_info['band_name'] = 'NDWI'
 regression_params['outlier_frac'] = 0 # Don't omit any ndwi outliers, because they are not way off scale.
 ndwi_df = make_reflectance_summaries(
