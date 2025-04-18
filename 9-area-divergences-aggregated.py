@@ -6,7 +6,7 @@ import seaborn as sns
 from scipy import stats
 import numpy as np
 
-resample_methods = ['bilinear30', 'noresample', 'bilinear60']
+resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'lanczos30']
 
 # %% 2.0 Explore differences in water fraction by satellite.
 
@@ -72,49 +72,65 @@ for i in resample_methods:
     plt.ylabel('(LS8% - S2% / LS8% * 100) Water Fraction')
     plt.xlabel('Landscape Zone')
 
+    # T-tests for surface reflectance (SR)
     total_ttest = stats.ttest_1samp(sr['relative_total_diff_sr'].dropna(), 0)
+    total_ttest_absolute = stats.ttest_1samp(sr['total_diff_sr'].dropna(), 0)
     total_result = {
         'level': 'sr',
         'resample_method': i,
         'zone': 'total_landscape',
-        't_statistic': total_ttest.statistic,
-        'p_value': total_ttest.pvalue,
+        't_statistic_rel': total_ttest.statistic,
+        'p_value_rel': total_ttest.pvalue,
+        't_statistic_abs': total_ttest_absolute.statistic, 
+        'p_value_abs': total_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(sr['relative_total_diff_sr']),
         'mean_diff_abs': np.mean(sr['total_diff_sr']),
         'var_diff_rel': np.var(sr['relative_total_diff_sr']),
         'var_diff_abs': np.var(sr['total_diff_sr'])
     }
+    
     lake_ttest = stats.ttest_1samp(sr['relative_lake_diff_sr'].dropna(), 0)
+    lake_ttest_absolute = stats.ttest_1samp(sr['lake_diff_sr'].dropna(), 0)
     lake_result = {
         'level': 'sr',
         'resample_method': i,
         'zone': 'lake',
-        't_statistic': lake_ttest.statistic,
-        'p_value': lake_ttest.pvalue,
+        't_statistic_rel': lake_ttest.statistic,
+        'p_value_rel': lake_ttest.pvalue,
+        't_statistic_abs': lake_ttest_absolute.statistic,
+        'p_value_abs': lake_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(sr['relative_lake_diff_sr']),
         'mean_diff_abs': np.mean(sr['lake_diff_sr']),
         'var_diff_rel': np.var(sr['relative_lake_diff_sr']),
         'var_diff_abs': np.var(sr['lake_diff_sr'])
     }
+    
     shoreline_ttest = stats.ttest_1samp(sr['relative_shoreline_diff_sr'].dropna(), 0)
+    shoreline_ttest_absolute = stats.ttest_1samp(sr['shoreline_diff_sr'].dropna(), 0)
     shoreline_result = {
         'level': 'sr',
         'resample_method': i,
         'zone': 'shoreline',
-        't_statistic': shoreline_ttest.statistic,
-        'p_value': shoreline_ttest.pvalue,
+        't_statistic_rel': shoreline_ttest.statistic,
+        'p_value_rel': shoreline_ttest.pvalue,
+        't_statistic_abs': shoreline_ttest_absolute.statistic,
+        'p_value_abs': shoreline_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(sr['relative_shoreline_diff_sr']),
         'mean_diff_abs': np.mean(sr['shoreline_diff_sr']),
         'var_diff_rel': np.var(sr['relative_shoreline_diff_sr']),
         'var_diff_abs': np.var(sr['shoreline_diff_sr'])
     }
+    
     lake_shoreline_ttest = stats.ttest_1samp(sr['relative_lake_shoreline_diff_sr'].dropna(), 0)
+    lake_shoreline_ttest_absolute = stats.ttest_1samp(sr['lake_shoreline_diff_sr'].dropna(), 0)
     lake_shoreline_result = {
         'level': 'sr', 
         'resample_method': i, 
         'zone': 'shoreline and lake',
-        't_statistic': lake_shoreline_ttest.statistic,
-        'p_value': lake_shoreline_ttest.pvalue,
+        't_statistic_rel': lake_shoreline_ttest.statistic,
+        'p_value_rel': lake_shoreline_ttest.pvalue,
+        't_statistic_abs': lake_shoreline_ttest_absolute.statistic,
+        'p_value_abs': lake_shoreline_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(sr['relative_lake_shoreline_diff_sr']),
         'mean_diff_abs': np.mean(sr['lake_shoreline_diff_sr']),
         'var_diff_rel': np.var(sr['relative_lake_shoreline_diff_sr']),
@@ -167,50 +183,65 @@ for i in resample_methods:
     plt.ylabel('(LS8% - S2% / LS8% * 100) Water Fraction')
     plt.xlabel('Landscape Zone')
 
-    # Relative t-tests for TOA
+    # T-tests for TOA
     total_ttest = stats.ttest_1samp(toa['relative_total_diff_toa'].dropna(), 0)
+    total_ttest_absolute = stats.ttest_1samp(toa['total_diff_toa'].dropna(), 0)
     total_result = {
         'level': 'toa',
         'resample_method': i,
         'zone': 'total_landscape',
-        't_statistic': total_ttest.statistic,
-        'p_value': total_ttest.pvalue,
+        't_statistic_rel': total_ttest.statistic,
+        'p_value_rel': total_ttest.pvalue,
+        't_statistic_abs': total_ttest_absolute.statistic,
+        'p_value_abs': total_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(toa['relative_total_diff_toa']),
         'mean_diff_abs': np.mean(toa['total_diff_toa']),
         'var_diff_rel': np.var(toa['relative_total_diff_toa']),
         'var_diff_abs': np.var(toa['total_diff_toa'])
     }
+    
     lake_ttest = stats.ttest_1samp(toa['relative_lake_diff_toa'].dropna(), 0)
+    lake_ttest_absolute = stats.ttest_1samp(toa['lake_diff_toa'].dropna(), 0)
     lake_result = {
         'level': 'toa',
         'resample_method': i,
         'zone': 'lake',
-        't_statistic': lake_ttest.statistic,
-        'p_value': lake_ttest.pvalue,
+        't_statistic_rel': lake_ttest.statistic,
+        'p_value_rel': lake_ttest.pvalue,
+        't_statistic_abs': lake_ttest_absolute.statistic,
+        'p_value_abs': lake_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(toa['relative_lake_diff_toa']),
         'mean_diff_abs': np.mean(toa['lake_diff_toa']),
         'var_diff_rel': np.var(toa['relative_lake_diff_toa']),
         'var_diff_abs': np.var(toa['lake_diff_toa'])
     }
+    
     shoreline_ttest = stats.ttest_1samp(toa['relative_shoreline_diff_toa'].dropna(), 0)
+    shoreline_ttest_absolute = stats.ttest_1samp(toa['shoreline_diff_toa'].dropna(), 0)
     shoreline_result = {
         'level': 'toa',
         'resample_method': i,
         'zone': 'shoreline',
-        't_statistic': shoreline_ttest.statistic,
-        'p_value': shoreline_ttest.pvalue,
+        't_statistic_rel': shoreline_ttest.statistic,
+        'p_value_rel': shoreline_ttest.pvalue,
+        't_statistic_abs': shoreline_ttest_absolute.statistic,
+        'p_value_abs': shoreline_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(toa['relative_shoreline_diff_toa']),
         'mean_diff_abs': np.mean(toa['shoreline_diff_toa']),
         'var_diff_rel': np.var(toa['relative_shoreline_diff_toa']),
         'var_diff_abs': np.var(toa['shoreline_diff_toa'])
     }
+    
     lake_shoreline_ttest = stats.ttest_1samp(toa['relative_lake_shoreline_diff_toa'].dropna(), 0)
+    lake_shoreline_ttest_absolute = stats.ttest_1samp(toa['lake_shoreline_diff_toa'].dropna(), 0)
     lake_shoreline_result = {
         'level': 'toa', 
         'resample_method': i, 
         'zone': 'shoreline and lake',
-        't_statistic': lake_shoreline_ttest.statistic,
-        'p_value': lake_shoreline_ttest.pvalue,
+        't_statistic_rel': lake_shoreline_ttest.statistic,
+        'p_value_rel': lake_shoreline_ttest.pvalue,
+        't_statistic_abs': lake_shoreline_ttest_absolute.statistic,
+        'p_value_abs': lake_shoreline_ttest_absolute.pvalue,
         'mean_diff_rel': np.mean(toa['relative_lake_shoreline_diff_toa']),
         'mean_diff_abs': np.mean(toa['lake_shoreline_diff_toa']),
         'var_diff_rel': np.var(toa['relative_lake_shoreline_diff_toa']),
@@ -247,7 +278,7 @@ sr_shoreline_mean_bilinear30 = test_results_df[
     (test_results_df['resample_method'] == 'bilinear30')
 ]
 print(f'Total landscape toa abs diff mean: {toa_total_landscape_mean_bilinear30["mean_diff_abs"].values[0]}')
-print(f'Total landscape toa abs diff t-statistic: {toa_total_landscape_mean_bilinear30["t_statistic"].values[0]}')
+print(f'Total landscape toa abs diff t-statistic: {toa_total_landscape_mean_bilinear30["t_statistic_abs"].values[0]}')
 print(f'Total landscape toa variance relative: {toa_total_landscape_mean_bilinear30["var_diff_rel"].values[0]}')
 print(f'Total landscape sr variance relative: {sr_total_landscape_mean_bilinear30["var_diff_rel"].values[0]}')
 print(f'Total landscape toa sd relative: {np.sqrt(toa_total_landscape_mean_bilinear30["var_diff_rel"].values[0])}')
@@ -263,7 +294,7 @@ toa_results = test_results_df[test_results_df['level'] == 'toa']
 ax = sns.barplot(
     data=toa_results,
     x='resample_method',
-    y='t_statistic',
+    y='t_statistic_rel',
     hue='zone'
 )
 ax.set_title('TOA Divergence T-Statistic by Resampling Method and Zone')
@@ -278,7 +309,7 @@ sr_reslts = test_results_df[test_results_df['level'] == 'sr']
 ax = sns.barplot(
     data=sr_reslts,
     x='resample_method',
-    y='t_statistic',
+    y='t_statistic_rel',
     hue='zone'
 )
 ax.set_title('SR Divergence T-Statistic by Resampling Method and Zone')
@@ -292,8 +323,8 @@ plt.show()
 # %%
 
 significant_results = test_results_df[
-    (test_results_df['p_value'] < 0.05)
-].sort_values(by='p_value')
+    (test_results_df['p_value_abs'] < 0.05)
+].sort_values(by='p_value_abs')
 significant_results.head(15)
 print(len(significant_results))
 

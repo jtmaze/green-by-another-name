@@ -66,9 +66,7 @@ def read_band_by_description(
         # Get a description list
         desc_list = src.descriptions
         # Read the data for a specific band
-        print(desc_list)
         for idx, desc in enumerate(desc_list, start=1):
-            print(idx, desc)
             if desc == description and image_window_params is None:
                 data = src.read(idx)
                 return data
@@ -339,6 +337,6 @@ def make_ndwi_images(
         raise ValueError('ERROR: need to specify proper resampling method')
 
     # Quick plot of NDWI images
-    #ndwi_images_vis(s2_ndwi_out, ls_ndwi_out)
+    ndwi_images_vis(s2_ndwi_out, ls_ndwi_out)
     
     return ls_ndwi_out, s2_ndwi_out, image_window_params
