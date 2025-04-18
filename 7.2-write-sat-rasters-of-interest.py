@@ -15,24 +15,29 @@ resample_method = 'bilinear30'
 toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
 sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
 
-cols_to_keep =['date', 'roi', 'buff_lake_ls_water_frac_adaptive',
+cols_to_keep =['date', 'roi', 'level', 'buff_lake_ls_water_frac_adaptive',
                'buff_lake_s2_water_frac_adaptive']
 
 toa_data = toa_data[cols_to_keep].rename(
     columns={
-        'buff_lake_ls_water_frac_adaptive': 'toa_ls_water_frac',
-        'buff_lake_s2_water_frac_adaptive': 'toa_s2_water_frac',
+        'buff_lake_ls_water_frac_adaptive': 'ls_water_frac',
+        'buff_lake_s2_water_frac_adaptive': 's2_water_frac',
         'roi': 'roi_name'
     }
 ).copy()
 
 sr_data = sr_data[cols_to_keep].rename(
     columns={
-        'buff_lake_ls_water_frac_adaptive': 'sr_ls_water_frac',
-        'buff_lake_s2_water_frac_adaptive': 'sr_s2_water_frac',
+        'buff_lake_ls_water_frac_adaptive': 'ls_water_frac',
+        'buff_lake_s2_water_frac_adaptive': 's2_water_frac',
         'roi': 'roi_name'
     }
 ).copy()
+
+combined = pd.concat([toa_data, sr_data])
+
+combined['abs_sat_diff'] = combined['ls_water_frac'] - combined['s2_water_frac']
+combined['rel_sat_diff'] = combined['abs_sat_diff'] / combined['ls_water_frac'] * 100
 
 
 # %% 3.0 
