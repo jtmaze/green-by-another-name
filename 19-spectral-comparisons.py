@@ -35,7 +35,7 @@ combined_wide = combined_clean.pivot(
 ).reset_index()
 
 # %% Plot the above and below frac by level
-plot_data = combined[combined['level'] == 'toa']
+plot_data = combined[combined['level'] == 'sr']
 
 plt.figure(figsize=(12, 5))
 sns.boxplot(
