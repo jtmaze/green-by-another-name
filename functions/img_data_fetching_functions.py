@@ -5,6 +5,7 @@ regress_image_functions.py and water_area_thresholding_functions.py files
 """
 import os
 import re
+import random
 import glob
 from typing import Optional
 
@@ -15,6 +16,8 @@ from matplotlib.colors import LinearSegmentedColormap
 import rasterio as rio
 from rasterio.windows import from_bounds
 from rasterio.warp import Resampling
+
+random.seed(20)
 
 def extract_unique(
     files: list, 
@@ -28,25 +31,25 @@ def extract_unique(
     return list(unique_items)
 
 def check_match_imgs(
-    ls_fp: str, 
-    s2_fp: str, 
+    fp1: str, 
+    fp2: str, 
 ):
 
     """
     Checks to ensure both images exist in directory
-    If both images do not exist, then 
-    Otherwise, specifies if one (ls or s2) file is missing. 
+    If both images do not exist, then return false
+    Otherwise, specifies if one file is missing and return false. 
     """
-    if os.path.exists(s2_fp) and os.path.exists(ls_fp):
+    if os.path.exists(fp2) and os.path.exists(fp1):
         return True
-    elif not os.path.exists(s2_fp) and not os.path.exists(ls_fp):
+    elif not os.path.exists(fp2) and not os.path.exists(fp1):
         #print(f'No data for {image_info}')
         return False
-    elif not os.path.exists(s2_fp) and os.path.exists(ls_fp):
-        print(f'Missing file {s2_fp}')
+    elif not os.path.exists(fp2) and os.path.exists(fp1):
+        print(f'Missing file {fp2}')
         return False
     else:
-        print(f'Missing file {ls_fp}')
+        print(f'Missing file {fp1}')
         return False
     
 def read_band_by_description(
@@ -143,6 +146,53 @@ def rio_get_data_arrays_with_common_trans(
 
     return ls_data, s2_data, image_window_params
 
+
+def downsample_image_arrays(
+    arr1_pixels: np.array,
+    arr2_pixels: np.array,
+    sample_size: int
+):
+    """
+    Downsampling makes the pixel regressions more efficient.
+    Inputs: 2D images with identical masked pixels = np.nan
+    Returns: 1D arrays with randomly downsampled to the sample_size if above pixel count.
+    """
+
+    if arr1_pixels.shape != arr2_pixels.shape:
+        raise ValueError(
+        f"Incompatible array shapes: array1 shape {arr1_pixels.shape} != "
+        f"array2 shape {arr2_pixels.shape}. Images must be resampled to identical dimensions "
+    )
+    # Create a common mask so that we drop the same pixels in both arrays
+    # (exclude NaNs or zeros in either array).
+    common_mask = (
+        ~np.isnan(arr1_pixels) & (arr1_pixels != 0) &
+        ~np.isnan(arr2_pixels) & (arr2_pixels != 0)
+    )
+
+    # Flatten both arrays using the same mask
+    arr1_flat = arr1_pixels[common_mask].flatten()
+    arr2_flat = arr2_pixels[common_mask].flatten()
+
+    # Double-check that both arrays have the same length after masking
+    if arr1_flat.size != arr2_flat.size:
+        raise ValueError(
+            "After applying the common mask, the image arrays "
+            "do not have the same valid pixel count."
+        )
+
+    valid_pix_cnt = arr1_flat.size # ls_flat.size and s2_flat.size will be the same
+    if valid_pix_cnt < sample_size:
+        print(f"Not downsampling the number of measured pixels {valid_pix_cnt} < {sample_size}")
+        return arr1_flat, arr2_flat, valid_pix_cnt
+    else:
+        sample_idx = np.random.choice(arr1_flat.size, sample_size, replace=False)
+        # Applies sample_idx to pixels_flat
+        arr1_sampled = arr1_flat[sample_idx]
+        arr2_sampled = arr2_flat[sample_idx]
+
+        return arr1_sampled, arr2_sampled, valid_pix_cnt
+
 def rio_get_data_arrays_native_trans(
     ls_fp,
     s2_fp, 
@@ -203,8 +253,8 @@ def make_measure_mask(
     return measure_mask
 
 def find_measured_pixels(
-    ls_data: np.array,
-    s2_data: np.array,
+    arr1_data: np.array,
+    arr2_data: np.array,
     measure_mask: np.array
 ):
     """
@@ -214,16 +264,16 @@ def find_measured_pixels(
     2) Ensures both images have common set of nans
     """
 
-    ls_masked = apply_measure_mask(ls_data, measure_mask)
-    s2_masked = apply_measure_mask(s2_data, measure_mask)
-    valid_ls_mask = ~np.isnan(ls_masked)
-    valid_s2_mask = ~np.isnan(s2_masked)
+    arr1_masked = apply_measure_mask(arr1_data, measure_mask)
+    arr2_masked = apply_measure_mask(arr2_data, measure_mask)
+    valid_arr1_mask = ~np.isnan(arr1_masked)
+    valid_arr2_mask = ~np.isnan(arr2_masked)
 
     # Make the same nan values from filtering common to each dataset
-    ls_data_out = np.where(valid_s2_mask, ls_masked, np.nan)
-    s2_data_out = np.where(valid_ls_mask, s2_masked, np.nan)
+    arr1_data_out = np.where(valid_arr2_mask, arr1_masked, np.nan)
+    arr2_data_out = np.where(valid_arr1_mask, arr2_masked, np.nan)
 
-    return ls_data_out, s2_data_out
+    return arr1_data_out, arr2_data_out
 
 def calc_ndwi(
         green_array: np.array, 
@@ -263,39 +313,46 @@ def calc_ndwi(
     return ndwi_array
 
 def ndwi_images_vis(
-    s2_ndwi: np.array,
-    ls_ndwi: np.array
+    arr1_ndwi: np.array,
+    arr2_ndwi: np.array,
+    arr1_ndwi_title: str,
+    arr2_ndwi_title: str
 ):
-    # Plot the NDWI images
+    # Find global min and max values across both arrays
+    vmin = min(np.nanmin(arr1_ndwi), np.nanmin(arr2_ndwi))
+    vmax = max(np.nanmax(arr1_ndwi), np.nanmax(arr2_ndwi))
+    
+    # Plot the NDWI images with the same color scale
     green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
+    
     fig, ax = plt.subplots()
     ax.set_facecolor('darkgrey')
-    ax.imshow(ls_ndwi, cmap=green_white_blue)
-    ax.set_title('Landsat NDWI')
-    plt.colorbar(ax.images[0], ax=ax)
+    im1 = ax.imshow(arr1_ndwi, cmap=green_white_blue, vmin=vmin, vmax=vmax)
+    ax.set_title(f'{arr1_ndwi_title} NDWI')
+    plt.colorbar(im1, ax=ax)
     plt.show()
+    
     fig, ax = plt.subplots()
     ax.set_facecolor('darkgrey')
-    ax.imshow(s2_ndwi, cmap=green_white_blue)
-    ax.set_title('Sentinel-2 NDWI')
-    plt.colorbar(ax.images[0], ax=ax)
+    im2 = ax.imshow(arr2_ndwi, cmap=green_white_blue, vmin=vmin, vmax=vmax)
+    ax.set_title(f'{arr2_ndwi_title} NDWI')
+    plt.colorbar(im2, ax=ax)
     plt.show()
 
-def make_ndwi_images(
+def make_sat_ndwi_images(
     image_info: dict
 ):
     """
-    Takes the file paths for two coincident images
+    Takes the file paths for two coincident images from Sentinel-2 and Landsat8
     Returns two NDWI images as numpy arrays. 
     Plots the NDWI images for visual inspection.
     NOTE: For not resampled images, the process is dramatically different. 
     """
     
-    level, date, roi, band_name, resample_method = (
+    level, date, roi, resample_method = (
         image_info['level'], 
         image_info['date'], 
         image_info['roi'],
-        image_info['band_name'],
         image_info['resample_method']
     )
 
@@ -337,6 +394,71 @@ def make_ndwi_images(
         raise ValueError('ERROR: need to specify proper resampling method')
 
     # Quick plot of NDWI images
-    ndwi_images_vis(s2_ndwi_out, ls_ndwi_out)
+    ndwi_images_vis(s2_ndwi_out, ls_ndwi_out, f'Sentinel-2 {level}', f'Landsat8 {level}')
     
     return ls_ndwi_out, s2_ndwi_out, image_window_params
+
+def make_ac_ndwi_images(
+    image_info: dict
+):
+    sat, roi, date, resample_method = (
+        image_info['satellite'],
+        image_info['roi'],
+        image_info['date'],
+        image_info['resample_method']
+    )
+
+    toa_fp = f'./data/toa_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_toa_date_{date}_roi_{roi}.tif'
+    sr_fp = f'./data/sr_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_sr_date_{date}_roi_{roi}.tif'
+
+    toa_green, sr_green, image_window_params = rio_get_ac_arrays(toa_fp, sr_fp, band_name='Green')
+    toa_nir, sr_nir, _ = rio_get_ac_arrays(toa_fp, sr_fp, band_name='NIR')
+
+    toa_ndwi = calc_ndwi(toa_green, toa_nir)
+    sr_ndwi = calc_ndwi(sr_green, sr_nir)
+
+    valid_toa_mask = ~np.isnan(toa_ndwi)
+    valid_sr_mask = ~np.isnan(sr_ndwi)
+    toa_ndwi_out = np.where(valid_sr_mask, toa_ndwi, np.nan)
+    sr_ndwi_out = np.where(valid_toa_mask, sr_ndwi, np.nan)
+
+    # Quick plot of NDWI images
+    ndwi_images_vis(toa_ndwi_out, sr_ndwi_out, f'TOA {sat}', f'SR {sat}')
+
+    return toa_ndwi_out, sr_ndwi_out, image_window_params
+
+def rio_get_ac_arrays(
+    toa_path: str,
+    sr_path: str,
+    band_name: str
+):
+
+    toa_data = read_band_by_description(toa_path, band_name, image_window_params=None)
+    sr_data = read_band_by_description(sr_path, band_name, image_window_params=None)
+
+    toa_data = toa_data.copy()
+    sr_data = sr_data.copy()
+
+    # Zero values should already be nan, but just incase
+    toa_data = np.where(toa_data >= 0, toa_data, np.nan)
+    sr_data = np.where(sr_data >= 0, sr_data, np.nan)
+
+    if toa_data.shape != sr_data.shape:
+        raise ValueError(
+        f"Incompatible array shapes: TOA shape {toa_data.shape} != "
+        f"SR shape {sr_data.shape}."
+    )
+
+    with rio.open(toa_path) as src:
+        meta = src.meta
+        bounds = src.bounds
+        transform = src.transform
+        shape = src.shape
+
+    image_window_params = {
+        'bounds': bounds,
+        'transform': transform,
+        'shape': shape
+    }
+
+    return toa_data, sr_data, image_window_params

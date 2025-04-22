@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-resample_method = 'noresample'
+resample_method = 'bilinear30'
 lake_areas_dir = './data/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
 sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
@@ -74,7 +74,7 @@ plot_data = plot_df.melt(
 plot_data['lake_size'] = plot_data['lake_size'].map({
     'rel_smallest_sat_diff': 'Smallest (0.01-0.5 km²)',
     'rel_small_sat_diff': 'Small (0.05-0.5 km²)',
-    'rel_medium_sat_diff': 'Medium (0.5-10 km²)',
+    'rel_medium_sat_diff': 'Medium (0.5-1 km²)',
     'rel_large_sat_diff': 'Large (> 1 km²)'
 })
 
@@ -91,7 +91,7 @@ plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
 plt.title(f'Satellite Differences by Lake Size for {resample_method}', fontsize=14)
 plt.xlabel('Lake Size Category', fontsize=12)
 plt.ylabel('Relative Satellite Difference (LS8% - S2%) / LS8%', fontsize=12)
-plt.ylim(-400, 125) # NOTE: Adjust this, because the plot is a little messy
+plt.ylim(-100, 110) # NOTE: Adjust this, because the plot is a little messy
 
 plt.tight_layout()
 plt.show()
@@ -144,9 +144,9 @@ abs_plot_data = abs_plot_df.melt(
 )
 
 abs_plot_data['lake_size'] = abs_plot_data['lake_size'].map({
-    'abs_smallest_sat_diff': 'Smallest (0.01-0.5 km²)',
+    'abs_smallest_sat_diff': 'Smallest (0.01-0.05 km²)',
     'abs_small_sat_diff': 'Small (0.05-0.5 km²)',
-    'abs_medium_sat_diff': 'Medium (0.5-10 km²)',
+    'abs_medium_sat_diff': 'Medium (0.5-1 km²)',
     'abs_large_sat_diff': 'Large (> 1 km²)'
 })
 
@@ -171,3 +171,5 @@ plt.show()
 
 
 
+
+# %%

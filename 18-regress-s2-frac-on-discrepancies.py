@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import linregress
-from week_dt_converters import year_week_to_datetime, add_year_week
+from functions.misc.week_dt_converters import year_week_to_datetime, add_year_week
 
 ts_dir = './data/s2_weekly_timeseries'
 area_dir = './data/lake_area_results'

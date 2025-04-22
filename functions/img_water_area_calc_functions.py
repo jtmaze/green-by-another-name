@@ -12,10 +12,10 @@ import rasterio as rio
 from rasterio.warp import reproject, Resampling
 
 # ------ Custom Functions ------
-from img_data_fetching_functions import (
+from functions.img_data_fetching_functions import (
     check_match_imgs,
     make_measure_mask,
-    make_ndwi_images
+    make_sat_ndwi_images
 )
 
 # Small helper function

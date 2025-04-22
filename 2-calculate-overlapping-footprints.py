@@ -9,7 +9,7 @@ import geopandas as gpd
 import glob
 import re
 
-from img_data_fetching_functions import extract_unique
+from functions.img_data_fetching_functions import extract_unique
 
 footprint_file_list = glob.glob('./data/image_footprints/*.shp')
 

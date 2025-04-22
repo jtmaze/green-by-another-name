@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-resample_method = 'bilinear30'
+resample_method = 'noresample'
 lake_areas_dir = './data/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
 sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
@@ -111,7 +111,7 @@ plot_data['lake_size'] = plot_data['metric'].apply(lambda x: x.split('_')[2].cap
 size_order = ['Smallest', 'Small', 'Medium', 'Large']
 plot_data['lake_size'] = pd.Categorical(plot_data['lake_size'], categories=size_order, ordered=True)
 size_labels = {
-    'Smallest': 'Smallest (0.01-0.5 km²)',
+    'Smallest': 'Smallest (0.01-0.05 km²)',
     'Small': 'Small (0.05-0.5 km²)',
     'Medium': 'Medium (0.5-10 km²)',
     'Large': 'Large (> 1 km²)'

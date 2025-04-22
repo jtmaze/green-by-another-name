@@ -3,8 +3,8 @@ import glob
 import pandas as pd
 import pprint as pp
 
-from img_data_fetching_functions import extract_unique
-from img_water_area_calc_functions import make_area_thresholding_summaries
+from functions.img_data_fetching_functions import extract_unique
+from functions.img_water_area_calc_functions import make_area_thresholding_summaries
 
 toa_files = glob.glob('./data/toa_images/**/*tif')
 sr_files = glob.glob('./data/sr_images/**/*.tif')

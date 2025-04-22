@@ -10,7 +10,7 @@ ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
 roi_name = 'TUK_sub3'
-level = 'sr'
+level = 'toa'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
 best_image_dates = gpd.read_file(image_footprints_path) 

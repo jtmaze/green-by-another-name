@@ -8,7 +8,7 @@ from scipy.stats import linregress
 
 lake_size_summaries = pd.read_csv('./data/lake_size_summaries.csv')
 resample_method = 'bilinear30'
-ac_level = 'toa'
+ac_level = 'sr'
 
 sat_diff_path = f'./data/lake_area_results/{ac_level}_resampled_{resample_method}_area_summaries_batch2.csv'
 
@@ -120,8 +120,8 @@ g = sns.lmplot(
 )
 
 # Add labels and title
-plt.xlabel('Lake size bins area proportion (%)', fontsize=12)
-plt.ylabel('Relative LS8 vs S2 Difference (%)', fontsize=12)
+plt.xlabel('ROIs lake area proportion (%)', fontsize=12)
+plt.ylabel('ROIs mean LS8 vs S2 Difference (%)', fontsize=12)
 plt.title(f'Lake size impact on satellite discrepancies -- {ac_level} {resample_method}', fontsize=14)
 
 plt.legend(loc='upper right')

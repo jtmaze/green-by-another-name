@@ -1,8 +1,8 @@
 # %%
 # 
 import pandas as pd
-from histogram_functions import overlay_sr_toa_hist_otsu
-from histogram_functions import overlay_sr_toa_hist_reflect
+from functions.misc.histogram_functions import overlay_sr_toa_hist_otsu
+from functions.misc.histogram_functions import overlay_sr_toa_hist_reflect
 
 
 regression_data = pd.read_csv('./data/regression_summaries_60m_lake.csv')
