@@ -48,6 +48,9 @@ def mask_ndwi_images_on_common_grid(
     """
 
     pld_path = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
+    print(image_window_params)
+    # TODO: Can I use the image window params to count the number of valid PLD +60m pixels within the image extent?
+
     pld_plus = make_measure_mask(pld_path, 
                                  image_window_params, 
                                  zone='lake', 
@@ -73,6 +76,7 @@ def mask_ndwi_images_native_grid(
 
     with rio.open(image_path) as tgt, rio.open(pld_path) as src:
         src_data = src.read(6) # NOTE: Hard-coded the band index for lakes buffered by 60 meters.
+        # TODO: Use the tgt.meta to determine the number of valid PLD+60m pixels within the image extent
         pld_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
 
         reproject(
@@ -599,8 +603,8 @@ def write_mask_rasters(
     image_info: dict
 ):
     """
+    Optional function to write the binary water masks to disk
     Writes the binary water masks to disk
-
     """
     roi_name = image_info['roi']
     level = image_info['level']
@@ -629,6 +633,11 @@ def write_ndwi_rasters(
     s2_ndwi: np.array,
     image_info: dict
 ):
+    
+    """
+    Optional function to write the NDWI rasters to disk
+    """
+
     roi_name = image_info['roi']
     level = image_info['level']
     date = image_info['date']
@@ -717,7 +726,7 @@ def image_wtr_area(
         if not check_match_imgs(ls8_fp, s2_fp):
             return None
     
-        ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
+        ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
         ls_ndwi_lakes = mask_ndwi_images_on_common_grid(ls_ndwi, image_window_params, roi, res)
         s2_ndwi_lakes = mask_ndwi_images_on_common_grid(s2_ndwi, image_window_params, roi, res)
 
@@ -730,7 +739,7 @@ def image_wtr_area(
         s2_valid_threshold = 225_000
         if not check_match_imgs(ls8_fp, s2_fp):
             return None
-        ls_ndwi, s2_ndwi, image_window_params = make_ndwi_images(image_info)
+        ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
         ls_ndwi_lakes = mask_ndwi_images_native_grid(
             ls_ndwi, ls8_fp, roi
         )

@@ -394,7 +394,7 @@ def make_sat_ndwi_images(
         raise ValueError('ERROR: need to specify proper resampling method')
 
     # Quick plot of NDWI images
-    ndwi_images_vis(s2_ndwi_out, ls_ndwi_out, f'Sentinel-2 {level}', f'Landsat8 {level}')
+    #ndwi_images_vis(s2_ndwi_out, ls_ndwi_out, f'Sentinel-2 {level}', f'Landsat8 {level}')
     
     return ls_ndwi_out, s2_ndwi_out, image_window_params
 
@@ -423,7 +423,7 @@ def make_ac_ndwi_images(
     sr_ndwi_out = np.where(valid_toa_mask, sr_ndwi, np.nan)
 
     # Quick plot of NDWI images
-    ndwi_images_vis(toa_ndwi_out, sr_ndwi_out, f'TOA {sat}', f'SR {sat}')
+    #ndwi_images_vis(toa_ndwi_out, sr_ndwi_out, f'TOA {sat}', f'SR {sat}')
 
     return toa_ndwi_out, sr_ndwi_out, image_window_params
 

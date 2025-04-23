@@ -98,19 +98,32 @@ plt.show()
 # %% 5.0 Linear regression on the data
 
 slope, intercept, r_value, p_value, std_err = linregress(
-    merged_df['net_lake_sn_frac'],
+    merged_df['net_lake_sn_frac'] * -1,
     merged_df['rel_ls_s2_diff']
 )
 print(f'Linear regression: slope = {slope:.3f}, r-squared = {r_value**2:.3f}, p-value = {p_value:.3f}')
 
-sns.regplot(
-    x='net_lake_sn_frac',
+merged_df['net_lake_sn_frac_inv'] = merged_df['net_lake_sn_frac'] * -1
+# Create the regression plot
+ax = sns.regplot(
+    x='net_lake_sn_frac_inv',
     y='rel_ls_s2_diff',
     data=merged_df,
     scatter_kws={'alpha':0.7, 's':60, 'edgecolor':'k'},
     line_kws={'color':'red', 'lw':2},
     ci=None
 )
+
+# Add ROI name labels to each point
+for i, row in merged_df.iterrows():
+    ax.annotate(
+        row['roi_name'], 
+        (row['net_lake_sn_frac_inv'], row['rel_ls_s2_diff']),
+        xytext=(5, 5),
+        textcoords='offset points',
+        fontsize=9,
+        bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7)
+    )
 
 plt.title(f'Relating mean(GSWO, GLAD, S2) seasonal fractions to LS8-S2 differences')
 plt.xlabel('Net Lake Seasonal Fraction (%)', fontsize=12)

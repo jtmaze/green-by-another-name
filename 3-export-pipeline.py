@@ -19,7 +19,7 @@ roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
-# 2.0 %% Functions
+# 2.0 Functions
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -942,16 +942,19 @@ mask_attrs_list = []
 
 for idx, row in best_image_dates.iterrows():
 
-    s2_attrs, ls8_attrs, mask_attrs = pair_processor(
+    result = pair_processor(
         row,
         roi_name=roi_name,
         roi_est_crs=est_utm, 
         level=level
     )
-
-    mask_attrs_list.append(mask_attrs)
-    s2_attrs_list.append(s2_attrs)
-    ls8_attrs_list.append(ls8_attrs)
+    if result is not None:
+        s2_attrs, ls8_attrs, mask_attrs = result
+        mask_attrs_list.append(mask_attrs)
+        s2_attrs_list.append(s2_attrs)
+        ls8_attrs_list.append(ls8_attrs)
+    else:
+        print(f"Skipping row {idx} - no valid image pair found")
 
 # %% Write output to a dataframe
 mask_batch_summary = pd.DataFrame(mask_attrs_list)

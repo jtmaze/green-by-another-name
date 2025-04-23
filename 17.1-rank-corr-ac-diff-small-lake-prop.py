@@ -220,8 +220,8 @@ g = sns.lmplot(
 )
 
 # Add labels and title
-plt.xlabel('Lake size bins area proportion (%)', fontsize=12)
-plt.ylabel('Relative TOA vs SR difference (%)', fontsize=12)
+plt.xlabel('ROIs lake area proportion (%)', fontsize=12)
+plt.ylabel('ROIs mean relative TOA-SR Difference (%)', fontsize=12)
 plt.title(f'Lake size impact on LS8 AC discrepancies -- {resample_method}', fontsize=14)
 
 plt.legend(loc='upper right')
