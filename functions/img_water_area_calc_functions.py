@@ -48,7 +48,7 @@ def mask_ndwi_images_on_common_grid(
     """
 
     pld_path = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
-    print(image_window_params)
+    #print(image_window_params)
     # TODO: Can I use the image window params to count the number of valid PLD +60m pixels within the image extent?
 
     pld_plus = make_measure_mask(pld_path, 
@@ -102,8 +102,6 @@ def clean_ndwi_data(
     flat_ndwi = ndwi_data.flatten()
     valid_mask = ~np.isnan(flat_ndwi)
     valid_data = flat_ndwi[valid_mask]
-    # Extra check to ensure NDWI values are valid (between -1 and 1)
-    valid_data = np.clip(valid_data, -1, 1)
     
     return valid_data
 
@@ -119,14 +117,14 @@ def find_otsu_threshold(
     show_hist: bool,
 ):
     """
-    Input: NDWI array (-1,1)
+    Input: NDWI array
     Output: Otsu Threshold for a given NDWI image
     """
     
     valid_data = clean_ndwi_data(ndwi) # NDWI data is now flat
 
     n_bins = 500
-    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(-1, 1))
+    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(valid_data.min(), valid_data.max()))
     total_pixels = hist.sum()
     pdf = hist / total_pixels
     cumulative_prob = np.cumsum(pdf)               
@@ -678,7 +676,6 @@ Function contains the following steps:
 
 def image_wtr_area(
     image_info: dict,
-    write_mask: bool,
     hist_return: bool, 
     write_rasters: bool,
 ):
@@ -718,9 +715,9 @@ def image_wtr_area(
         ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
         res = re.search(r"(\d{2}$)", resample_method).group(1) # Gets the resolution digits from resample method
         if res == '30':
-            s2_valid_threshold = ls_valid_threshold = 25_000
+            s2_valid_threshold = ls_valid_threshold = 20_000
         elif res == '60':
-            s2_valid_threshold = ls_valid_threshold = 6_250
+            s2_valid_threshold = ls_valid_threshold = 5_000
         else:
             print("ERROR: Invalid resolution, must be 30 or 60")
         if not check_match_imgs(ls8_fp, s2_fp):
@@ -735,8 +732,8 @@ def image_wtr_area(
         s2_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
         ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
         res = 'native'
-        ls_valid_threshold = 25_000
-        s2_valid_threshold = 225_000
+        ls_valid_threshold = 40_000
+        s2_valid_threshold = 360_000
         if not check_match_imgs(ls8_fp, s2_fp):
             return None
         ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
@@ -749,7 +746,9 @@ def image_wtr_area(
     print(f"Working {level} for {date} over the {roi} region")
     # CHECK: ensure there's enough quality lake pixels in the image
     if np.sum(~np.isnan(ls_ndwi_lakes)) < ls_valid_threshold or np.sum(~np.isnan(s2_ndwi_lakes)) < s2_valid_threshold:
-        print('ERROR: Skipping water area calculations -- Bad Image')
+        print("ERROR: Skipping water area calculations -- Bad Image")
+        print(f"Only {np.sum(~np.isnan(ls_ndwi_lakes))} valid pixels in LS8")
+        print(f"and {np.sum(~np.isnan(s2_ndwi_lakes))} valid pixels in S2")
         bad_val = "Poor Quality Image Data"
         results = bad_val
         return results
@@ -863,7 +862,6 @@ def make_area_thresholding_summaries(
                 # Calculate the Otsu thresholds and water fractions for each image
                 area_items = image_wtr_area(
                     image_info, 
-                    write_mask=False, 
                     hist_return=hist_return, 
                     write_rasters=write_rasters
                 )
