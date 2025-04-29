@@ -13,7 +13,7 @@ import rasterio as rio
 from rasterio.features import rasterize
 
 out_dir = './data/pld_rasterized/'
-roi_name = 'YKD_sub8'
+roi_name = 'TUK_sub4'
 roi_prefix = roi_name.split('_')[0]
 res = 30 # 30 or 60 meters
 buffers = [-120, -60, -30, 0, 30, 60, 120] # Buffer sizes in meters to dilate and erode the PLD lakes
@@ -122,9 +122,6 @@ img_path = f'./data/roi_shapes/rois/rasterized_{roi_name}_shape_res{res}.tif'
 
 lake_size_summaries = []
 
-total_lake_area = pld_utm.area.sum() / 1_000_000
-print(f'Total lake area: {total_lake_area:.2f} km^2')
-
 for size, (min_area, max_area) in lake_size_bins.items(): 
     # Designate out_path for the lake
     out_path = f'{out_dir}/{roi_name}_lake_masks_res{res}_{size}.tif'
@@ -155,9 +152,9 @@ for size, (min_area, max_area) in lake_size_bins.items():
     }
     lake_size_summaries.append(summary)
 
-    # for i, buffer in enumerate(buffers):
-    #     pld_buffered, band_name = pld_buffer_img_clip(lakes_in_category, buffer, roi_utm)
-    #     rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
+    for i, buffer in enumerate(buffers):
+        pld_buffered, band_name = pld_buffer_img_clip(lakes_in_category, buffer, roi_utm)
+        rasterize_buffers(pld_buffered, band_name, img_path, out_path, band_idx=i+1)
 
 
 summary_df = pd.DataFrame(lake_size_summaries)

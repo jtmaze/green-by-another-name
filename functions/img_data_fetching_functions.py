@@ -110,7 +110,7 @@ def rio_get_data_arrays_with_common_trans(
     """
     NOTE: This function is only intended for images resampled to a common reference grid. 
     Returns two numpy arrays for corresponding Sentinel-2 and Landsat8 bands.
-    Converts any values <= 0 to np.nan for both datasets
+    Keeps reflectance values <= 0 
     """
 
     ls_data = read_band_by_description(ls_path, band_name, image_window_params=None) #Keep image window params None
@@ -318,10 +318,10 @@ def ndwi_images_vis(
     arr1_ndwi_title: str,
     arr2_ndwi_title: str
 ):
-    # Find global min and max values across both NDWI arrays
-    vmin = min(np.nanmin(arr1_ndwi), np.nanmin(arr2_ndwi))
-    vmax = max(np.nanmax(arr1_ndwi), np.nanmax(arr2_ndwi))
-    
+    # Hard-coded these, becuase of negative values in LS8 SR images.
+    # Still want to visualize how unbounded NDWI values are distributed. 
+    vmin = -2
+    vmax = 2
     # Plot the NDWI images with the same color scale
     green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
     

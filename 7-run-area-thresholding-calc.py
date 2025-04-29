@@ -18,7 +18,7 @@ rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 
 # Specify the level and resample method
-level = 'sr'
+level = 'toa'
 levels = [level]
 resample_method = 'bilinear30'
 
@@ -48,5 +48,5 @@ print("Area summaries finished")
 # %% 4.0 Write the output to csv
 out_df = out_df[out_df['ls_otsu_threshold'].notna()]
 # NOTE: change the batch number if you add more ROIs to the study!
-out_df.to_csv(f'./data/lake_area_results/{level}_resampled_{resample_method}_area_summaries_batch2.csv', index=False)
+out_df.to_csv(f'./data/lake_area_results/{level}_resampled_{resample_method}_area_summaries_batch3.csv', index=False)
 # %%
