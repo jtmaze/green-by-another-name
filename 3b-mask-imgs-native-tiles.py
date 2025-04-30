@@ -12,7 +12,7 @@ import numpy as np
 
 from functions.img_data_fetching_functions import extract_unique
 
-level = 'sr'
+level = 'toa'
 
 download_dir = f'./data/{level}_image_downloads/'
 roi_dir = f'./data/roi_shapes/rois/'

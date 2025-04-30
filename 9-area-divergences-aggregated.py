@@ -7,6 +7,7 @@ from scipy import stats
 import numpy as np
 
 resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'lanczos30']
+resample_methods = ['bilinear30']
 
 # %% 2.0 Explore differences in water fraction by satellite.
 
@@ -18,10 +19,14 @@ creates boxplots to visualize them, and performs t-tests to assess statistical s
 test_results = []
 for i in resample_methods:
 
-    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch2.csv')
+    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch3.csv')
+    print(f'{len(sr)} SR observations with bad images')
     sr = sr[sr['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
-    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch2.csv')
+    print(f'{len(sr)} quality SR observations')
+    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch3.csv')
+    print(f'{len(toa)} TOA observations with bad images')
     toa = toa[toa['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
+    print(f'{len(toa)} quality TOA observations')
 
     cols_to_make_float = [
         'total_ls_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_otsu', 'total_s2_water_frac_adaptive',
@@ -52,6 +57,7 @@ for i in resample_methods:
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
+    plt.ylim(-30, 40)
     plt.title(f'Absolute Difference in Water Fraction (SR, {i})')
     plt.ylabel('LS8% - S2% Water Fraction')
     plt.xlabel('Landscape Zone')
@@ -61,13 +67,7 @@ for i in resample_methods:
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
-    # NOTE: resetting y-axis limits to 0-97.5 percentile
-    flat = rel_plot_data.values.flatten()
-    flat = flat[~np.isnan(flat)]
-    y_min = np.percentile(flat, 2.5)
-    y_max = np.percentile(flat, 100)
-    padding = (y_max - y_min) * 0.5
-    plt.ylim(y_min - padding, y_max + padding)
+    plt.ylim(-75, 110)
     plt.title(f'Relative Difference in Water Fraction (SR, {i})')
     plt.ylabel('(LS8% - S2% / LS8% * 100) Water Fraction')
     plt.xlabel('Landscape Zone')
@@ -161,6 +161,7 @@ for i in resample_methods:
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
+    plt.ylim(-30, 40)
     plt.title(f'Absolute Satellite Difference in Water Fraction (TOA, {i})')
     plt.ylabel('LS8% - S2% Water Fraction')
     plt.xlabel('Landscape Zone')
@@ -172,13 +173,7 @@ for i in resample_methods:
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
-    # NOTE: resetting y-axis limits to 0-97.5 percentile
-    flat = rel_plot_data.values.flatten()
-    flat = flat[~np.isnan(flat)]
-    y_min = np.percentile(flat, 2.5)
-    y_max = np.percentile(flat, 100)
-    padding = (y_max - y_min) * 0.5
-    plt.ylim(y_min - padding, y_max + padding)
+    plt.ylim(-75, 110)
     plt.title(f'Relative Difference in Water Fraction (TOA, {i})')
     plt.ylabel('(LS8% - S2% / LS8% * 100) Water Fraction')
     plt.xlabel('Landscape Zone')

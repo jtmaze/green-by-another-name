@@ -121,8 +121,8 @@ def regress_reflectance(
     sample_size = arr1_sample.size # Sample sizes will be the same from downsample_img_arrays()
     # If there's a to few-pixels 
     # This is prone to happen in narrow shoreline zones (e.g. only pixels in PLD buffered 0 to + 30 meters)
-    if sample_size < 1500: # TODO: how to make this in relation to number of relevant pixels
-        print(f'Error: Insuffcient quality pixels given parameters (less than 1500)')
+    if sample_size <= 1_000: 
+        print(f'Error: Insuffcient quality pixels given parameters (less than 1,000)')
         model = 'Poor Quality Image Data'
         model_domain = 'Poor Quality Image Data'
         arr1_histogram = arr2_histogram = 'Poor Quality Image Data'
@@ -145,7 +145,7 @@ def regress_reflectance(
             np.max([arr1_modeled.max(), arr2_modeled.max()])
         )
 
-        #regression_vis(arr1_modeled, arr2_modeled, model, comparison)
+        regression_vis(arr1_modeled, arr2_modeled, model, comparison)
 
         if hist_return == True:
             arr1_histogram = np.histogram(arr1_modeled, bins=100)

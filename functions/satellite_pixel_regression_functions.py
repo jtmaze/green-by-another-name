@@ -20,7 +20,7 @@ from functions.img_data_fetching_functions import (
     downsample_image_arrays
 )
 
-from functions.general_pixel_regressoin_functions import (
+from functions.general_pixel_regression_functions import (
     regress_reflectance,
     numpy_to_list
 )
