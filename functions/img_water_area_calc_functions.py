@@ -770,10 +770,10 @@ def image_wtr_area(
 
     print(f"Working {level} for {date} over the {roi} region")
     # CHECK: ensure there's enough quality lake pixels in the image
-    if pld_plus_valid_frac < 75:
+    if pld_plus_valid_frac < 40:
         print('****************************************************')
         print("WARNING: Skipping water area calculations -- Bad Image")
-        print(f"High masked {pld_plus_valid_frac:.2f} % of pixels in PLD + 60m area")
+        print(f"Low valid frac {pld_plus_valid_frac:.2f} % of pixels in PLD + 60m area")
         print('****************************************************')
         bad_val = "Poor Quality Image Data"
         results = bad_val
@@ -849,7 +849,9 @@ def image_wtr_area(
         'total_s2_water_frac_adaptive': total_s2_water_frac_adaptive,
         # Histograms
         'ls_hist': ls_hist,
-        's2_hist': s2_hist
+        's2_hist': s2_hist,
+        # Image quality
+        'pld_plus_valid_frac': pld_plus_valid_frac,
     }
     # Combine partial results with lake and shoreline fractions
     results = {**partial_results, **pld_zone_wtr_fracs}
@@ -908,14 +910,16 @@ def make_area_thresholding_summaries(
                     s2_hist_bins = numpy_to_list(area_items.get('s2_hist')[1])
 
                 # Print the total water fractions for each image
-                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive')}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive')}')
-                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive')}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive')}')
+                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive'):.2f}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive'):.2f}')
+                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive'):.2f}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive'):.2f}')
 
                 summary = {
                     'date': date,
                     'roi': roi,
                     'level': level,
                     'resample_method': resample_method,
+                    # Image quality 
+                    'pld_plus_valid_frac': area_items.get('pld_plus_valid_frac'),
                     # Thresholds
                     'ls_otsu_threshold': area_items.get('ls_otsu_threshold'),
                     'ls_adaptive_land': area_items.get('ls_adaptive_land'),

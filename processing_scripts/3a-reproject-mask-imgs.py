@@ -14,8 +14,8 @@ import numpy as np
 from functions.img_data_fetching_functions import extract_unique
 
 level = 'toa' # must be 'sr' or 'toa'
-res = 30 # 30 or 60 meters
-resample_method = 'lanczos'
+res = 60 # 30 or 60 meters
+resample_method = 'lanczos' # 'nearest', 'bilinear', 'cubic', 'average', 'lanczos'
 
 band_desc = {
     1: 'Blue',

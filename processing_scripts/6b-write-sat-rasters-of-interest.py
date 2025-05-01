@@ -1,19 +1,34 @@
 # %% 1.0 Libraries and dirctories
-import glob
+import os
+import sys
+
 import pandas as pd
 import pprint as pp
+import random
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.img_water_area_calc_functions import make_area_thresholding_summaries
+
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
+random.seed(42)
 
 area_dir = './data/lake_area_results'
 
 # %% 2.0 Determine 10 rois/dates with the highest LS8 and Sentinel-2 TOA-SR difference
 resample_method = 'bilinear30'
 
-resample_method = 'bilinear30'
-toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
-sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
+toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
+toa_data = toa_data[
+    toa_data['pld_plus_valid_frac'] >= 70
+]
+sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch3.csv')
+sr_data = sr_data[
+    sr_data['pld_plus_valid_frac'] >= 70
+]
+print(len(toa_data))
+print(len(sr_data))
+# %%
 
 cols_to_keep =['date', 'roi', 'level', 'buff_lake_ls_water_frac_adaptive',
                'buff_lake_s2_water_frac_adaptive']
@@ -40,10 +55,15 @@ combined['abs_sat_diff'] = combined['ls_water_frac'] - combined['s2_water_frac']
 combined['rel_sat_diff'] = combined['abs_sat_diff'] / combined['ls_water_frac'] * 100
 
 
-# %% 3.0 
+# %% 3.0 Choose the 5 highest satellite discrepancies for toa and sr
 
-highest_toa_sat_diff = combined.sort_values(by='abs_ls_ac_diff', ascending=False).head(5).copy()
-highest_sr_sat_diff = combined.sort_values(by='abs_s2_ac_diff', ascending=False).head(5).copy()
+highest_toa_sat_diff = combined[
+    combined['level'] == 'toa'
+].sort_values(by='abs_sat_diff', ascending=False).head(5).copy()
+
+highest_sr_sat_diff = combined[
+    combined['level'] == 'sr'
+].sort_values(by='abs_sat_diff', ascending=False).head(5).copy()
 
 toa_image_info_dicts = []
 
@@ -84,16 +104,30 @@ print("\nCommon date-ROI combinations:")
 for date, roi in common_date_roi:
     print(f"Date: {date}, ROI: {roi}")
 
-# %%
+# %% Randomly select 5 rows from the combined dataframe
+random_samples = combined.sample(n=5, random_state=42)
+random_image_info_dicts = []
 
-combined_image_info = toa_image_info_dicts + sr_image_info_dicts
+for idx, row in random_samples.iterrows():
+    image_info = {
+        'level': None,
+        'date': row['date'],
+        'roi': row['roi_name'],
+        'band_name': None,
+        'resample_method': 'bilinear30'
+    }
+    random_image_info_dicts.append(image_info)
 
-# %% Write some masks for images that agree decently well. Picked 3 randomly
+print(f"\nRandomly selected 5 roi/date pairs:")
+for d in random_image_info_dicts:
+    print(f"Date: {d['date']}, ROI: {d['roi']}")
+
+combined_image_info = toa_image_info_dicts + sr_image_info_dicts + random_image_info_dicts
 
 
 # %% 3.0 Run area calculations
 
-for d in toa_image_info_dicts:
+for d in combined_image_info:
     print(d)
     rois = [d.get('roi')]
     image_dates = [d.get('date')]
@@ -109,3 +143,4 @@ for d in toa_image_info_dicts:
     print('***********************')
     print('***********************')
     print('***********************')
+# %%

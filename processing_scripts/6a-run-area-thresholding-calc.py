@@ -20,7 +20,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 # Specify the level and resample method
 level = 'toa'
 levels = [level]
-resample_method = 'bilinear30'
+resample_method = 'noresample'
 
 # %% 2.0 Dictionaries to hold image information
 
