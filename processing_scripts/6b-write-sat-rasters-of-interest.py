@@ -59,11 +59,11 @@ combined['rel_sat_diff'] = combined['abs_sat_diff'] / combined['ls_water_frac'] 
 
 highest_toa_sat_diff = combined[
     combined['level'] == 'toa'
-].sort_values(by='abs_sat_diff', ascending=False).head(5).copy()
+].sort_values(by='abs_sat_diff', ascending=True).head(5).copy()
 
 highest_sr_sat_diff = combined[
     combined['level'] == 'sr'
-].sort_values(by='abs_sat_diff', ascending=False).head(5).copy()
+].sort_values(by='abs_sat_diff', ascending=True).head(5).copy()
 
 toa_image_info_dicts = []
 

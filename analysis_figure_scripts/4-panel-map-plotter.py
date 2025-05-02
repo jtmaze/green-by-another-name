@@ -2,6 +2,8 @@
 
 import os
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from skimage import exposure
 import numpy as np
 import rasterio as rio
 from rasterio.plot import show
@@ -11,8 +13,8 @@ os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 # %%
 
-roi_name = "YKF_sub4"
-date = "2021-06-06"
+roi_name = "AND_sub2"
+date = "2021-06-16"
 res = 30
 resample_method = f"bilinear{res}"
 
@@ -49,12 +51,13 @@ pld_path = f'./data/pld_rasterized/{roi_name}_lake_masks_res{res}.tif'
 
 # Stylistic parameters
 rgb_scaling = (0, 0.0001) # (min, max)
-MASK_ALPHA = 0.5
+MASK_ALPHA = 1
 MASK_COLOR = "pink"
-NDWI_CMAP = "Blues"
-PLD_EDGE_COLOR = 'red'
-PLD_BUFFER_COLOR = 'blue'
-PLD_INNER_COLOR = 'green'
+ndwi_colors = ['darkgreen', 'white', 'darkblue']
+NDWI_CMAP = LinearSegmentedColormap.from_list("custom_ndwi", ndwi_colors, N=100)
+PLD_EDGE_COLOR = 'orange'
+PLD_BUFFER_COLOR = 'red'
+PLD_INNER_COLOR = 'yellow'
 
 # %% Fiddle with the bounds
 
@@ -65,10 +68,10 @@ with rio.open(rgb_paths[0]) as src:
     center_y = (full_bounds.bottom + full_bounds.top) / 2
     print(center_x, center_y)
 
-    chosen_x = center_x + 8_500
-    chosen_y = center_y - 7_500
+    chosen_x = center_x - 670
+    chosen_y = center_y + 400
 
-spread = 2_000  # 1km in each direction
+spread = 1_250  # 1km in each direction
 utm_bounds = (chosen_x - spread, chosen_y - spread, chosen_x + spread, chosen_y + spread)
 print("Testing with bounds:", utm_bounds)
 
@@ -91,12 +94,16 @@ def read_window(path: str, bounds: tuple, bands: list):
 
         return data, trans, src.crs
     
-def scale_rgb(arr: np.ndarray, min_val: float, max_val: float):
+def scale_rgb(arr: np.ndarray, upper: float, lower: float):
     """Scales the RGB values for display"""
-    arr = arr.astype(np.float32)
-    arr = (arr - min_val) / (max_val - min_val)
-    arr = np.clip(arr, 0, 1)
-    return arr    
+
+    stretched = arr.astype(np.float32).copy()
+    for i in range(stretched.shape[0]):
+        p_low, p_high = np.nanpercentile(stretched[i], (lower, upper))
+        stretched[i] = exposure.rescale_intensity(
+            stretched[i], in_range=(p_low, p_high), out_range=(0.0, 1.0)
+        )
+    return np.clip(stretched, 0, 1)   
 
 def plot_rgb_panels(ax, rgb_path: str, wtr_mask_path: str):
     """Plots each satellite's RGB image with the water mask."""
@@ -111,7 +118,7 @@ def plot_rgb_panels(ax, rgb_path: str, wtr_mask_path: str):
     print(data_min)
     print(data_max)
 
-    rgb_scaled = scale_rgb(rgb, data_min, data_max)
+    rgb_scaled = scale_rgb(rgb, 98, 2)
     print(rgb_scaled.shape)
     # Transpose from (bands,height,width) to (height,width,bands)
     rgb_display = np.transpose(rgb_scaled, (1, 2, 0))
@@ -130,17 +137,18 @@ def plot_rgb_panels(ax, rgb_path: str, wtr_mask_path: str):
     ax.set_axis_off()
 
     # Read the water mask set it on the plot
-    # wtr_mask, _, _ = read_window(wtr_mask_path, utm_bounds, bands=[1])
-    # wtr_bool = np.squeeze(wtr_mask) > 0
-    # show(
-    #     wtr_bool.astype("uint8"),
-    #     transform = trans,
-    #     ax=ax,
-    #     cmap=None,
-    #     alpha=0,
-    # )
-    # ax.contour(wtr_bool, levels=[0.5], colors=MASK_COLOR, linewidths=0.5, alpha=MASK_ALPHA)
-    ax.set_axis_off()
+    wtr_mask, _, _ = read_window(wtr_mask_path, utm_bounds, bands=[1])
+    wtr_bool = np.squeeze(wtr_mask) > 0
+    # Build an X/Y grid that matches the raster window
+    ny, nx = wtr_bool.shape
+    x = np.linspace(left,  right, nx)          # east-west
+    y = np.linspace(top,   bottom, ny)         # north-south (flip)
+                                              # NB: top > bottom in UTM
+    # Draw the outline
+    ax.contour(x, y, wtr_bool, levels=[0.5],
+               colors=MASK_COLOR, linewidths=4,
+               alpha=MASK_ALPHA, origin='image')
+
 
 def plot_ndwi_panels(ax, ndwi_path: str, pld_path: str):
     """Plots the NDWI image with PLD lakes as an overlay."""
@@ -148,39 +156,46 @@ def plot_ndwi_panels(ax, ndwi_path: str, pld_path: str):
     # Read and set NDWI on the plot
     ndwi, trans, _ = read_window(ndwi_path, utm_bounds, bands=[1])
     ndwi = ndwi.squeeze()
+    # Need to clip for unbounded SR NDWI values
+    ndwi = np.clip(ndwi, -1, 1)
     # Calculate the proper extent
     height, width = ndwi.shape
     left, bottom, right, top = rio.transform.array_bounds(height, width, trans)
     extent = [left, right, bottom, top]  # [west, east, south, north]
     
     # Display with correct extent
-    ax.imshow(ndwi, extent=extent, cmap=NDWI_CMAP)
+    im = ax.imshow(ndwi, extent=extent, cmap=NDWI_CMAP, vmin=-1, vmax=1)
     
     # Force aspect ratio to be equal
     ax.set_aspect('equal')
 
-    # lake, _, _ = read_window(pld_path, utm_bounds, bands=[4]) # lake with 0m buffer
-    # lake_bool = lake.squeeze() > 0
-    # print(lake_bool.shape)
-    # buffer, _,  _ = read_window(pld_path, utm_bounds, bands=[6]) # lake with 60m buffer
-    # buffer_bool = buffer.squeeze() > 0
-    # inner, _, _ = read_window(pld_path, utm_bounds, bands=[2]) # lake with -60m buffer
-    # inner_bool = inner.squeeze() > 0
+    lake,   _, _ = read_window(pld_path, utm_bounds, bands=[4])
+    buffer, _, _ = read_window(pld_path, utm_bounds, bands=[6])
+    inner,  _, _ = read_window(pld_path, utm_bounds, bands=[2])
 
-    # print(f"Lake mask contains True values: {lake_bool.any()}")
-    # print(f"Buffer mask contains True values: {buffer_bool.any()}")
-    # print(f"Inner mask contains True values: {inner_bool.any()}")
+    lake_bool   = lake.squeeze()   > 0
+    buffer_bool = buffer.squeeze() > 0
+    inner_bool  = inner.squeeze()  > 0
 
-    # ax.contour(lake_bool, levels=[0.5], colors=PLD_EDGE_COLOR, linewidths=1, alpha=MASK_ALPHA)
-    # ax.contour(buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR, linewidths=1, alpha=MASK_ALPHA)
-    # ax.contour(inner_bool, levels=[0.5], colors=PLD_INNER_COLOR, linewidths=1, alpha=MASK_ALPHA)
+    ny, nx = lake_bool.shape
+    x = np.linspace(left,  right, nx)
+    y = np.linspace(top,   bottom, ny)
+
+    # ax.contour(x, y, lake_bool,   levels=[0.5], colors=PLD_EDGE_COLOR,
+    #            linewidths=2, alpha=MASK_ALPHA, origin='image')
+    ax.contour(x, y, buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR,
+               linewidths=2, alpha=MASK_ALPHA, origin='image')
+    # ax.contour(x, y, inner_bool,  levels=[0.5], colors=PLD_INNER_COLOR,
+    #            linewidths=2, alpha=MASK_ALPHA, origin='image')
 
     ax.set_axis_off()
+
+    return im
 
 
 # %% Make the plots
 
-fig, axes = plt.subplots(2, 4, figsize=(16, 8), constrained_layout=True)  
+fig, axes = plt.subplots(2, 4, figsize=(16, 8), constrained_layout=False)  
 
 # Plot RGB images
 for i, (label, rgb_path, wtr_mask_path) in enumerate(zip(plot_labels, rgb_paths, wtr_mask_paths)):
@@ -188,12 +203,22 @@ for i, (label, rgb_path, wtr_mask_path) in enumerate(zip(plot_labels, rgb_paths,
     plot_rgb_panels(ax, rgb_path, wtr_mask_path)
     ax.set_title(f"{label} RGB", fontsize=12)
 
+ndwi_images = []
 for i, (label, ndwi_path, pld_path) in enumerate(zip(plot_labels, ndwi_paths, [pld_path]*4)): # PLD path is the same for all
     ax = axes[1, i]
-    plot_ndwi_panels(ax, ndwi_path, pld_path)
+    im = plot_ndwi_panels(ax, ndwi_path, pld_path)
+    ndwi_images.append(im)
     ax.set_title(f"{label} NDWI", fontsize=12)
 
-fig.suptitle(f"Image comparison for {roi_name} on {date} resampled {resample_method}", fontsize=16, fontweight='bold')
+cbar_ax = fig.add_axes([0.15, 0.08, 0.7, 0.02])  # [x, y, width, height]
+cbar = fig.colorbar(ndwi_images[0], cax=cbar_ax, orientation='horizontal')
+cbar.set_label('NDWI Values', labelpad=15)
+
+fig.suptitle(f"Image comparison for {roi_name} on {date} resampled {resample_method}", 
+             fontsize=16, fontweight='bold')
+
+plt.tight_layout()
+plt.subplots_adjust(bottom=0.15)
 plt.show()
 
     

@@ -9,8 +9,6 @@ import re
 import ast
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy import stats
 import random
 
 # ----- Custom Functions -----
@@ -150,6 +148,11 @@ def regress_ac_pairs(
             toa_sample, sr_sample, valid_pix_cnt = get_ndwi_ac_samples(
                 image_info, pld_fp, **sample_params
             )
+            # NOTE:
+            # Becuase we kept negative reflectance values NDWI can be enormously negative or positive
+            # For regression plots, we bound NDWI at [-1, 1]
+            toa_sample = np.clip(toa_sample, -1, 1)
+            sr_sample = np.clip(sr_sample, -1, 1)
         # Get single band (G or NIR) samples
         else: 
             toa_sample, sr_sample, valid_pix_cnt = get_band_ac_pixel_samples(

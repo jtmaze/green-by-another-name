@@ -1,8 +1,11 @@
 # %% 1.0 Libraries and dirctories
 import glob
+import sys
+import os
 import pandas as pd
 import pprint as pp
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.img_water_area_calc_functions import make_area_thresholding_summaries
 

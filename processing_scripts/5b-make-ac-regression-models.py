@@ -1,9 +1,12 @@
 # %% 1.0 Get the unique dates and rois from the image files
 # 1.0 Get the unique dates and rois from the image files
 import glob
+import sys
+import os
 import pandas as pd
 import pprint as pp
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.ac_pixel_regression_functions import make_ac_reflectance_summaries
 
@@ -20,7 +23,6 @@ resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'
 satellites = ['Landsat8', 'Sentinel2']
 
-regression_summaries = []
 # SECTION 2.0: Make regressions for PLD 60 meter buffered lake zone
 
 image_info = {
@@ -38,8 +40,8 @@ mask_params = {
 }
 
 regression_params = {
-    'sample_size': 5_000,
-    'outlier_frac': 0.0005,
+    'sample_size': 10_000,
+    'outlier_frac': 0,
 }
 
 # %% SECTION 2.1: Green Band - Lake Zone (60m buffer)
@@ -112,7 +114,7 @@ mask_params = {
 
 regression_params = {
     'sample_size': 10_000,
-    'outlier_frac': 0.0005,
+    'outlier_frac': 0,
 }
 
 # SECTION 3.1: Green Band - Lake Zone (0m buffer)
@@ -182,7 +184,7 @@ mask_params = {
 
 regression_params = {
     'sample_size': 10_000,
-    'outlier_frac': 0.0005,
+    'outlier_frac': 0,
 }
 # SECTION 4.1: Green Band - Shoreline Zone (-60m to +60m buffer)
 
@@ -251,7 +253,7 @@ mask_params = {
 
 regression_params = {
     'sample_size': 10_000,
-    'outlier_frac': 0.0005,
+    'outlier_frac': 0,
 }
 
 # SECTION 5.1: Green Band - Land Zone (60m buffer)

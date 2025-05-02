@@ -164,10 +164,10 @@ def downsample_image_arrays(
         f"array2 shape {arr2_pixels.shape}. Images must be resampled to identical dimensions "
     )
     # Create a common mask so that we drop the same pixels in both arrays
-    # (exclude NaNs or (-1) in either array).
+    # (exclude NaNs or (<= -1) in either array).
     common_mask = (
-        ~np.isnan(arr1_pixels) & (arr1_pixels != -1) &
-        ~np.isnan(arr2_pixels) & (arr2_pixels != -1)
+        ~np.isnan(arr1_pixels) & (arr1_pixels > -1) & (arr1_pixels < 1) &
+        ~np.isnan(arr2_pixels) & (arr2_pixels > -1) & (arr2_pixels < 1)
     )
 
     # Flatten both arrays using the same mask
