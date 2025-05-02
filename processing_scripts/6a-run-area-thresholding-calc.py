@@ -1,8 +1,11 @@
 # %% 1.0 Libraries and dirctories
 import glob
+import sys
+import os
 import pandas as pd
 import pprint as pp
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.img_water_area_calc_functions import make_area_thresholding_summaries
 
@@ -20,7 +23,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 # Specify the level and resample method
 level = 'toa'
 levels = [level]
-resample_method = 'lanczos60'
+resample_method = 'noresample'
 
 # %% 2.0 Dictionaries to hold image information
 
@@ -48,5 +51,5 @@ print("Area summaries finished")
 # %% 4.0 Write the output to csv
 out_df = out_df[out_df['ls_otsu_threshold'].notna()]
 # NOTE: change the batch number if you add more ROIs to the study!
-out_df.to_csv(f'./data/lake_area_results/{level}_resampled_{resample_method}_area_summaries_batch2.csv', index=False)
+out_df.to_csv(f'./data/lake_area_results/{level}_resampled_{resample_method}_area_summaries_batch3.csv', index=False)
 # %%

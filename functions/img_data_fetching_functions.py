@@ -110,7 +110,7 @@ def rio_get_data_arrays_with_common_trans(
     """
     NOTE: This function is only intended for images resampled to a common reference grid. 
     Returns two numpy arrays for corresponding Sentinel-2 and Landsat8 bands.
-    Converts any values <= 0 to np.nan for both datasets
+    Keeps reflectance values <= 0 
     """
 
     ls_data = read_band_by_description(ls_path, band_name, image_window_params=None) #Keep image window params None
@@ -119,9 +119,9 @@ def rio_get_data_arrays_with_common_trans(
     ls_data = ls_data.copy()
     s2_data = s2_data.copy()
 
-    # Zero's values should already be nan, but just in case
-    ls_data = np.where(ls_data >= 0, ls_data, np.nan)
-    s2_data = np.where(s2_data >= 0, s2_data, np.nan)
+    # In case no-data meta values are not saved to rasters. -1 is the hardcoded value. 
+    ls_data = np.where(ls_data != -1, ls_data, np.nan)
+    s2_data = np.where(s2_data != -1, s2_data, np.nan)
 
     if ls_data.shape != s2_data.shape:
         raise ValueError(
@@ -133,7 +133,7 @@ def rio_get_data_arrays_with_common_trans(
     # Get the data's bounds and transform (LS and S2 grid will already be the same) 
     # The purpose here is window for the PLD mask already on their grids. 
     with rio.open(ls_path) as src: 
-        meta = src.meta
+        meta = src.meta.copy()
         ls_bounds = src.bounds
         ls_transform = src.transform
         ls_shape = src.shape
@@ -164,10 +164,10 @@ def downsample_image_arrays(
         f"array2 shape {arr2_pixels.shape}. Images must be resampled to identical dimensions "
     )
     # Create a common mask so that we drop the same pixels in both arrays
-    # (exclude NaNs or zeros in either array).
+    # (exclude NaNs or (<= -1) in either array).
     common_mask = (
-        ~np.isnan(arr1_pixels) & (arr1_pixels != 0) &
-        ~np.isnan(arr2_pixels) & (arr2_pixels != 0)
+        ~np.isnan(arr1_pixels) & (arr1_pixels > -1) & (arr1_pixels < 1) &
+        ~np.isnan(arr2_pixels) & (arr2_pixels > -1) & (arr2_pixels < 1)
     )
 
     # Flatten both arrays using the same mask
@@ -208,9 +208,9 @@ def rio_get_data_arrays_native_trans(
     ls_data = read_band_by_description(ls_fp, band_name, image_window_params=None) #Keep image window params None
     s2_data = read_band_by_description(s2_fp, band_name, image_window_params=None) #Keep image window params None
 
-    # Zero's values should already be nan, but just in case
-    ls_data_out = np.where(ls_data >= 0, ls_data, np.nan)
-    s2_data_out = np.where(s2_data >= 0, s2_data, np.nan)
+    # In case no-data meta values are not saved to rasters. -1 is the hardcoded value. 
+    ls_data_out = np.where(ls_data != -1, ls_data, np.nan)
+    s2_data_out = np.where(s2_data != -1, s2_data, np.nan)
 
     return ls_data_out, s2_data_out
 
@@ -282,9 +282,9 @@ def calc_ndwi(
     """
     Given the Green and NIR data arrays, the function calculates the NDWI array
     """
-    # Should be no negative values, but just in case
-    green_array_calc = np.where(green_array <= 0, np.nan, green_array)
-    nir_array_calc = np.where(nir_array <= 0, np.nan, nir_array)
+    # No data values (hard-coded -1) should be omitted in data reading, but just in case
+    green_array_calc = np.where(green_array == -1, np.nan, green_array)
+    nir_array_calc = np.where(nir_array == -1, np.nan, nir_array)
     
     # # Extract valid Green values for plotting
     # valid_green = green_array_calc[~np.isnan(green_array_calc)]
@@ -318,10 +318,10 @@ def ndwi_images_vis(
     arr1_ndwi_title: str,
     arr2_ndwi_title: str
 ):
-    # Find global min and max values across both arrays
-    vmin = min(np.nanmin(arr1_ndwi), np.nanmin(arr2_ndwi))
-    vmax = max(np.nanmax(arr1_ndwi), np.nanmax(arr2_ndwi))
-    
+    # Hard-coded these, becuase of negative values in LS8 SR images.
+    # Still want to visualize how unbounded NDWI values are distributed. 
+    vmin = -2
+    vmax = 2
     # Plot the NDWI images with the same color scale
     green_white_blue = LinearSegmentedColormap.from_list("GreenWhiteBlue", ["green", "white", "blue"])
     
@@ -346,7 +346,7 @@ def make_sat_ndwi_images(
     Takes the file paths for two coincident images from Sentinel-2 and Landsat8
     Returns two NDWI images as numpy arrays. 
     Plots the NDWI images for visual inspection.
-    NOTE: For not resampled images, the process is dramatically different. 
+    NOTE: For un-resampled images (native tiles), the process is dramatically different. 
     """
     
     level, date, roi, resample_method = (
@@ -439,9 +439,10 @@ def rio_get_ac_arrays(
     toa_data = toa_data.copy()
     sr_data = sr_data.copy()
 
-    # Zero values should already be nan, but just incase
-    toa_data = np.where(toa_data >= 0, toa_data, np.nan)
-    sr_data = np.where(sr_data >= 0, sr_data, np.nan)
+    # Create a common mask so that we drop the same pixels in both arrays
+    # (exclude NaNs or (-1) in either array).
+    toa_data = np.where(toa_data != -1, toa_data, np.nan)
+    sr_data = np.where(sr_data != -1, sr_data, np.nan)
 
     if toa_data.shape != sr_data.shape:
         raise ValueError(
@@ -450,7 +451,7 @@ def rio_get_ac_arrays(
     )
 
     with rio.open(toa_path) as src:
-        meta = src.meta
+        meta = src.meta.copy()
         bounds = src.bounds
         transform = src.transform
         shape = src.shape

@@ -1,3 +1,15 @@
+"""
+This script iterates through the potential overlapping dates for a image targe area. The high-level steps are:
+1. Spatially and temporally filter the Sentinel-2 and Landsat 8 image collections by the overlap footprint and date
+2. Becuase the overlap footprint was generated using mosaics, we need to find the best image pair for each date.
+   - The main criteria are lowest masked fraction and highest overlap area
+   - First, we find the best Sentinel-2 image and its mask
+   - Then, we find the Landsat 8 image with high overlap that also meets the masked fraction threshold.
+3. We gernerate a common LS8 and S2 mask, which is seived (to remove noise) and dilated (for conservative masking)
+4. We export the images and common mask to Google Drive
+5. We also save each images metadata (sun angle, cloud percetage, etc.) to a CSV file
+"""
+
 # %% 1.0 Libraries and directories
 
 import ee
@@ -9,7 +21,7 @@ import pprint as pp
 ee.Authenticate()
 ee.Initialize(project='ee-green-by-another-name')
 
-roi_name = 'TUK_sub3'
+roi_name = 'TUK_sub4'
 level = 'sr'
 
 image_footprints_path = f'./data/overlap_dates_for_roi/{roi_name}_overlap_dates.shp'
@@ -110,16 +122,16 @@ def calc_s2_mask_stats(
     s2_scl_list = s2_scl.toList(col_size)
     cloud_col_size = s2_clouds.size().getInfo()
     s2_cloud_list = s2_clouds.toList(col_size)
-    # TODO: Remove this join key sanity-check later 
-    print("***************************")
-    print("Checking Sentinel-2 SCL and Cloud Probability join keys")
-    print(f"Sizes are scl={col_size} and clouds={cloud_col_size}")
+    # Commented out this sanity check on join keys
+    # print("***************************")
+    # print("Checking Sentinel-2 SCL and Cloud Probability join keys")
+    # print(f"Sizes are scl={col_size} and clouds={cloud_col_size}")
     for i in range(col_size):
-        print('---------------------')
-        print('CHECKING JOIN KEYS FOR S2 MASK...')
+        # print('---------------------')
+        # print('CHECKING JOIN KEYS FOR S2 MASK...')
         scl_img = ee.Image(s2_scl_list.get(i))
         scl_key = scl_img.get('join_key').getInfo()  # get join_key as a client-side string
-        print("SCL join_key:", scl_key)
+        # print("SCL join_key:", scl_key)
         shaddows = scl_img.eq(3).rename('s2_shaddows')
         shaddow_frac = get_mask_frac(shaddows, 's2_shaddows', polygon, 10)
         cirrus = scl_img.eq(10).rename('s2_cirrus')
@@ -131,8 +143,8 @@ def calc_s2_mask_stats(
         cloud_binary = cloud_img.gte(70).rename('s2_opaque_clouds')
         cloud_frac = get_mask_frac(cloud_binary, 's2_opaque_clouds', polygon, 10)
         cloud_key = cloud_img.get('join_key').getInfo()
-        print("Cloud join_key:", cloud_key)
-        print('----------------------')
+        # print("Cloud join_key:", cloud_key)
+        # print('----------------------')
         attrs = {
             's2_shaddows': shaddow_frac,
             's2_cirrus': cirrus_frac,
@@ -140,7 +152,7 @@ def calc_s2_mask_stats(
             's2_clouds': cloud_frac
         }
         mask_attrs_list.append(attrs)
-    print("****************************")
+    #print("****************************")
 
     return mask_attrs_list
 
@@ -294,7 +306,7 @@ def compute_valid_pixel_coverage(
 
     #print('Total pixels in ROI:', total_roi_pixels.getInfo())
     #print('Unmasked pixels in ROI:', unmasked_pixels.getInfo())
-    print(f'Tile fraction unmasked: {frac_unmasked_float:.2f}')
+    print(f'ROI fraction covered by unmasked tile: {frac_unmasked_float:.2f}')
 
     return frac_unmasked_float
 
@@ -313,7 +325,7 @@ def determine_best_img(
         scale=10
         img_id_str = 'PRODUCT_ID'
 
-    elif satellite == 'LS8': # TODO: update these params. 
+    elif satellite == 'LS8':  
         band_name = "ls8_mask"
         scale=30
         img_id_str = "LANDSAT_PRODUCT_ID" 
@@ -322,27 +334,26 @@ def determine_best_img(
 
     col_len = mask_col.size().getInfo()
     col_list = mask_col.toList(col_len)
-    best_img_id = None
-    best_img_mask = None
-    best_img_mask_attrs = None
-    highest_frac_unmasked = float(-0.01) # Negative incase valid pixel coverage is zero
 
+    ranked = []
+    print("***********************************************")
+    print(f'Satellite: {satellite} tiles={col_len} masked frations...')
     for i in range(col_len):
         img = ee.Image(col_list.get(i))
         img_id = img.get(img_id_str).getInfo()
+        print("----------------------")
         frac_unmasked = compute_valid_pixel_coverage(img, band_name, polygon, scale)
 
-        if frac_unmasked > highest_frac_unmasked:
-            highest_frac_unmasked = frac_unmasked
-            best_img_id = img_id
-            best_img_mask = img
-            if i < len(mask_attrs_list):  # Safety check
-                best_img_mask_attrs = mask_attrs_list[i]
-            else:
-                print(f"WARNING: No attributes for {satellite} image at index {i}")
+        ranked.append({
+            'idx': i,
+            'img': img,
+            'img_id': img_id,
+            'frac_unmasked': frac_unmasked,
+            'attrs': mask_attrs_list[i] if i < len(mask_attrs_list) else None
+        })
 
-    print(f'{satellite} Highest Frac Unmasked = {highest_frac_unmasked:.2f}')
-    return best_img_mask, best_img_id, highest_frac_unmasked, best_img_mask_attrs
+    ranked.sort(key=lambda dct: dct["frac_unmasked"], reverse=True)
+    return ranked
         
 def calculate_tile_overlap(
     s2_mask: ee.Image,
@@ -401,38 +412,60 @@ def find_pairs_and_masks(
     """
     # Step 1: Find the best Sentinel-2 image and its mask
     s2_mask_col, s2_mask_attrs = make_s2_mask_col(polygon, date, date_plus1d)
-    best_s2_mask, best_s2_id, s2_unmasked_frac, best_s2_mask_attrs = determine_best_img(
+    s2_ranked = determine_best_img(
         s2_mask_col, 
         s2_mask_attrs, 
         polygon=polygon, 
         satellite="S2"
     )
+    best_s2 = s2_ranked[0]
+    UNMASKED_THRESHOLD = 0.25
+     # Check if Sentinel-2 too much cloud/mask coverage
+    # (unmasked fraction < 25% means >75% of image is masked/cloudy)
+    if best_s2["frac_unmasked"] < UNMASKED_THRESHOLD:
+        print(f"Skiping Export: best S2 tile only {best_s2['frac_unmasked']:.2f} un-masked")
+        print(f'No need to compute LS8 tile(s) masked fractions')
+        return None
     
     # Step 2: Find the best Landsat 8 image and its mask
     ls8_mask_col, ls8_mask_attrs = make_ls8_mask_col(polygon, date, date_plus1d, level)
-    best_ls8_mask, best_ls8_id, ls8_unmasked_frac, best_ls8_mask_attrs = determine_best_img(
+    ls8_ranked = determine_best_img(
         ls8_mask_col, 
         ls8_mask_attrs, 
         polygon=polygon, 
         satellite="LS8"
     )
+    OVERLAP_THRESHOLD = 0.4
     
-    # Step 3: Check if either image has too much cloud/mask coverage
-    # (unmasked fraction < 25% means >75% of image is masked/cloudy)
-    UNMASKED_THRESHOLD = 0.25
-    if s2_unmasked_frac < UNMASKED_THRESHOLD or ls8_unmasked_frac < UNMASKED_THRESHOLD:
-        print(f'WARNING: UNMASKED FRACTION IS LOW (S2: {s2_unmasked_frac:.2f}, LS8: {ls8_unmasked_frac:.2f}), will probably skip export')
-    
-    # Step 4: Verify sufficient overlap between the two satellite images
-    overlap_percentage = calculate_tile_overlap(best_s2_mask, best_ls8_mask, polygon)
-    
-    OVERLAP_THRESHOLD = 40  # percent
-    if overlap_percentage < OVERLAP_THRESHOLD:
-        print(f"SKIPPING EXPORT: LOW TILE OVERLAP ({overlap_percentage:.2f}% < {OVERLAP_THRESHOLD}%)")
-        return None
-    
-    return best_s2_mask, best_s2_id, best_ls8_mask, best_ls8_id, best_s2_mask_attrs, best_ls8_mask_attrs
-
+    for cand in ls8_ranked:
+        if cand['frac_unmasked'] < UNMASKED_THRESHOLD:
+            if cand['idx'] == 0:
+                print(f'WARNING: best LS8 tile only {cand["frac_unmasked"]:.2f} un-masked')
+                continue
+            else:
+                continue
+        
+        overlap_percentage = calculate_tile_overlap(best_s2['img'], cand['img'], polygon)
+        if overlap_percentage >= 0.75:
+            print("Found LS8 tile with high overlap")
+            return (
+                best_s2['img'], best_s2['img_id'],
+                cand['img'], cand['img_id'],
+                best_s2['attrs'], cand['attrs']
+            )
+        
+        elif cand['ixd'] == ls8_ranked[-1]['idx'] and overlap_percentage < OVERLAP_THRESHOLD:
+            print("No LS8 tile with overlap > 75%")
+            print(f"Using best ranked LS8 image with overlap > 40%")
+            first_ls8 = ls8_ranked[0]
+            return (
+                best_s2['img'], best_s2['img_id'],
+                first_ls8['img'], first_ls8['img_id'],
+                best_s2['attrs'], first_ls8['attrs']
+            )
+    # If we get here, no LS-8 tile met the overlap rule
+    print("SKIPPING EXPORT.. No Landsat-8 candidate meets overlap and/or masked threshold")
+    return None
 
 def fetch_imgs_from_ids(
     s2_id: str,
@@ -767,7 +800,7 @@ def export_imgs_to_drive(
     s2_out_img: ee.Image,
     ls8_out_img: ee.Image,
     common_mask: ee.Image,
-    polygon: ee.Geometry, # TODO: see if this arg breaks shit
+    polygon: ee.Geometry, 
     roi_name: str,
     date: str,
     level: str,
@@ -787,9 +820,6 @@ def export_imgs_to_drive(
     ls8_proj = ls8_out_img.projection().getInfo()
     mask_export_name = f'CommonMask_date_{date}_roi_{roi_name}'
     mask_proj = common_mask.projection().getInfo()
-    print("---- checking projections -------")
-    print(s2_proj)
-    print(ls8_proj)
 
     s2_task = ee.batch.Export.image.toDrive(
         image=s2_out_img,
@@ -844,7 +874,9 @@ def pair_processor(
 
     date_plus1d = (pd.to_datetime(date) + pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     polygon = convert_gpd_geom_to_ee(geom, None)
-
+    print("=======================================")
+    print(f"Processing {roi_name} for date {date}")
+    print("=======================================")
 ###############################################################################
 # 1.0 Find the optimal image pair (i.e. lowest masked portion and high overlap)
 ##############################################################################
@@ -874,7 +906,6 @@ def pair_processor(
     s2_img = rescale_imgs(s2_img, satellite="S2", level=level)
     ls8_img = rescale_imgs(ls8_img, satellite="LS8", level=level)
 
-    # TODO: Calculate mask summary stats here???
 
 #########################################################################
 # Produce the common mask
@@ -911,9 +942,12 @@ def pair_processor(
             date,
             level
         )
-
+    print(".................")
+    print("Sentinel-2 Mask Attributes")
     pp.pp(pairs_and_masks[4])
+    print("Landsat-8 Mask Attributes")
     pp.pp(pairs_and_masks[5])
+    print(".................")
 
     mask_attrs = pairs_and_masks[4] | pairs_and_masks[5]
     mask_attrs['s2_export_name'] = s2_export_name

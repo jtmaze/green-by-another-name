@@ -1,6 +1,16 @@
 """
-After exporting the coincident satellite footprints for a given date from GEE,
-use this script to calculate the overlapping footprint area for each date.
+Calculate Overlapping Footprint Area Between Landsat 8 and Sentinel-2 Imagery
+
+This script processes previously exported satellite footprints from Google Earth Engine
+to identify areas where both Landsat 8 and Sentinel-2 imagery overlap for the same date.
+The script:
+1. Loads and processes shapefiles containing image footprints for each sensor
+2. Calculates intersection areas between the two sensors for each date
+3. Computes coverage percentages relative to region of interest (ROI)
+4. Exports the results as shapefiles indexed by date for further analysis
+
+Input: Shapefile exports from GEE containing satellite footprints
+Output: Shapefiles of overlapping areas with coverage statistics
 """
 # %% 1.0 Libraries and directories
 
@@ -50,7 +60,7 @@ for r in unique_rois:
                                   on='date',
                                   suffixes=('_ls8', '_s2'))
     
-    # Filter out invalid geometries
+    # Filtering out invalid geometries that could cause errors in spatial operations
     merged = merged[merged['geometry_ls8'].is_valid & merged['geometry_s2'].is_valid]
     # Merge the satellite footprints for calculations
     merged['inter'] = merged.apply(
@@ -70,12 +80,13 @@ for r in unique_rois:
     top_dates.drop(columns=['geometry_ls8', 'geometry_s2'], inplace=True)
     top_dates['per_cover'] = (top_dates['int_sqkm'] / roi_area * 100).round(0)
 
+    # NOTE: Filtering to only include dates with at least 25% ROI coverage
     top_dates = top_dates[top_dates['per_cover'] > 25]
     top_dates['date'] = top_dates['date'].astype(str)
     top_dates['date'] = pd.to_datetime(top_dates['date']).dt.date
 
     top_dates.to_crs('EPSG: 4326', inplace=True)
-    # A few of the intersections yield LINESTRING geoms, filter these out for writing
+    # Filtering out non-Polygon geometries (e.g., LINESTRING) that may result from intersection operations
     top_dates = top_dates[top_dates.geometry.type == 'Polygon']
     top_dates.to_file(f'./data/overlap_dates_for_roi/{r}_overlap_dates.shp')
 

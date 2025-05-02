@@ -48,7 +48,7 @@ def mask_ndwi_images_on_common_grid(
     """
 
     pld_path = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
-    print(image_window_params)
+    #print(image_window_params)
     # TODO: Can I use the image window params to count the number of valid PLD +60m pixels within the image extent?
 
     pld_plus = make_measure_mask(pld_path, 
@@ -58,9 +58,11 @@ def mask_ndwi_images_on_common_grid(
                                  buffer_delim_outer=None
     )
 
+    pld_plus_pixel_count = np.sum(pld_plus == 1)
+
     ndwi_masked = ndwi[pld_plus == 1]
 
-    return ndwi_masked
+    return ndwi_masked, pld_plus_pixel_count
 
 def mask_ndwi_images_native_grid(
     ndwi: np.array,
@@ -89,21 +91,23 @@ def mask_ndwi_images_native_grid(
             resampling=Resampling.nearest
         )
 
+    pld_plus_pixel_count = np.sum(pld_reproj == 1)
+
     ndwi_masked = ndwi[pld_reproj == 1]
 
-    return ndwi_masked
+    return ndwi_masked, pld_plus_pixel_count
     
 def clean_ndwi_data(
-    ndwi_data: np.array
+    flat_ndwi: np.array
 ):
     """
     Removes NaN values from NDWI before computing Otsu Thresholds or Histograms
+    Also clips data to -1, 1 range for histogram calculations. 
     """
-    flat_ndwi = ndwi_data.flatten()
     valid_mask = ~np.isnan(flat_ndwi)
     valid_data = flat_ndwi[valid_mask]
-    # Extra check to ensure NDWI values are valid (between -1 and 1)
-    valid_data = np.clip(valid_data, -1, 1)
+    # NOTE: The clip functions swaps values above and below with the respective thresholds
+    valid_data = np.clip(valid_data, -2, 2) # Clip to [-2, 2] range
     
     return valid_data
 
@@ -119,14 +123,24 @@ def find_otsu_threshold(
     show_hist: bool,
 ):
     """
-    Input: NDWI array (-1,1)
+    Input: NDWI array
     Output: Otsu Threshold for a given NDWI image
     """
-    
-    valid_data = clean_ndwi_data(ndwi) # NDWI data is now flat
+    flat_ndwi = ndwi.flatten()
+    bounded_ndwi = clean_ndwi_data(flat_ndwi) # NDWI data is now flat
+
+    # Count of non-NaN NDWI pixels
+    non_nan_ndwi_count = np.sum(~np.isnan(flat_ndwi))
+    # Count of pixels within [-1, 1] bounds
+    in_bounds_count = np.sum((~np.isnan(flat_ndwi)) & (flat_ndwi >= -1) & (flat_ndwi <= 1))
+    # Count of pixels outside bounds
+    out_of_bounds_count = non_nan_ndwi_count - in_bounds_count
+    # Calculate percentage of pixels outside [-1, 1] bounds
+    unbounded_fraction = (out_of_bounds_count / non_nan_ndwi_count) * 100
+    print(f"[-1, 1] unbounded % NDWI pixels: {unbounded_fraction:.2f}")
 
     n_bins = 500
-    hist, bin_edges = np.histogram(valid_data, bins=n_bins, range=(-1, 1))
+    hist, bin_edges = np.histogram(bounded_ndwi, bins=n_bins, range=(bounded_ndwi.min(), bounded_ndwi.max()))
     total_pixels = hist.sum()
     pdf = hist / total_pixels
     cumulative_prob = np.cumsum(pdf)               
@@ -157,7 +171,7 @@ def find_otsu_threshold(
     threshold = 0.5 * (bin_edges[best_threshold] + bin_edges[best_threshold + 1])
 
     if show_hist == True:
-        plt.hist(valid_data, bins=50, edgecolor='black')
+        plt.hist(bounded_ndwi, bins=50, edgecolor='black')
         plt.axvline(x=threshold, color='red', label=f'Threshold = {threshold}')
         plt.xlabel('NDWI values')
         plt.legend()
@@ -229,6 +243,7 @@ def find_adaptive_thresholds(
         plt.axhline(y=land_prominence, color='brown', linestyle='-', label=f'Land Prominence: {land_prominence:.2f}')
         plt.axvline(x=land_ndwi, color='brown', linestyle=':', label=f'Land NDWI: {land_ndwi:.2f}')
         plt.axvline(x=water_ndwi, color='blue', linestyle=':', label=f'Water NDWI: {water_ndwi:.2f}')
+        plt.xlim(-2, 2)
         plt.legend()
         plt.xlabel('NDWI values')
         plt.show()
@@ -678,7 +693,6 @@ Function contains the following steps:
 
 def image_wtr_area(
     image_info: dict,
-    write_mask: bool,
     hist_return: bool, 
     write_rasters: bool,
 ):
@@ -717,39 +731,50 @@ def image_wtr_area(
         s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
         ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
         res = re.search(r"(\d{2}$)", resample_method).group(1) # Gets the resolution digits from resample method
-        if res == '30':
-            s2_valid_threshold = ls_valid_threshold = 25_000
-        elif res == '60':
-            s2_valid_threshold = ls_valid_threshold = 6_250
-        else:
-            print("ERROR: Invalid resolution, must be 30 or 60")
         if not check_match_imgs(ls8_fp, s2_fp):
             return None
-    
-        ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
-        ls_ndwi_lakes = mask_ndwi_images_on_common_grid(ls_ndwi, image_window_params, roi, res)
-        s2_ndwi_lakes = mask_ndwi_images_on_common_grid(s2_ndwi, image_window_params, roi, res)
 
+        ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
+
+        ls_ndwi_lakes, pld_plus_pix_cnt_ls = mask_ndwi_images_on_common_grid(ls_ndwi, image_window_params, roi, res)
+        s2_ndwi_lakes, pld_plus_pix_cnt_s2 = mask_ndwi_images_on_common_grid(s2_ndwi, image_window_params, roi, res)
+
+        ls_pld_plus_valid_frac = np.sum(~np.isnan(ls_ndwi_lakes)) / pld_plus_pix_cnt_ls * 100
+        s2_pld_plus_valid_frac = np.sum(~np.isnan(s2_ndwi_lakes)) / pld_plus_pix_cnt_s2 * 100
+        print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
+        print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
+        pld_plus_valid_frac = max(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
+        
     # Noresample requires bringing PLD into the Landsat8 and Sentinel-2 tiles grid.
     else: 
         s2_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
         ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
         res = 'native'
-        ls_valid_threshold = 25_000
-        s2_valid_threshold = 225_000
         if not check_match_imgs(ls8_fp, s2_fp):
             return None
         ls_ndwi, s2_ndwi, image_window_params = make_sat_ndwi_images(image_info)
-        ls_ndwi_lakes = mask_ndwi_images_native_grid(
+
+        ls_ndwi_lakes, pld_plus_pix_cnt_ls = mask_ndwi_images_native_grid(
             ls_ndwi, ls8_fp, roi
         )
-        s2_ndwi_lakes = mask_ndwi_images_native_grid(
+        s2_ndwi_lakes, pld_plus_pix_cnt_s2 = mask_ndwi_images_native_grid(
             s2_ndwi, s2_fp, roi
         )
+
+        ls_pld_plus_valid_frac = np.sum(~np.isnan(ls_ndwi_lakes)) / pld_plus_pix_cnt_ls * 100
+        s2_pld_plus_valid_frac = np.sum(~np.isnan(s2_ndwi_lakes)) / pld_plus_pix_cnt_s2 * 100
+
+        print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
+        print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
+        pld_plus_valid_frac = max(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
+
     print(f"Working {level} for {date} over the {roi} region")
     # CHECK: ensure there's enough quality lake pixels in the image
-    if np.sum(~np.isnan(ls_ndwi_lakes)) < ls_valid_threshold or np.sum(~np.isnan(s2_ndwi_lakes)) < s2_valid_threshold:
-        print('ERROR: Skipping water area calculations -- Bad Image')
+    if pld_plus_valid_frac < 40:
+        print('****************************************************')
+        print("WARNING: Skipping water area calculations -- Bad Image")
+        print(f"Low valid frac {pld_plus_valid_frac:.2f} % of pixels in PLD + 60m area")
+        print('****************************************************')
         bad_val = "Poor Quality Image Data"
         results = bad_val
         return results
@@ -758,10 +783,10 @@ def image_wtr_area(
         # Find otsu and adaptive thresholds
         print("----- LandSat Histogram --------------")
         ls_otsu_threshold, ls_hist = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
-        ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=True)
+        ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=False)
         print("----- Sentinel-2 Histogram --------------")
         s2_otsu_threshold, s2_hist = find_otsu_threshold(s2_ndwi_lakes, show_hist=False)
-        s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=True)
+        s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=False)
 
         # Make binary water masks using the thresholds
         ls_water_otsu = (ls_ndwi > ls_otsu_threshold).astype(int)
@@ -824,7 +849,9 @@ def image_wtr_area(
         'total_s2_water_frac_adaptive': total_s2_water_frac_adaptive,
         # Histograms
         'ls_hist': ls_hist,
-        's2_hist': s2_hist
+        's2_hist': s2_hist,
+        # Image quality
+        'pld_plus_valid_frac': pld_plus_valid_frac,
     }
     # Combine partial results with lake and shoreline fractions
     results = {**partial_results, **pld_zone_wtr_fracs}
@@ -863,7 +890,6 @@ def make_area_thresholding_summaries(
                 # Calculate the Otsu thresholds and water fractions for each image
                 area_items = image_wtr_area(
                     image_info, 
-                    write_mask=False, 
                     hist_return=hist_return, 
                     write_rasters=write_rasters
                 )
@@ -884,14 +910,16 @@ def make_area_thresholding_summaries(
                     s2_hist_bins = numpy_to_list(area_items.get('s2_hist')[1])
 
                 # Print the total water fractions for each image
-                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive')}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive')}')
-                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive')}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive')}')
+                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive'):.2f}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive'):.2f}')
+                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive'):.2f}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive'):.2f}')
 
                 summary = {
                     'date': date,
                     'roi': roi,
                     'level': level,
                     'resample_method': resample_method,
+                    # Image quality 
+                    'pld_plus_valid_frac': area_items.get('pld_plus_valid_frac'),
                     # Thresholds
                     'ls_otsu_threshold': area_items.get('ls_otsu_threshold'),
                     'ls_adaptive_land': area_items.get('ls_adaptive_land'),

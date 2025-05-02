@@ -20,7 +20,7 @@ from functions.img_data_fetching_functions import (
     downsample_image_arrays
 )
 
-from functions.general_pixel_regressoin_functions import (
+from functions.general_pixel_regression_functions import (
     regress_reflectance,
     numpy_to_list
 )
@@ -172,11 +172,17 @@ def regress_sat_pairs(
             ls_sample, s2_sample, valid_pix_cnt = get_ndwi_sat_samples(
                 image_info, pld_fp, **sample_params
             )
+            # NOTE:
+            # Becuase we kept negative reflectance values NDWI can be enormously negative or positive
+            # For regression plots, we bound NDWI at [-1, 1]
+            ls_sample = np.clip(ls_sample, -1, 1)
+            s2_sample = np.clip(s2_sample, -1, 1)
         # Get the single band (G or NIR) samples
         else:
             ls_sample, s2_sample, valid_pix_cnt = get_band_sat_pixel_samples(
                 ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
             )
+
         # Run regression function
         print(f'{level} {resample_method} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
         regression_output = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return, comparison='Satellite')
