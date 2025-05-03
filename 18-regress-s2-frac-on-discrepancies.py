@@ -1,11 +1,17 @@
 # %% 1.0 Libraries and file paths
 
 import glob
+import os
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import linregress
 from functions.misc.week_dt_converters import year_week_to_datetime, add_year_week
+
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 ts_dir = './data/s2_weekly_timeseries'
 area_dir = './data/lake_area_results'
@@ -48,10 +54,11 @@ for f in ts_files:
     # plt.show()
 
     # NOTE: I'm messing around with this ALOT
-    df_clean = df[(df['valid_fraction'] >= 80)]
-    # df_clean = df_clean[(df_clean['week'] >= 25) &
-    #                     (df_clean['week'] <= 31)
-    # ]
+    df_clean = df[(df['valid_fraction'] >= 95)].copy()
+
+    if df_clean.empty:
+        print(f"Skipping {df['roi_name'].iloc[0]} due to no observations meeting the valid fraction threshold.")
+        continue
 
     print("------------------------------------------------")
     plt.figure(figsize=(12, 6))
@@ -88,9 +95,13 @@ rois = timeseries['roi_name'].unique()
 
 # %% 2.0 Read and format the lake area data
 
+PLD_VALID_FRAC_THRESH = 95
+
 resample_method = 'bilinear30'
-toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
-sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
+toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
+toa_data = toa_data[toa_data['pld_plus_valid_frac'] >= PLD_VALID_FRAC_THRESH].copy()
+sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch3.csv')
+sr_data = sr_data[sr_data['pld_plus_valid_frac'] >= PLD_VALID_FRAC_THRESH].copy()
 
 cols_to_keep =['date', 'roi', 'buff_lake_ls_water_frac_adaptive',
                'buff_lake_s2_water_frac_adaptive']
@@ -234,3 +245,4 @@ sns.scatterplot(
 plt.title('Relative Sentinel-2 AC Difference vs. ALPOD Lake Water Fraction')
 plt.xlabel('(%) water fraction of maxed obseved over ALPOD')
 plt.ylabel('Sentinel-2 (TOA-SR) / TOA * 100')
+# %%

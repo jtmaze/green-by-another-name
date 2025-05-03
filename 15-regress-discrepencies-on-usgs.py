@@ -1,5 +1,7 @@
 # %% 1.0 Libraries and file paths
 
+import os 
+import sys
 import pandas as pd
 from io import StringIO
 import matplotlib.pyplot as plt
