@@ -10,7 +10,9 @@ import seaborn as sns
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch3.csv')
+print(len(sr_bilinear30))
 toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+print(len(toa_bilinear30))
 sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch3.csv')
 toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch3.csv')
 
