@@ -28,7 +28,7 @@ combined = pd.concat(
 
 combined_valid = combined[combined['total_ls_water_frac_otsu'] != 'Poor Quality Image Data']
 combined_valid = combined_valid[
-    combined_valid['pld_plus_valid_frac'] >= 80
+    combined_valid['pld_plus_valid_frac'] >= 90
 ].copy()
 
 total_toa_img_pairs = len(combined_valid[
@@ -117,6 +117,15 @@ def area_boxplot_maker(
     plt.legend(title='Satellite')
     plt.tight_layout()
     plt.show()
+    
+    # Print mean values for each series after the boxplot is rendered
+    print(f"\n--- Mean Water Fraction Values for {zone_label} ---")
+    for group in order:
+        for satellite_name in label_dict.values():
+            mean_value = melted_df[(melted_df['group'] == group) & 
+                                  (melted_df['satellite_name'] == satellite_name)]['water_fraction'].mean()
+            print(f"{new_labels[order.index(group)]} - {satellite_name}: {mean_value:.2f}%")
+        print("")
 
 # %% Bilinear 30 Total
 """

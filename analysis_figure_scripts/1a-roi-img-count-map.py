@@ -1,5 +1,6 @@
 # %% 1.0 Libraries and directories
 
+import os
 import glob
 import geopandas as gpd
 import pandas as pd
@@ -11,6 +12,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 footprint_dir = './data/overlap_dates_for_roi'
 footprints_files = glob.glob(f'{footprint_dir}/**_overlap_dates.shp')
@@ -28,7 +30,7 @@ for f in footprints_files:
 overlap_footprints = pd.concat(overlap_list)
 
 # Valid dates for images with enough pixels and low cloud cover
-valid_roi_dates = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch2.csv')
+valid_roi_dates = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valid_roi_dates = valid_roi_dates[['roi', 'date']].copy()
 
 # Main rois
@@ -130,3 +132,4 @@ cbar.set_label('Coincident Image Count')
 plt.title('Sub Regions Colored by Image Count with Main Boundaries')
 plt.tight_layout()
 plt.show()
+# %%

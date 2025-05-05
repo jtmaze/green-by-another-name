@@ -38,21 +38,21 @@ combined_wide = combined_clean.pivot(
 ).reset_index()
 
 # %% Plot the above and below frac by level
-plot_data = combined[combined['level'] == 'toa']
+plot_data = combined[combined['level'] == 'sr']
 
-plt.figure(figsize=(12, 7))
+plt.figure(figsize=(12, 5))
 sns.boxplot(
     data=plot_data,
     x='zone',
-    y='r_squared',
+    y='above_frac',
     hue='band_name',
     palette='Set2'
 )
-#plt.axhline(y=50, color='red', linestyle='--')
-plt.xlabel('Landscape Zone')
-plt.ylim(0.5, 1)
-plt.ylabel('r-squared value')
-plt.title('')
+plt.axhline(y=50, color='red', linestyle='--')
+plt.xlabel(None)
+plt.ylim(0, 100)
+plt.ylabel('(%) of Image Pixels')
+plt.title('SR (%) of pixels with higher Sentinel-2 Reflectance')
 plt.show()
 
 # %% Read the area data

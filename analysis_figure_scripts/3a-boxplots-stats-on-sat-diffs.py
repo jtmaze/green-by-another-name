@@ -1,10 +1,12 @@
 # %% 1.0 Libraries and file paths
-
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 import numpy as np
+
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'lanczos30']
 resample_methods = ['bilinear30']
