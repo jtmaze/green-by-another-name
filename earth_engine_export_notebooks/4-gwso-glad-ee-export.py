@@ -1,7 +1,9 @@
 # %% 1.0 Libraries and file paths 
 import os
 import glob
-import sys
+import time
+import pprint as pp
+
 import ee
 import pandas as pd
 import geopandas as gpd
@@ -20,8 +22,6 @@ for f in files:
 rois = pd.concat(rois_list, ignore_index=True)
 unique_rois = rois['sub_name'].unique()
 
-glad_asset_dir = 'projects/glad/water/individualMonths'
-gswo_asset_dir = ''
 
 # %% 2.0 Combine all the GLAD observations for June & August for 20 years
 
@@ -87,16 +87,22 @@ def calc_valid_occurence(
     """
     Creates a new image with the sum of valid water observations across years
     """
-
     # Make an image with the sum of invalid observations across years
     inval_masks = img_collection.map(lambda img: select_invalid(img, mask_val))
     inval_sum = inval_masks.reduce(ee.Reducer.sum())
+    print("1. ********************************")
+    pp.pp(inval_sum.getInfo())
 
     # Sum the valid water observations in each image. 
     data = img_collection.map(lambda img: sepperate_mask_from_data(img, mask_val))
     if dataset == 'GSWO': # GSWO has water values = 2
         data = data.map(lambda img: select_water_pixels(img, water_val=2))
+    else:
+        data = data.map(lambda img: img.eq(1))
+    
+    print("3. *********************************")
     sum_water = data.reduce(ee.Reducer.sum())
+
 
     # Calculate the % of valid occurance
     max_obs_img = ee.Image.constant(max_obs)
@@ -113,13 +119,19 @@ def export_dataset(
     polygon: ee.Geometry
 ):
     export_name = f'dataset_{dataset_name}_month_{month}_roi_{roi_name}'
+    folder = 'global_datasets'
     print(f"batching {export_name}")
+
+    clipped_image = image.clip(polygon)
     export_task = ee.batch.Export.image.toDrive(
-        image=image,
+        image=clipped_image,
         description=export_name,
         fileNamePrefix=export_name,
-        folder='global_datasets',
+        folder=folder,
+        scale=30,
+        crs='EPSG:4326',
         region=polygon,
+        fileFormat='GeoTIFF',
         maxPixels=1e13
     )
 
@@ -153,7 +165,7 @@ def gswo_glad_pipeline(
     ]
 
     for ds in glad_monthly_datasets:
-        valid_occurence = calc_valid_occurence(ds[0], ds[1], dataset='GLAD', mask_val=255)
+        valid_occurence = calc_valid_occurence(ds[0], ds[1], mask_val=255, dataset='GLAD')
         month_name = ds[2]
         export_dataset(
             image=valid_occurence,
@@ -171,13 +183,14 @@ def gswo_glad_pipeline(
     gswo_aug_imgs = gswo.filter(ee.Filter.inList('system:index', aug_sys_idx))
     gswo_aug_max_obs = gswo_aug_imgs.size().getInfo()
 
+
     gswo_monthly_datasets = [
         (gswo_june_imgs, gswo_june_max_obs, 'june'),
         (gswo_aug_imgs, gswo_aug_max_obs, 'aug')
     ]
 
     for ds in gswo_monthly_datasets:
-        valid_occurence = calc_valid_occurence(ds[0], ds[1], dataset='GSWO', mask_val=0)
+        valid_occurence = calc_valid_occurence(ds[0], ds[1], mask_val=0, dataset='GSWO')
         month_name = ds[2]
         export_dataset(
             image=valid_occurence,
@@ -186,7 +199,6 @@ def gswo_glad_pipeline(
             month=month_name,
             polygon=roi_ee
         )
-
 
 # %%
 
@@ -197,4 +209,8 @@ for r in unique_rois:
         rois=rois,
         years=(1999, 2021)
     )
+
+# %% 
+print(t.getInfo())
+
 # %%
