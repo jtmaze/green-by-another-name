@@ -97,8 +97,6 @@ def calc_valid_occurence(
     data = img_collection.map(lambda img: sepperate_mask_from_data(img, mask_val))
     if dataset == 'GSWO': # GSWO has water values = 2
         data = data.map(lambda img: select_water_pixels(img, water_val=2))
-    else:
-        data = data.map(lambda img: img.eq(1))
     
     print("3. *********************************")
     sum_water = data.reduce(ee.Reducer.sum())
@@ -119,7 +117,7 @@ def export_dataset(
     polygon: ee.Geometry
 ):
     export_name = f'dataset_{dataset_name}_month_{month}_roi_{roi_name}'
-    folder = 'global_datasets'
+    folder = f'global_datasets/{dataset_name}_{month}'
     print(f"batching {export_name}")
 
     clipped_image = image.clip(polygon)
@@ -201,8 +199,8 @@ def gswo_glad_pipeline(
         )
 
 # %%
-
-for r in unique_rois:
+test = [unique_rois[5]]
+for r in test:
 
     gswo_glad_pipeline(
         roi_name=r,
