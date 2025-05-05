@@ -1,5 +1,5 @@
 # %% 1.0 Libraries and file paths 
-
+import os
 import glob
 import sys
 import ee
@@ -9,6 +9,7 @@ import geopandas as gpd
 ee.Authenticate()
 ee.Initialize()
 
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 roi_shape_dir = './data/roi_shapes/rois'
 files = glob.glob(f'{roi_shape_dir}/*.shp')
 rois_list = []
@@ -93,7 +94,7 @@ def calc_valid_occurence(
 
     # Sum the valid water observations in each image. 
     data = img_collection.map(lambda img: sepperate_mask_from_data(img, mask_val))
-    if dataset == 'gswo': # GSWO has water values = 2
+    if dataset == 'GSWO': # GSWO has water values = 2
         data = data.map(lambda img: select_water_pixels(img, water_val=2))
     sum_water = data.reduce(ee.Reducer.sum())
 
@@ -111,7 +112,8 @@ def export_dataset(
     month: str,
     polygon: ee.Geometry
 ):
-    export_name = f'dataset_{dataset_name}_month_{month}_'
+    export_name = f'dataset_{dataset_name}_month_{month}_roi_{roi_name}'
+    print(f"batching {export_name}")
     export_task = ee.batch.Export.image.toDrive(
         image=image,
         description=export_name,
@@ -123,3 +125,76 @@ def export_dataset(
 
     export_task.start()
 
+def gswo_glad_pipeline(
+    roi_name: str,
+    rois: gpd.GeoDataFrame,
+    years: tuple
+):
+    
+    roi = rois[rois['sub_name'] == roi_name]
+    years_range = range(years[0], years[1])
+    roi_ee = convert_gpd_geom_to_ee(roi['geometry'].values[0], None)
+
+    june_sys_idx = [f'{year}_06' for year in years_range]
+    aug_sys_idx = [f'{year}_08' for year in years_range]
+
+    # ------------- GLAD Export ----------------- #
+    glad = ee.ImageCollection('projects/glad/water/individualMonths')
+
+    june_imgs = glad.filter(ee.Filter.inList('system:index', june_sys_idx))
+    june_max_obs = june_imgs.size().getInfo()
+
+    aug_imgs = glad.filter(ee.Filter.inList('system:index', aug_sys_idx))
+    aug_max_obs = aug_imgs.size().getInfo()
+
+    glad_monthly_datasets = [
+        (june_imgs, june_max_obs, 'june'),
+        (aug_imgs, aug_max_obs, 'aug')
+    ]
+
+    for ds in glad_monthly_datasets:
+        valid_occurence = calc_valid_occurence(ds[0], ds[1], dataset='GLAD', mask_val=255)
+        month_name = ds[2]
+        export_dataset(
+            image=valid_occurence,
+            roi_name=roi_name,
+            dataset_name='GLAD',
+            month=month_name,
+            polygon=roi_ee
+        )
+
+    # ------------- GSWO Export ----------------- #
+    gswo = ee.ImageCollection('JRC/GSW1_4/MonthlyHistory')
+
+    gswo_june_imgs = gswo.filter(ee.Filter.inList('system:index', june_sys_idx))
+    gswo_june_max_obs = gswo_june_imgs.size().getInfo()
+    gswo_aug_imgs = gswo.filter(ee.Filter.inList('system:index', aug_sys_idx))
+    gswo_aug_max_obs = gswo_aug_imgs.size().getInfo()
+
+    gswo_monthly_datasets = [
+        (gswo_june_imgs, gswo_june_max_obs, 'june'),
+        (gswo_aug_imgs, gswo_aug_max_obs, 'aug')
+    ]
+
+    for ds in gswo_monthly_datasets:
+        valid_occurence = calc_valid_occurence(ds[0], ds[1], dataset='GSWO', mask_val=0)
+        month_name = ds[2]
+        export_dataset(
+            image=valid_occurence,
+            roi_name=roi_name,
+            dataset_name='GSWO',
+            month=month_name,
+            polygon=roi_ee
+        )
+
+
+# %%
+
+for r in unique_rois:
+
+    gswo_glad_pipeline(
+        roi_name=r,
+        rois=rois,
+        years=(1999, 2021)
+    )
+# %%

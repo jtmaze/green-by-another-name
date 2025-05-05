@@ -55,9 +55,9 @@ MASK_ALPHA = 1
 MASK_COLOR = "pink"
 ndwi_colors = ['darkgreen', 'white', 'darkblue']
 NDWI_CMAP = LinearSegmentedColormap.from_list("custom_ndwi", ndwi_colors, N=100)
-PLD_EDGE_COLOR = 'orange'
+PLD_EDGE_COLOR = 'red'
 PLD_BUFFER_COLOR = 'red'
-PLD_INNER_COLOR = 'yellow'
+PLD_INNER_COLOR = 'red'
 
 # %% Fiddle with the bounds
 
@@ -68,12 +68,22 @@ with rio.open(rgb_paths[0]) as src:
     center_y = (full_bounds.bottom + full_bounds.top) / 2
     print(center_x, center_y)
 
-    chosen_x = center_x - 670
-    chosen_y = center_y + 400
+    chosen_x = center_x - 1_300
+    chosen_y = center_y + 1_200
 
-spread = 1_250  # 1km in each direction
+spread = 400  # 1km in each direction
 utm_bounds = (chosen_x - spread, chosen_y - spread, chosen_x + spread, chosen_y + spread)
 print("Testing with bounds:", utm_bounds)
+
+"""
+For AND_sub2 on 2021-06-16
+Panel A
+spread = 1250
+x = -670
+y = +400
+Panel B
+spread = 800
+"""
 
 # %% functions
 
@@ -181,10 +191,10 @@ def plot_ndwi_panels(ax, ndwi_path: str, pld_path: str):
     x = np.linspace(left,  right, nx)
     y = np.linspace(top,   bottom, ny)
 
-    # ax.contour(x, y, lake_bool,   levels=[0.5], colors=PLD_EDGE_COLOR,
-    #            linewidths=2, alpha=MASK_ALPHA, origin='image')
-    ax.contour(x, y, buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR,
+    ax.contour(x, y, lake_bool,   levels=[0.5], colors=PLD_EDGE_COLOR,
                linewidths=2, alpha=MASK_ALPHA, origin='image')
+    # ax.contour(x, y, buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR,
+    #            linewidths=2, alpha=MASK_ALPHA, origin='image')
     # ax.contour(x, y, inner_bool,  levels=[0.5], colors=PLD_INNER_COLOR,
     #            linewidths=2, alpha=MASK_ALPHA, origin='image')
 
