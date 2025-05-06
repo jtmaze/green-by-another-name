@@ -90,17 +90,13 @@ def calc_valid_occurence(
     # Make an image with the sum of invalid observations across years
     inval_masks = img_collection.map(lambda img: select_invalid(img, mask_val))
     inval_sum = inval_masks.reduce(ee.Reducer.sum())
-    print("1. ********************************")
-    pp.pp(inval_sum.getInfo())
 
     # Sum the valid water observations in each image. 
     data = img_collection.map(lambda img: sepperate_mask_from_data(img, mask_val))
     if dataset == 'GSWO': # GSWO has water values = 2
         data = data.map(lambda img: select_water_pixels(img, water_val=2))
     
-    print("3. *********************************")
     sum_water = data.reduce(ee.Reducer.sum())
-
 
     # Calculate the % of valid occurance
     max_obs_img = ee.Image.constant(max_obs)
@@ -117,7 +113,7 @@ def export_dataset(
     polygon: ee.Geometry
 ):
     export_name = f'dataset_{dataset_name}_month_{month}_roi_{roi_name}'
-    folder = f'global_datasets/{dataset_name}_{month}'
+    folder = f'global_datasets'
     print(f"batching {export_name}")
 
     clipped_image = image.clip(polygon)
@@ -199,8 +195,8 @@ def gswo_glad_pipeline(
         )
 
 # %%
-test = [unique_rois[5]]
-for r in test:
+
+for r in unique_rois:
 
     gswo_glad_pipeline(
         roi_name=r,
@@ -209,6 +205,4 @@ for r in test:
     )
 
 # %% 
-print(t.getInfo())
 
-# %%
