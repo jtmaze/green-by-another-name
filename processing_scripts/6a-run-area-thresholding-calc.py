@@ -25,7 +25,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 # Specify the level and resample method
 level = 'sr'
 levels = [level]
-resample_method = 'noresample'
+resample_method = 'cubic30'
 
 # %% 2.0 Dictionaries to hold image information
 

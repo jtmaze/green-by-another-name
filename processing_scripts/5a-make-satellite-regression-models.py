@@ -21,7 +21,7 @@ resample_pattern = r'/reprojected_(.*?)_'
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
-resample_method = 'bilinear30'
+resample_method = 'cubic30'  
 levels = ['toa', 'sr']
 
 image_info = {
@@ -229,6 +229,10 @@ out_df.to_csv(
     index=False
 )
 
+"""
+Land outside of the 60m buffer
+"""
+
 image_info = {
     'level': None,
     'date': None,  # Dates will be itterated through
@@ -292,6 +296,75 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 out_df.to_csv(
     f'./data/regression_summaries/sat_regression_summaries_60m_land_{resample_method}_batch3.csv',
+    index=False
+)
+
+# %%
+
+"""
+Shoreline at finer scale inside the 30m-30m buffer
+"""
+
+image_info = {
+    'level': None,
+    'date': None,  # Dates will be itterated through
+    'roi': None,   # ROIs will be itterated through
+    'band_name': None  # Bands will be specified
+}
+
+mask_params = {
+    'zone': 'shoreline',
+    'buffer_delim': -30,
+    'buffer_delim_outer': 30,
+}
+
+regression_params = {
+    'sample_size': 10_000,
+    'outlier_frac': 0,
+}
+
+# Green Band - Shoreline Zone (-30m to +30m buffer)
+image_info['band_name'] = 'Green'
+image_info['resample_method'] = resample_method
+green_df = make_satellite_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+# NIR Band - Shoreline Zone (-30m to +30m buffer)
+image_info['band_name'] = 'NIR'
+nir_df = make_satellite_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+# NDWI Band - Shoreline Zone (-30m to +30m buffer)
+image_info['band_name'] = 'NDWI'
+ndwi_df = make_satellite_reflectance_summaries(
+    image_info=image_info,
+    mask_params=mask_params,
+    regression_params=regression_params,
+    levels=levels,
+    rois=rois,
+    dates=image_dates,
+    hist_return=False
+)
+
+out_df = pd.concat([green_df, nir_df, ndwi_df])
+out_df = out_df[out_df['slope'] != 'No Image Data']
+out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
+out_df.to_csv(
+    f'./data/regression_summaries/sat_regression_summaries_shoreline_neg30-30_{resample_method}_batch3.csv',
     index=False
 )
 

@@ -9,7 +9,7 @@ os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 reflectance_comp_dir = './data/regression_summaries'
 area_dir = './data/lake_area_results'
-resample_method = 'bilinear30'
+resample_method = 'cubic30'
 # %%
 
 lake_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_0m_lake_{resample_method}_batch3.csv')
@@ -38,7 +38,7 @@ combined_wide = combined_clean.pivot(
 ).reset_index()
 
 # %% Plot the above and below frac by level
-plot_data = combined[combined['level'] == 'sr']
+plot_data = combined[combined['level'] == 'toa']
 
 plt.figure(figsize=(12, 5))
 sns.boxplot(
@@ -120,7 +120,7 @@ area_reflectance = pd.merge(toa_area, combined_wide, on=['level', 'roi', 'date']
 
 # %% 
 plot_data2 = area_reflectance.copy()
-plot_data2 = plot_data2[plot_data2['band_name'] == 'Green']
+plot_data2 = plot_data2[plot_data2['band_name'] == 'NIR']
 
 plot_data2['roi_main'] = plot_data2['roi'].apply(lambda x: x.split('_')[0])
 print(plot_data2.columns)
