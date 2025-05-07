@@ -9,6 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.img_water_area_calc_functions import make_area_thresholding_summaries
 
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
+
 toa_files = glob.glob('./data/toa_images/**/*tif')
 sr_files = glob.glob('./data/sr_images/**/*.tif')
 full_files = toa_files + sr_files
@@ -21,7 +23,7 @@ rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 
 # Specify the level and resample method
-level = 'toa'
+level = 'sr'
 levels = [level]
 resample_method = 'noresample'
 

@@ -766,7 +766,7 @@ def image_wtr_area(
 
         print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
         print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
-        pld_plus_valid_frac = max(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
+        pld_plus_valid_frac = min(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
 
     print(f"Working {level} for {date} over the {roi} region")
     # CHECK: ensure there's enough quality lake pixels in the image

@@ -21,6 +21,9 @@ area_data = pd.concat(lake_area_dfs, ignore_index=True)
 
 count_data = area_data[area_data['level'] == 'toa']
 
+unique_target_areas = count_data['roi'].unique()
+print(unique_target_areas)
+
 # %% 3.0 Plot the distribution of PLD+60m pixels that were masked
 
 count_data['pld_plus_valid_frac'].hist(
@@ -50,6 +53,9 @@ roi_summary = count_data.groupby(['roi_main']).agg(
     total_obs_count=('unique_roi_date', 'count'),
     above_75_count=('above_75', 'sum')
 )
+
+# %% 
+
 
 # %%
 month_summary = count_data.groupby(['month']).agg(

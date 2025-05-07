@@ -15,7 +15,7 @@ seasonality_path = f'./data/gswo_glad_areas.csv'
 
 area_data = pd.read_csv(area_path)
 seasonality_data = pd.read_csv(seasonality_path)
-area_data = area_data[area_data['pld_plus_valid_frac'] > 75]
+#area_data = area_data[area_data['pld_plus_valid_frac'] > 40]
 
 # %%
 
@@ -41,8 +41,6 @@ area_data.rename(
     inplace=True
 )
 
-
-
 area_data['abs_sat_diff'] = area_data['ls_water_frac'] - area_data['s2_water_frac']
 area_data['rel_sat_diff'] = area_data['abs_sat_diff'] / area_data['ls_water_frac'] * 100
 
@@ -52,7 +50,14 @@ grouped_areas = area_data.groupby(['roi'])['rel_sat_diff'].mean()
 
 merged_df = pd.merge(grouped_areas, seasonality_data, on='roi', how='inner')
 print(len(merged_df))
-#merged_df['roi_main'] = 
+
+
+glad_over_20 = (merged_df['glad_seasonal_frac'] > 20).sum()
+print(glad_over_20)
+
+gswo_over_20 = (merged_df['gswo_seasonal_frac'] > 20).sum()
+print(gswo_over_20)
+
 
 # %%
 plot_data = merged_df.copy()
@@ -69,6 +74,7 @@ melted_data = pd.melt(
 
 # Clean up the source names
 melted_data['source'] = melted_data['source'].str.replace('_seasonal_frac', '')
+melted_data['source'] = melted_data['source'].map({'gswo': 'GSWO', 'glad': 'GLAD'})
 
 # Create linear regression plot using lmplot without confidence intervals
 g = sns.lmplot(
@@ -78,7 +84,8 @@ g = sns.lmplot(
     hue='source',
     height=6,
     aspect=1.5,
-    scatter_kws={'alpha': 0.6},
+    legend=False,
+    scatter_kws={'alpha': 0.7, 's': 80},  # Increase point size
     line_kws={'linewidth': 2},
     ci=None  # Disable confidence intervals
 )
@@ -86,13 +93,14 @@ g = sns.lmplot(
 # Add regression statistics to the plot
 for source, group in melted_data.groupby('source'):
     slope, intercept, r_value, p_value, std_err = linregress(group['rel_sat_diff'], group['seasonal_frac'])
-    plt.annotate(f"{source}: r²={r_value**2:.4f}, p={p_value:.4f}", 
-                 xy=(0.05, 0.85 if source == 'gswo' else 0.80), 
-                 xycoords='axes fraction')
+    print(f"{source}: r²={r_value**2:.4f}, p={p_value:.4f}, slope={slope:.4f}")
 
 plt.xlabel('Relative Satellite Difference (%)')
 plt.ylabel('Seasonal Fraction (%)')
-plt.title('Satellite Difference vs Seasonal Fraction')
+plt.title('Buffered Lakes Satellite Difference vs Seasonal Fraction')
+
+# Move legend outside the plot
+plt.legend(title='Source', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
 plt.tight_layout()
 plt.show()
