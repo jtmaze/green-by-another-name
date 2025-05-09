@@ -7,6 +7,7 @@ from io import StringIO
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 path_gauge_h = './data/ykf_gauge_height.txt'
 path_gauge_dis = './data/ykf_usgs_discharge.txt'
 lake_areas_dir = './data/lake_area_results/'
@@ -39,8 +40,8 @@ gauge_dis = df.groupby('date')['1716_00060'].mean().reset_index()
 
 # %% 2.0 Read the area data
 resample_method = 'noresample'
-toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
-sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
+toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
+sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch3.csv')
 combined = pd.concat([toa_data_resamp, sr_data_resamp])
 
 cols_to_keep = ['date', 'roi', 'level', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']
@@ -54,7 +55,10 @@ sr = sr.rename(
 )
 
 sr['sr_sat_diff'] = sr['sr_ls'] - sr['sr_s2']
-sr['rel_sr_sat_diff'] = sr['sr_sat_diff'] / sr['sr_ls']
+sr['rel_sr_sat_diff'] = (
+    sr['sr_sat_diff'] / ((sr['sr_ls'] + sr['sr_s2']) * 0.5) * 100
+)
+
 sr.drop('level', axis=1, inplace=True)
 
 toa = toa_data_resamp[cols_to_keep].copy()
@@ -67,7 +71,9 @@ toa = toa.rename(
 )
 
 toa['toa_sat_diff'] = toa['toa_ls'] - toa['toa_s2']
-toa['rel_toa_sat_diff'] = toa['toa_sat_diff'] / toa['toa_ls']
+toa['rel_toa_sat_diff'] = (
+    toa['toa_sat_diff'] / ((toa['toa_ls'] + toa['toa_s2']) * 0.5) * 100
+)
 toa.drop('level', axis=1, inplace=True)
 
 # %% 3.0 Join the satellite data with the gauge data
@@ -169,7 +175,7 @@ sns.scatterplot(
 
 # Add title and labels
 plt.title('LS8-S2 Relative Difference vs. Yukon River Discharge (USGS @ Stevens Village)', fontsize=14)
-plt.ylim((-0.7, 0.7))
+plt.ylim(-50, 50)
 plt.xlabel('Gauge Discharge (cfs)', fontsize=12)
 plt.ylabel('Relative LS8-S2 Difference (LS8% - S2% / LS8%)', fontsize=12)
 
@@ -181,3 +187,5 @@ plt.legend(title='AC Processing', title_fontsize=12)
 
 plt.tight_layout()
 plt.show()
+
+# %%

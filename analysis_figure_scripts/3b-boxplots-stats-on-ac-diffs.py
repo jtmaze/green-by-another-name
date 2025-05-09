@@ -60,10 +60,10 @@ for i in resample_methods:
         total_wide['s2_toa'] - total_wide['s2_sr']
     )
     total_wide['ls_ac_rel_diff'] = (
-        total_wide['ls_ac_abs_diff'] / total_wide['ls_toa'] * 100
+        total_wide['ls_ac_abs_diff'] / ((total_wide['ls_toa'] + total_wide['ls_sr']) * 0.5) * 100
     )
     total_wide['s2_ac_rel_diff'] = (
-        total_wide['s2_ac_abs_diff'] / total_wide['s2_toa'] * 100
+        total_wide['s2_ac_abs_diff'] / ((total_wide['s2_toa'] + total_wide['s2_sr']) * 0.5) * 100
     )
     total_wide = total_wide[['date', 'roi', 'ls_ac_abs_diff', 's2_ac_abs_diff', 'ls_ac_rel_diff', 's2_ac_rel_diff']]
     total_wide['zone'] = 'total'
@@ -96,10 +96,10 @@ for i in resample_methods:
         lake_wide['s2_toa'] - lake_wide['s2_sr']
     )
     lake_wide['ls_ac_rel_diff'] = (
-        lake_wide['ls_ac_abs_diff'] / lake_wide['ls_toa'] * 100
+        lake_wide['ls_ac_abs_diff'] / ((lake_wide['ls_toa'] + lake_wide['ls_sr']) * 0.5) * 100
     )
     lake_wide['s2_ac_rel_diff'] = (
-        lake_wide['s2_ac_abs_diff'] / lake_wide['s2_toa'] * 100
+        lake_wide['s2_ac_abs_diff'] / ((lake_wide['s2_toa'] + lake_wide['s2_sr']) * 0.5) * 100
     )
     lake_wide = lake_wide[['date', 'roi', 'ls_ac_abs_diff', 's2_ac_abs_diff', 'ls_ac_rel_diff', 's2_ac_rel_diff']]
     lake_wide['zone'] = 'lake'
@@ -130,10 +130,10 @@ for i in resample_methods:
         shoreline_wide['s2_toa'] - shoreline_wide['s2_sr']
     )
     shoreline_wide['ls_ac_rel_diff'] = (
-        shoreline_wide['ls_ac_abs_diff'] / shoreline_wide['ls_toa'] * 100
+        shoreline_wide['ls_ac_abs_diff'] / ((shoreline_wide['ls_toa'] + shoreline_wide['ls_sr']) * 0.5) * 100
     )
     shoreline_wide['s2_ac_rel_diff'] = (
-        shoreline_wide['s2_ac_abs_diff'] / shoreline_wide['s2_toa'] * 100
+        shoreline_wide['s2_ac_abs_diff'] / ((shoreline_wide['s2_toa'] + shoreline_wide['s2_sr']) * 0.5) * 100
     )
     shoreline_wide = shoreline_wide[['date', 'roi', 'ls_ac_abs_diff', 's2_ac_abs_diff', 'ls_ac_rel_diff', 's2_ac_rel_diff']]
     shoreline_wide['zone'] = 'shoreline'
@@ -165,10 +165,10 @@ for i in resample_methods:
         buffer_wide['s2_toa'] - buffer_wide['s2_sr']
     )
     buffer_wide['ls_ac_rel_diff'] = (
-        buffer_wide['ls_ac_abs_diff'] / buffer_wide['ls_toa'] * 100
+        buffer_wide['ls_ac_abs_diff'] / ((buffer_wide['ls_toa'] + buffer_wide['ls_sr']) * 0.5) * 100
     )
     buffer_wide['s2_ac_rel_diff'] = (
-        buffer_wide['s2_ac_abs_diff'] / buffer_wide['s2_toa'] * 100
+        buffer_wide['s2_ac_abs_diff'] / ((buffer_wide['s2_toa'] + buffer_wide['s2_sr']) * 0.5) * 100
     )
     buffer_wide = buffer_wide[['date', 'roi', 'ls_ac_abs_diff', 's2_ac_abs_diff', 'ls_ac_rel_diff', 's2_ac_rel_diff']]
     buffer_wide['zone'] = 'Lake + Shoreline'

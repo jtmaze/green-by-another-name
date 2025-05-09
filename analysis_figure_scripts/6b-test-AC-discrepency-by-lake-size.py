@@ -1,14 +1,22 @@
 # %% 1.0 Libraries and filepaths
-
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-resample_method = 'noresample'
+os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
+
+resample_method = 'bilinear30'
 lake_areas_dir = './data/lake_area_results/'
-toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch2.csv')
-sr_data_resamp = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch2.csv')
+toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
+valids = toa_data_resamp[['roi', 'date']].agg('_'.join, axis=1).unique()
+
+
+sr = pd.read_csv(f'{lake_areas_dir}/sr_resampled_{resample_method}_area_summaries_batch3.csv')
+sr = sr[sr[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
+toa = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
+toa = toa[toa[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 # 1.1 Select the relevant columns
 
@@ -19,9 +27,8 @@ water_frac_cols = [
 ]
 
 cols_to_keep = ['date', 'roi', 'level'] + water_frac_cols
-toa_data = toa_data_resamp[cols_to_keep]
-sr_data = sr_data_resamp[cols_to_keep]
-
+toa_data = toa[cols_to_keep]
+sr_data = sr[cols_to_keep]
 
 # %% 2.0 Define the function to filter and calculate satellite differences
 
@@ -67,22 +74,46 @@ combined = pd.merge(
     on=['date', 'roi']
 )
 
-combined['rel_ls_smallest_ac_diff'] = ((combined['toa_smallest_ls'] - combined['sr_smallest_ls']) 
-                                       / combined['toa_smallest_ls'] * 100)
-combined['rel_ls_small_ac_diff'] = ((combined['toa_small_ls'] - combined['sr_small_ls'])
-                                        / combined['toa_small_ls'] * 100)
-combined['rel_ls_medium_ac_diff'] = ((combined['toa_medium_ls'] - combined['sr_medium_ls'])
-                                        / combined['toa_medium_ls'] * 100)
-combined['rel_ls_large_ac_diff'] = ((combined['toa_large_ls'] - combined['sr_large_ls'])
-                                        / combined['toa_large_ls'] * 100)
-combined['rel_s2_smallest_ac_diff'] = ((combined['toa_smallest_s2'] - combined['sr_smallest_s2'])
-                                        / combined['toa_smallest_s2'] * 100)
-combined['rel_s2_small_ac_diff'] = ((combined['toa_small_s2'] - combined['sr_small_s2'])
-                                        / combined['toa_small_s2'] * 100)
-combined['rel_s2_medium_ac_diff'] = ((combined['toa_medium_s2'] - combined['sr_medium_s2'])
-                                        / combined['toa_medium_s2'] * 100)
-combined['rel_s2_large_ac_diff'] = ((combined['toa_large_s2'] - combined['sr_large_s2'])
-                                        / combined['toa_large_s2'] * 100)
+combined['rel_ls_smallest_ac_diff'] = (
+    (combined['toa_smallest_ls'] - combined['sr_smallest_ls']) 
+        / ((combined['toa_smallest_ls'] + combined['sr_smallest_ls']) * 0.5) * 100
+)
+
+combined['rel_ls_small_ac_diff'] = (
+    (combined['toa_small_ls'] - combined['sr_small_ls'])
+        / ((combined['toa_small_ls'] + combined['sr_small_ls']) * 0.5 ) * 100
+)
+
+
+combined['rel_ls_medium_ac_diff'] = (
+    (combined['toa_medium_ls'] - combined['sr_medium_ls'])
+        / ((combined['toa_medium_ls'] + combined['sr_medium_ls']) * 0.5) * 100
+)
+
+combined['rel_ls_large_ac_diff'] = (
+    (combined['toa_large_ls'] - combined['sr_large_ls'])
+        / ((combined['toa_large_ls'] + combined['sr_large_ls']) * 0.5) * 100
+)
+
+combined['rel_s2_smallest_ac_diff'] = (
+    (combined['toa_smallest_s2'] - combined['sr_smallest_s2'])
+        / ((combined['toa_smallest_s2'] + combined['sr_smallest_s2']) * 0.5) * 100
+)
+
+combined['rel_s2_small_ac_diff'] = (
+    (combined['toa_small_s2'] - combined['sr_small_s2'])
+        / ((combined['toa_small_s2'] + combined['sr_small_s2']) * 0.5) * 100
+)
+
+combined['rel_s2_medium_ac_diff'] = (
+    (combined['toa_medium_s2'] - combined['sr_medium_s2'])
+        / ((combined['toa_medium_s2'] + combined['sr_medium_s2']) * 0.5) * 100
+)
+
+combined['rel_s2_large_ac_diff'] = (
+    (combined['toa_large_s2'] - combined['sr_large_s2'])
+        / ((combined['toa_large_s2'] + combined['sr_large_s2']) * 0.5) * 100
+)
 
 combined = combined[[
     'date', 'roi',
@@ -133,12 +164,26 @@ sns.boxplot(
 plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
 plt.title(f'AC Differences by Lake Size for {resample_method}', fontsize=14)
 plt.xlabel('Lake Size Category', fontsize=12)
-plt.ylabel('Relative AC Difference (TOA% - SR%) / TOA%', fontsize=12)
-plt.ylim(bottom=-50)
+plt.ylabel('Relative AC Difference (%)', fontsize=12)
+plt.ylim(-100, 210)
 plt.tight_layout()
 plt.show()
 
+# %% Make a summary table for relative differences
+
+relative_diff_summary = plot_data.groupby(['lake_size', 'satellite'], observed=True)['relative_difference'].agg(
+    mean='mean',
+    var='var',
+    q25=lambda x: x.quantile(0.25),
+    q50=lambda x: x.quantile(0.5),
+    IQR=lambda x: x.quantile(0.75) - x.quantile(0.25),
+).reset_index()
+
+print(relative_diff_summary)
+
 # %% 3.0 Create the boxplot for absolute differences
+
+
 combined = pd.merge(
     sr_plot, 
     toa_plot,

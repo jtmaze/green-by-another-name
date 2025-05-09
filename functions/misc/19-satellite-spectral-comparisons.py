@@ -64,7 +64,7 @@ toa_data = pd.read_csv(f'{area_dir}/toa_resampled_{resample_method}_area_summari
 print(toa_data.columns)
 sr_data = pd.read_csv(f'{area_dir}/sr_resampled_{resample_method}_area_summaries_batch3.csv')
 
-lake_zone = 'buff_lake'
+lake_zone = 'small_buff_lake'
 
 cols_to_keep =['date', 'roi', 'level', f'{lake_zone}_ls_water_frac_adaptive',
                f'{lake_zone}_s2_water_frac_adaptive', 'pld_plus_valid_frac']
@@ -84,14 +84,17 @@ sr_data = sr_data[cols_to_keep].rename(
 ).copy()
 
 combined_area = pd.concat([toa_data, sr_data])
-combined_area = combined_area[combined_area['pld_plus_valid_frac'] >= 50]
+#combined_area = combined_area[combined_area['pld_plus_valid_frac'] >= 50]
 combined_area = combined_area.drop(columns=['pld_plus_valid_frac'])
 
 combined_area['abs_sat_diff'] = combined_area['ls_water_frac'] - combined_area['s2_water_frac']
-combined_area['rel_sat_diff'] = combined_area['abs_sat_diff'] / combined_area['ls_water_frac'] * 100
+combined_area['rel_sat_diff'] = (
+    combined_area['abs_sat_diff'] / ((combined_area['ls_water_frac'] + combined_area['s2_water_frac']) * 0.5) * 100
+)
 
 toa_area = combined_area[combined_area['level'] == 'toa']
 sr_area = combined_area[combined_area['level'] == 'sr']
+
 # %% 
 
 cols_to_keep = ['level', 'roi', 'date', 'zone', 'band_name', 'above_frac', 'slope']
@@ -123,17 +126,21 @@ area_reflectance = pd.merge(toa_area, combined_wide, on=['level', 'roi', 'date']
 
 # %% 
 plot_data2 = area_reflectance.copy()
-plot_data2 = plot_data2[plot_data2['band_name'] == 'NIR']
+plot_data2 = plot_data2[plot_data2['band_name'] == 'NDWI']
 
 plot_data2['roi_main'] = plot_data2['roi'].apply(lambda x: x.split('_')[0])
 print(plot_data2.columns)
 # %%
 # Define independent and dependent variables
-x_var = 'shoreline_tight_above_frac'
+x_var = 'shoreline_above_frac'
 y_var = 'rel_sat_diff'
 
-plot_data2[y_var] = plot_data2[y_var] * -1
-#plot_data2 = plot_data2[plot_data2[x_var] > 40]
+
+plot_data2 = plot_data2[plot_data2[x_var] > 50]
+plot_data2 = plot_data2[
+    (plot_data2[y_var] < 5) &
+    (plot_data2[y_var] > -20)
+]
 
 # Perform linear regression using the defined variables
 slope, intercept, r_value, p_value, std_err = linregress(

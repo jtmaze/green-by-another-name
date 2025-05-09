@@ -42,7 +42,9 @@ area_data.rename(
 )
 
 area_data['abs_sat_diff'] = area_data['ls_water_frac'] - area_data['s2_water_frac']
-area_data['rel_sat_diff'] = area_data['abs_sat_diff'] / area_data['ls_water_frac'] * 100
+area_data['rel_sat_diff'] = (
+    area_data['abs_sat_diff'] / ((area_data['ls_water_frac'] + area_data['s2_water_frac']) * 0.5) * 100
+)
 
 grouped_areas = area_data.groupby(['roi'])['rel_sat_diff'].mean()
 

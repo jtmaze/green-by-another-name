@@ -24,7 +24,7 @@ resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'
 satellites = ['Landsat8', 'Sentinel2']
 
-# SECTION 2.0: Make regressions for PLD 60 meter buffered lake zone
+# %% SECTION 2.0: Make regressions for PLD 60 meter buffered lake zone
 
 image_info = {
     'level': None,
@@ -233,7 +233,7 @@ out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 print(len(out_df))
 out_df.to_csv(f'./data/regression_summaries/AC_regression_summaries_shoreline_neg60-60_{resample_method}_batch3.csv', index=False)
 
-# SECTION 5.0: Green, NIR, NDWI over land with a 60m buffer
+# %% SECTION 5.0: Green, NIR, NDWI over land with a 60m buffer
 
 image_info = {
     'level': None,
@@ -282,7 +282,6 @@ nir_df = make_ac_reflectance_summaries(
 # SECTION 5.3: NDWI Band - Land Zone (60m buffer)
 image_info['band_name'] = 'NDWI'
 image_info['resample_method'] = resample_method
-regression_params['outlier_frac'] = 0
 
 ndwi_df = make_ac_reflectance_summaries(
     image_info=image_info,
@@ -299,6 +298,6 @@ out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 print(len(out_df))
-out_df.to_csv(f'./data/regression_summmaries/AC_regression_summaries_60m_land_{resample_method}.csv', index=False)
+out_df.to_csv(f'./data/regression_summaries/AC_regression_summaries_60m_land_{resample_method}_batch3.csv', index=False)
 
 # %%
