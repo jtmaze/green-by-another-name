@@ -24,8 +24,11 @@ print(len(land_data))
 shoreline_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_shoreline_neg60-60_{resample_method}_batch3.csv')
 shoreline_data['zone'] = 'shoreline'
 print(len(shoreline_data))
+shoreline_tight_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_shoreline_neg30-30_{resample_method}_batch3.csv')
+shoreline_tight_data['zone'] = 'shoreline_tight'
 
-combined = pd.concat([lake_data, lake_plus_data, land_data, shoreline_data])
+
+combined = pd.concat([lake_data, lake_plus_data, land_data, shoreline_data, shoreline_tight_data])
 
 cols_to_keep = ['level', 'roi', 'date', 'zone', 'band_name', 'r_squared', 'slope']
 
@@ -126,7 +129,7 @@ plot_data2['roi_main'] = plot_data2['roi'].apply(lambda x: x.split('_')[0])
 print(plot_data2.columns)
 # %%
 # Define independent and dependent variables
-x_var = 'lake_plus_above_frac'
+x_var = 'shoreline_tight_above_frac'
 y_var = 'rel_sat_diff'
 
 plot_data2[y_var] = plot_data2[y_var] * -1

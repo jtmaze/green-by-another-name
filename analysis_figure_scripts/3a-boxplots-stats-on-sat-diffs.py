@@ -13,12 +13,12 @@ os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
 resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'lanczos30']
 resample_methods = ['bilinear30', 'noresample', 'cubic30']
-resample_methods = ['bilinear30']
+resample_methods = ['bilinear30', 'noresample']
 temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
-rel_y_lim = (-170, 125)
-abs_y_lim = (-30, 40)
+rel_y_lim = (-150, 125)
+abs_y_lim = (-35, 40)
 
 # %% 2.0 Explore differences in water fraction by satellite.
 
@@ -52,16 +52,25 @@ for i in resample_methods:
     # SR Boxplot and t-tests
     # Total Landscape
     sr['total_diff_sr'] = sr['total_ls_water_frac_adaptive'] - sr['total_s2_water_frac_adaptive'] 
-    sr['relative_total_diff_sr'] = sr['total_diff_sr'] / sr['total_ls_water_frac_adaptive'] * 100
+    sr['relative_total_diff_sr'] = (
+        sr['total_diff_sr'] / ((sr['total_ls_water_frac_adaptive'] + sr['total_s2_water_frac_adaptive']) * 0.5) * 100
+    )
     # Lake Difference
     sr['lake_diff_sr'] = sr['lake_ls_water_frac_adaptive'] - sr['lake_s2_water_frac_adaptive']
-    sr['relative_lake_diff_sr'] = sr['lake_diff_sr'] / sr['lake_ls_water_frac_adaptive'] * 100
+    sr['relative_lake_diff_sr'] = (
+        sr['lake_diff_sr'] / ((sr['lake_ls_water_frac_adaptive'] + sr['lake_s2_water_frac_adaptive']) * 0.5) * 100
+    )
     # Shoreline Difference
     sr['shoreline_diff_sr'] = sr['shoreline_ls_water_frac_adaptive'] - sr['shoreline_s2_water_frac_adaptive']
-    sr['relative_shoreline_diff_sr'] = sr['shoreline_diff_sr'] / sr['shoreline_ls_water_frac_adaptive'] * 100
+
+    sr['relative_shoreline_diff_sr'] = (
+        sr['shoreline_diff_sr'] / ((sr['shoreline_ls_water_frac_adaptive'] + sr['shoreline_s2_water_frac_adaptive']) * 0.5) * 100
+    )
     # Lake plus shoreline difference
     sr['lake_shoreline_diff_sr'] = sr['buff_lake_ls_water_frac_adaptive'] - sr['buff_lake_s2_water_frac_adaptive']
-    sr['relative_lake_shoreline_diff_sr'] = sr['lake_shoreline_diff_sr'] / sr['buff_lake_ls_water_frac_adaptive'] * 100
+    sr['relative_lake_shoreline_diff_sr'] = (
+        sr['lake_shoreline_diff_sr'] / ((sr['buff_lake_ls_water_frac_adaptive'] + sr['buff_lake_s2_water_frac_adaptive']) * 0.5) * 100
+    )
 
     abs_plot_data = sr[['total_diff_sr', 'lake_diff_sr', 'shoreline_diff_sr', 'lake_shoreline_diff_sr']].copy()
     abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
@@ -184,10 +193,20 @@ for i in resample_methods:
     # Lake plus shoreline difference
     toa['lake_shoreline_diff_toa'] = toa['buff_lake_ls_water_frac_adaptive'] - toa['buff_lake_s2_water_frac_adaptive']
     
-    toa['relative_total_diff_toa'] = toa['total_diff_toa'] / toa['total_ls_water_frac_adaptive'] * 100
-    toa['relative_lake_diff_toa'] = toa['lake_diff_toa'] / toa['lake_ls_water_frac_adaptive'] * 100
-    toa['relative_shoreline_diff_toa'] = toa['shoreline_diff_toa'] / toa['shoreline_ls_water_frac_adaptive'] * 100
-    toa['relative_lake_shoreline_diff_toa'] = toa['lake_shoreline_diff_toa'] / toa['buff_lake_ls_water_frac_adaptive'] * 100
+    toa['relative_total_diff_toa'] = (
+        toa['total_diff_toa'] / ((toa['total_ls_water_frac_adaptive'] + toa['total_s2_water_frac_adaptive']) * 0.5) * 100
+    )
+
+    toa['relative_lake_diff_toa'] = (
+        toa['lake_diff_toa'] / ((toa['lake_ls_water_frac_adaptive'] + toa['lake_s2_water_frac_adaptive']) * 0.5) * 100
+    )
+
+    toa['relative_shoreline_diff_toa'] = (
+        toa['shoreline_diff_toa'] / ((toa['shoreline_ls_water_frac_adaptive'] + toa['shoreline_s2_water_frac_adaptive']) * 0.5) * 100
+    )
+    toa['relative_lake_shoreline_diff_toa'] = (
+        toa['lake_shoreline_diff_toa'] / ((toa['buff_lake_ls_water_frac_adaptive'] + toa['buff_lake_s2_water_frac_adaptive']) * 0.5) * 100
+    )
 
     # TOA Boxplot with renamed columns for absolute differences
     abs_plot_data = toa[['total_diff_toa', 'lake_diff_toa', 'shoreline_diff_toa', 'lake_shoreline_diff_toa']].copy()
