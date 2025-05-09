@@ -63,13 +63,14 @@ plt.show()
 
 # %% Plot the RMA lines
 sat = 'Landsat8' # Landsat8 or Sentinel2
-b = 'NIR' # Green, NIR, or NDWI
+b = 'NDWI' # Green, NIR, or NDWI
 
 
-plot_data = lake_data[
-    (lake_data['band_name'] == b) &
-    (lake_data['satellite'] == sat)
-]
+plot_data = combined[
+    (combined['band_name'] == b) &
+    (combined['satellite'] == sat) &
+    (combined['zone'] == 'lake_plus')
+].copy()
 
 def parse_domain(d):
     """
@@ -101,7 +102,7 @@ plot_data[['x_min','x_max']] = (
 
 # %% Make the plot
 
-fig, ax = plt.subplots(figsize=(10, 10))
+fig, ax = plt.subplots(figsize=(6, 6))
 
 for _, row in plot_data.iterrows():
 
@@ -109,13 +110,13 @@ for _, row in plot_data.iterrows():
     y = row['intercept'] + row['slope'] * x
 
     if b == 'NDWI':
-        line_color = '#66c2a5'  # teal from Set2
-    elif b == 'Green':
-        line_color = '#fc8d62'  # orange from Set2
-    elif b == 'NIR':
         line_color = '#8da0cb'  # blue from Set2
+    elif b == 'Green':
+        line_color = '#66c2a5'  # teal from Set
+    elif b == 'NIR':
+        line_color = '#fc8d62'  # orange from Set2
 
-    ax.plot(x, y, lw=1.5, color='green', alpha=0.4)
+    ax.plot(x, y, lw=1.5, color=line_color, alpha=0.2)
 
 # Create x and y values for the 1:1 line
 if b == 'NDWI':
@@ -123,17 +124,17 @@ if b == 'NDWI':
     plot_max = 1
 else: 
     plot_min = 0
-    plot_max = 0.5
+    plot_max = 0.25
 
 x_eq = np.linspace(plot_min, plot_max, 100)
 y_eq = x_eq  # 1:1 line means slope = 1, intercept = 0
 
 # Plot the 1:1 line on top of everything
 ax.plot(x_eq, y_eq, color='black', linestyle='--', linewidth=4, label='1:1 line')
-ax.set_xlim(-1, 1)
-ax.set_ylim(-1, 1)
+ax.set_xlim(plot_min, plot_max)
+ax.set_ylim(plot_min, plot_max)
 ax.set_xlabel(f'TOA Reflectance')
-ax.set_ylabel('AC Reflectance')
-ax.set_title(f'{sat} {b} AC RMA over lakes')
+ax.set_ylabel(f'SR Reflectance')
+ax.set_title(f'{sat} {b} AC RMA over Buffered Lakes')
 
 # %%
