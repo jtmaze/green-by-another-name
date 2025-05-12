@@ -202,6 +202,55 @@ def plot_ndwi_panels(ax, ndwi_path: str, pld_path: str):
 
     return im
 
+def plot_rgb_panels_with_pld(ax, rgb_path: str, pld_path: str):
+    """Plots each satellite's RGB image with the PLD lakes as an overlay."""
+
+    # Read and set RGB on
+    rgb, trans, _ = read_window(rgb_path, utm_bounds, bands=[1, 2, 3])
+    data_min = np.nanmin(rgb)
+    data_max = np.nanmax(rgb)
+    print(data_min)
+    print(data_max)
+
+    rgb_scaled = scale_rgb(rgb, 98, 2)
+    print(rgb_scaled.shape)
+    # Transpose from (bands,height,width) to (height,width,bands)
+    rgb_display = np.transpose(rgb_scaled, (1, 2, 0))
+    
+    # Calculate the proper extent
+    height, width = rgb_display.shape[0], rgb_display.shape[1]
+    left, bottom, right, top = rio.transform.array_bounds(height, width, trans)
+    extent = [left, right, bottom, top]  # [west, east, south, north]
+    
+    # Display the image with correct extent
+    img = ax.imshow(rgb_display, extent=extent)
+    
+    # Force aspect ratio to be equal
+    ax.set_aspect('equal')
+    
+    ax.set_axis_off()
+
+    lake,   _, _ = read_window(pld_path, utm_bounds, bands=[4])
+    buffer, _, _ = read_window(pld_path, utm_bounds, bands=[6])
+    inner,  _, _ = read_window(pld_path, utm_bounds, bands=[2])
+
+    lake_bool   = lake.squeeze()   > 0
+    buffer_bool = buffer.squeeze() > 0
+    inner_bool  = inner.squeeze()  > 0
+
+    ny, nx = lake_bool.shape
+    x = np.linspace(left,  right, nx)
+    y = np.linspace(top,   bottom, ny)
+
+    ax.contour(x, y, lake_bool,   levels=[0.5], colors=PLD_EDGE_COLOR,
+               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+    ax.contour(x, y, buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR,
+               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+    ax.contour(x, y, inner_bool,  levels=[0.5], colors=PLD_INNER_COLOR,
+               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+
+    ax.set_axis_off()
+
 
 # %% Make the plots
 
@@ -232,6 +281,51 @@ plt.subplots_adjust(bottom=0.15)
 plt.show()
 
     
+# %% Make one map with unresampled Sentinel-2 image and PLD zones
+
+roi_name = "AKCP_sub1"
+date = '2020-07-03'
+PLD_EDGE_COLOR = 'blue'
+PLD_BUFFER_COLOR = 'orange'
+PLD_INNER_COLOR = 'red'
+
+img_path = f'./data/sr_images/roi_{roi_name}_noresample/Landsat8_sr_date_{date}_roi_{roi_name}.tif'
+pld_path = f'./data/pld_rasterized/{roi_name}_lake_masks_res{30}.tif'
+
+with rio.open(img_path) as src:
+    full_bounds = src.bounds
+    # Create a small window in the center
+    center_x = (full_bounds.left + full_bounds.right) / 2
+    center_y = (full_bounds.bottom + full_bounds.top) / 2
+    print(center_x, center_y)
+
+    chosen_x = center_x + 5500
+    chosen_y = center_y - 3000
+
+spread = 1_200  # 1km in each direction
+utm_bounds = (chosen_x - spread, chosen_y - spread, chosen_x + spread, chosen_y + spread)
+
+fig, ax = plt.subplots(figsize=(8, 8))
+plot_rgb_panels_with_pld(ax, img_path, pld_path)   
+
+from matplotlib_scalebar.scalebar import ScaleBar
+
+# 1.0 means 1 pixel = 1 meter, which is true for UTM coordinates
+scalebar = ScaleBar(1.0, 
+                    units='m',
+                    length_fraction=0.25,
+                    location='upper left',
+                    box_alpha=1,
+                    color='black',
+                    frameon=True,
+                    box_color='white',
+                    pad=2,
+                    #box_kwargs={'edgecolor': 'black', 'linewidth': 2}
+)
+ax.add_artist(scalebar)
+
+plt.tight_layout()
+plt.show()
 
 
 # %%

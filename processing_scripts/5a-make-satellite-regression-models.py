@@ -21,8 +21,8 @@ resample_pattern = r'/reprojected_(.*?)_'
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
-resample_method = 'cubic30'  
-levels = ['toa', 'sr']
+resample_method = 'bilinear30'  # 'nearest', 'bilinear30', 'cubic30'
+levels = ['sr']
 
 image_info = {
     'level': None,
@@ -39,10 +39,10 @@ mask_params = {
 }
 
 regression_params = {
-    'sample_size': 5_000,
+    'sample_size': 10_000,
     'outlier_frac': 0,
 }
-
+# %%
 # Green Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'Green'
 image_info['resample_method'] = resample_method
@@ -57,6 +57,8 @@ green_df = make_satellite_reflectance_summaries(
     hist_return=True
 )
 print("Done")
+
+# %%
 
 # NIR Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'NIR'
@@ -87,6 +89,8 @@ ndwi_df = make_satellite_reflectance_summaries(
     hist_return=False
 )
 print("Done")
+
+# %%
 
 # Save the 60m Lake regression summaries to a CSV
 out_df = pd.concat([green_df, nir_df, ndwi_df])
@@ -163,6 +167,7 @@ out_df.to_csv(
     f'./data/regression_summaries/sat_regression_summaries_0m_lake_{resample_method}_batch3.csv',
     index=False
 )
+# %%
 
 image_info = {
     'level': None,
@@ -181,7 +186,7 @@ regression_params = {
     'sample_size': 10_000,
     'outlier_frac': 0,
 }
-
+# %%
 # Green Band - Shoreline Zone (-60m to +60m buffer)
 image_info['band_name'] = 'Green'
 image_info['resample_method'] = resample_method
@@ -195,7 +200,7 @@ green_df = make_satellite_reflectance_summaries(
     dates=image_dates,
     hist_return=False
 )
-
+# %%
 # NIR Band - Shoreline Zone (-60m to +60m buffer)
 image_info['band_name'] = 'NIR'
 nir_df = make_satellite_reflectance_summaries(
@@ -221,6 +226,7 @@ ndwi_df = make_satellite_reflectance_summaries(
     hist_return=False
 )
 
+# %%
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']

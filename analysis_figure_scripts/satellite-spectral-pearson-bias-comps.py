@@ -73,13 +73,13 @@ plt.show()
 
 # %% Plot all of the RMA lines
 
-lvl = 'toa'
+lvl = 'sr'
 b = 'NDWI'
 
 plot_data = combined[
     (combined['band_name'] == b) &
     (combined['level'] == lvl) &
-    (combined['zone'] == 'shoreline')
+    (combined['zone'] == 'lake_plus')
 ]
 
 def parse_domain(d):
@@ -119,8 +119,8 @@ for _, row in plot_data.iterrows():
 
     if b == 'NDWI':
         line_color = '#8da0cb'  # blue from Set2
-        plot_min = -0.25
-        plot_max = 0.25
+        plot_min = -1
+        plot_max = 1
     elif b == 'NIR':
         line_color = '#fc8d62'
         plot_min = 0
@@ -139,7 +139,7 @@ ax.set_xlim(plot_min, plot_max)
 ax.set_ylim(plot_min, plot_max)
 ax.set_xlabel('Landsat8 Reflectance')
 ax.set_ylabel('Sentinel-2 Reflectance')
-ax.set_title(f'{lvl} {b} Reflectance')
+ax.set_title(f'{lvl} {b} Reflectance over Buffered Lakes')
 
     
 

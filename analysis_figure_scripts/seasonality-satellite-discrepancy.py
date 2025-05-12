@@ -77,7 +77,7 @@ melted_data = pd.melt(
 # Clean up the source names
 melted_data['source'] = melted_data['source'].str.replace('_seasonal_frac', '')
 melted_data['source'] = melted_data['source'].map({'gswo': 'GSWO', 'glad': 'GLAD'})
-
+melted_data['roi_main'] = melted_data['roi'].str.split('_').str[0]
 # Create linear regression plot using lmplot without confidence intervals
 g = sns.lmplot(
     data=melted_data, 

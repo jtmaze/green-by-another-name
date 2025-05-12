@@ -57,8 +57,8 @@ sns.boxplot(
 )
 plt.xlabel('Lake Position')
 plt.ylim(0, 100)
-plt.ylabel('Pearson R-squared')
-plt.title(f'{sat} AC r-squared by Lake Position and Band')
+plt.ylabel('(%) of Image Pixels')
+plt.title(f'{sat} % of pixels with higher SR reflectance')
 plt.show()
 
 # %% Plot the RMA lines
