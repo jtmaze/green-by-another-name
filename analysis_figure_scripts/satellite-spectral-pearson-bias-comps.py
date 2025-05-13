@@ -52,7 +52,7 @@ combined_wide = combined_clean.pivot(
 
 # %% Plot the above and below frac by level
 lvl = 'toa'
-plot_data = combined[combined['level'] == lvl]
+plot_data = combined_clean[combined_clean['level'] == lvl]
 
 plt.figure(figsize=(12, 5))
 sns.boxplot(
@@ -70,6 +70,19 @@ plt.title(f'{lvl} (%) of pixels with higher Sentinel-2 Reflectance')
 plt.show()
 
 # %% Make a summary table
+
+summary = combined.groupby(['level', 'band_name']).agg(
+    mean_r_squared=('r_squared', 'mean'),
+    mean_above_frac=('above_frac', 'mean'),
+).reset_index()
+
+
+summary_zones = combined.groupby(['level', 'band_name', 'zone']).agg(
+    mean_r_squared=('r_squared', 'mean'),
+    mean_above_frac=('above_frac', 'mean'),
+    above_frac_50=('above_frac', lambda x: (x > 50).sum()),
+).reset_index()
+print(summary_zones)
 
 # %% Plot all of the RMA lines
 

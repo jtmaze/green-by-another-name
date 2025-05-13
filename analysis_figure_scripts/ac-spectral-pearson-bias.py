@@ -61,6 +61,23 @@ plt.ylabel('(%) of Image Pixels')
 plt.title(f'{sat} % of pixels with higher SR reflectance')
 plt.show()
 
+# %% Summary tables
+
+summary1 = combined.groupby(['satellite', 'band_name']).agg(
+    mean_r_squared=('r_squared', 'mean'),
+    mean_above_frac=('above_frac', 'mean'),
+).reset_index()
+
+summary2 = combined.groupby(['satellite', 'band_name', 'zone']).agg(
+    mean_r_squared=('r_squared', 'mean'),
+    mean_above_frac=('above_frac', 'mean'),
+    above_frac_50 =('above_frac', lambda x: (x > 50).sum()),
+).reset_index()
+
+print(summary1)
+print(summary2)
+
+
 # %% Plot the RMA lines
 sat = 'Landsat8' # Landsat8 or Sentinel2
 b = 'NDWI' # Green, NIR, or NDWI

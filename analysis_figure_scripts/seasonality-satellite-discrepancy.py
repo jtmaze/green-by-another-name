@@ -53,6 +53,7 @@ grouped_areas = area_data.groupby(['roi'])['rel_sat_diff'].mean()
 merged_df = pd.merge(grouped_areas, seasonality_data, on='roi', how='inner')
 print(len(merged_df))
 
+merged_df['pld_frac'] = merged_df['total_lake_pix'] / merged_df['total_roi_pix'] * 100
 
 glad_over_20 = (merged_df['glad_seasonal_frac'] > 20).sum()
 print(glad_over_20)

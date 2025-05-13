@@ -52,7 +52,9 @@ sr_data = sr_data[cols_to_keep].rename(
 combined = pd.concat([toa_data, sr_data])
 
 combined['abs_sat_diff'] = combined['ls_water_frac'] - combined['s2_water_frac']
-combined['rel_sat_diff'] = combined['abs_sat_diff'] / combined['ls_water_frac'] * 100
+combined['rel_sat_diff'] = (
+    combined['abs_sat_diff'] /((combined['ls_water_frac'] + combined['s2_water_frac']) * 0.5) * 100
+)
 
 
 # %% 3.0 Choose the 5 highest satellite discrepancies for toa and sr

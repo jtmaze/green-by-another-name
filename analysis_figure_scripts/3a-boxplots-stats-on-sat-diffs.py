@@ -78,9 +78,9 @@ for i in resample_methods:
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
     plt.ylim(abs_y_lim)
-    plt.title(f'Absolute Difference in Water Fraction (SR, {i})')
-    plt.ylabel('Absolute Difference (%)')
-    plt.xlabel('Lake Position')
+    plt.title(f'Absolute Difference (%) in Water Fraction (SR, {i})')
+    plt.ylabel(None)
+    plt.xlabel(None)
 
     rel_plot_data = sr[['relative_total_diff_sr', 'relative_lake_diff_sr', 'relative_shoreline_diff_sr', 'relative_lake_shoreline_diff_sr']].copy()
     rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
@@ -88,9 +88,9 @@ for i in resample_methods:
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
     plt.ylim(rel_y_lim)
-    plt.title(f'Relative Difference in Water Fraction (SR, {i})')
-    plt.ylabel('Relative Difference (%)')
-    plt.xlabel('Lake Position')
+    plt.title(f'Relative Difference (%) in Water Fraction (SR, {i})')
+    plt.ylabel(None)
+    plt.xlabel(None)
 
     # T-tests for surface reflectance (SR)
     total_ttest = stats.ttest_1samp(sr['relative_total_diff_sr'].dropna(), 0)
@@ -216,9 +216,9 @@ for i in resample_methods:
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
     plt.ylim(abs_y_lim)
-    plt.title(f'Absolute Satellite Difference in Water Fraction (TOA, {i})')
-    plt.ylabel('Absolute Difference (%)')
-    plt.xlabel('Lake Position')
+    plt.title(f'Absolute Difference (%) in Water Fraction (TOA, {i})')
+    plt.ylabel(None)
+    plt.xlabel(None)
 
     # TOA Boxplot with renamed columns for relative differences
     rel_plot_data = toa[['relative_total_diff_toa', 'relative_lake_diff_toa', 'relative_shoreline_diff_toa', 'relative_lake_shoreline_diff_toa']].copy()
@@ -228,9 +228,9 @@ for i in resample_methods:
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
     plt.ylim(rel_y_lim)
-    plt.title(f'Relative Difference in Water Fraction (TOA, {i})')
-    plt.ylabel('Relative Difference (%)')
-    plt.xlabel('Lake Position')
+    plt.title(f'Relative Difference (%) in Water Fraction (TOA, {i})')
+    plt.ylabel(None)
+    plt.xlabel(None)
 
     # T-tests for TOA
     total_ttest = stats.ttest_1samp(toa['relative_total_diff_toa'].dropna(), 0)
