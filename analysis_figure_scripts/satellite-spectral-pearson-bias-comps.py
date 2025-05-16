@@ -46,7 +46,7 @@ combined_clean = combined[cols_to_keep]
 
 combined_wide = combined_clean.pivot(
     index=['level', 'roi', 'date', 'band_name'],
-    columns='zone', 
+    columns='slope', 
     values='r_squared'
 ).reset_index()
 
@@ -58,13 +58,13 @@ plt.figure(figsize=(12, 5))
 sns.boxplot(
     data=plot_data,
     x='zone',
-    y='above_frac',
+    y='slope',
     hue='band_name',
     palette='Set2'
 )
 plt.axhline(y=50, color='red', linestyle='--')
 plt.xlabel(None)
-plt.ylim(0, 100)
+plt.ylim(0, 2)
 plt.ylabel('(%) of Image Pixels')
 plt.title(f'{lvl} (%) of pixels with higher Sentinel-2 Reflectance')
 plt.show()
@@ -80,13 +80,17 @@ summary = combined.groupby(['level', 'band_name']).agg(
 summary_zones = combined.groupby(['level', 'band_name', 'zone']).agg(
     mean_r_squared=('r_squared', 'mean'),
     mean_above_frac=('above_frac', 'mean'),
+    mean_slope=('slope', 'mean'),
+    sd_slope=('slope', 'std'),
+    mean_intercept=('intercept', 'mean'),
+    sd_intercept=('intercept', 'std'),
     above_frac_50=('above_frac', lambda x: (x > 50).sum()),
 ).reset_index()
 print(summary_zones)
 
 # %% Plot all of the RMA lines
 
-lvl = 'sr'
+lvl = 'toa'
 b = 'NDWI'
 
 plot_data = combined[
@@ -132,8 +136,8 @@ for _, row in plot_data.iterrows():
 
     if b == 'NDWI':
         line_color = '#8da0cb'  # blue from Set2
-        plot_min = -1
-        plot_max = 1
+        plot_min = -0.25
+        plot_max = 0.25
     elif b == 'NIR':
         line_color = '#fc8d62'
         plot_min = 0

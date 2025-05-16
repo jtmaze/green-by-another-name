@@ -71,11 +71,12 @@ summary1 = combined.groupby(['satellite', 'band_name']).agg(
 summary2 = combined.groupby(['satellite', 'band_name', 'zone']).agg(
     mean_r_squared=('r_squared', 'mean'),
     mean_above_frac=('above_frac', 'mean'),
+    mean_slope=('slope', 'mean'),
+    sd_slope=('slope', 'std'),
+    mean_intercept=('intercept', 'mean'),
+    sd_intercept=('intercept', 'std'),
     above_frac_50 =('above_frac', lambda x: (x > 50).sum()),
 ).reset_index()
-
-print(summary1)
-print(summary2)
 
 
 # %% Plot the RMA lines

@@ -3,6 +3,12 @@ import os
 import pandas as pd
 import numpy as np
 
+from scipy import stats
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -22,9 +28,9 @@ toa = toa[toa[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 # 1.1 Select the relevant columns
 
 water_frac_cols = [
-    'smallest_buff_lake_ls_water_frac_adaptive', 'smallest_buff_lake_s2_water_frac_adaptive',
-    'small_buff_lake_ls_water_frac_adaptive', 'small_buff_lake_s2_water_frac_adaptive', 'medium_buff_lake_ls_water_frac_adaptive',
-    'medium_buff_lake_s2_water_frac_adaptive', 'large_buff_lake_ls_water_frac_adaptive', 'large_buff_lake_s2_water_frac_adaptive'
+    'smallest_lake_ls_water_frac_adaptive', 'smallest_lake_s2_water_frac_adaptive',
+    'small_lake_ls_water_frac_adaptive', 'small_lake_s2_water_frac_adaptive', 'medium_lake_ls_water_frac_adaptive',
+    'medium_lake_s2_water_frac_adaptive', 'large_lake_ls_water_frac_adaptive', 'large_lake_s2_water_frac_adaptive'
 ]
 
 cols_to_keep = ['date', 'roi', 'level'] + water_frac_cols
@@ -51,24 +57,24 @@ def filter_data_calc_satellite_differences(
     out_df[water_frac_cols] = df[water_frac_cols].replace(0, np.nan)
 
     out_df['rel_smallest_sat_diff'] = (
-        (out_df['smallest_buff_lake_ls_water_frac_adaptive'] - out_df['smallest_buff_lake_s2_water_frac_adaptive']) 
-            / ((out_df['smallest_buff_lake_ls_water_frac_adaptive'] + out_df['smallest_buff_lake_s2_water_frac_adaptive']) * 0.5) * 100
+        (out_df['smallest_lake_ls_water_frac_adaptive'] - out_df['smallest_lake_s2_water_frac_adaptive']) 
+            / ((out_df['smallest_lake_ls_water_frac_adaptive'] + out_df['smallest_lake_s2_water_frac_adaptive']) * 0.5) * 100
     )
 
     out_df['rel_small_sat_diff'] = (
-        (out_df['small_buff_lake_ls_water_frac_adaptive'] - out_df['small_buff_lake_s2_water_frac_adaptive'])
-            / ((out_df['small_buff_lake_ls_water_frac_adaptive'] + out_df['small_buff_lake_s2_water_frac_adaptive'])* 0.5 ) * 100
+        (out_df['small_lake_ls_water_frac_adaptive'] - out_df['small_lake_s2_water_frac_adaptive'])
+            / ((out_df['small_lake_ls_water_frac_adaptive'] + out_df['small_lake_s2_water_frac_adaptive'])* 0.5 ) * 100
     )
 
     out_df['rel_medium_sat_diff'] = (
-        (out_df['medium_buff_lake_ls_water_frac_adaptive'] - out_df['medium_buff_lake_s2_water_frac_adaptive'])
-            / ((out_df['medium_buff_lake_ls_water_frac_adaptive'] + out_df['medium_buff_lake_s2_water_frac_adaptive']) * 0.5) * 100
+        (out_df['medium_lake_ls_water_frac_adaptive'] - out_df['medium_lake_s2_water_frac_adaptive'])
+            / ((out_df['medium_lake_ls_water_frac_adaptive'] + out_df['medium_lake_s2_water_frac_adaptive']) * 0.5) * 100
     )
     
 
     out_df['rel_large_sat_diff'] = (
-        (out_df['large_buff_lake_ls_water_frac_adaptive'] - out_df['large_buff_lake_s2_water_frac_adaptive'])
-            / ((out_df['large_buff_lake_ls_water_frac_adaptive'] + out_df['large_buff_lake_s2_water_frac_adaptive']) * 0.5 ) * 100
+        (out_df['large_lake_ls_water_frac_adaptive'] - out_df['large_lake_s2_water_frac_adaptive'])
+            / ((out_df['large_lake_ls_water_frac_adaptive'] + out_df['large_lake_s2_water_frac_adaptive']) * 0.5 ) * 100
     )
     
     return out_df
@@ -119,12 +125,51 @@ plt.show()
 rel_diff_summary = plot_data.groupby(['level', 'lake_size'])['satellite_difference'].agg(
     mean='mean',
     var='var',
+    std='std',
+    p_val=lambda x: stats.ttest_1samp(x.dropna(), 0)[1],
     q25=lambda x: x.quantile(0.25),
     q75=lambda x: x.quantile(0.75),
     IQR=lambda x: x.quantile(0.75) - x.quantile(0.25),
 ).reset_index()
 
 print(rel_diff_summary)
+
+# %% Quick Tukey HSD across lake sizes for TOA satellite differences
+
+temp = plot_data[plot_data['level'] == 'toa']
+
+smallest = temp[temp['lake_size'] == 'Smallest (0.01-0.05 km²)']['satellite_difference']
+small = temp[temp['lake_size'] == 'Small (0.05-0.5 km²)']['satellite_difference']
+medium = temp[temp['lake_size'] == 'Medium (0.5-1 km²)']['satellite_difference']
+large = temp[temp['lake_size'] == 'Large (> 1 km²)']['satellite_difference']
+
+f_stat, p_val = stats.f_oneway(smallest, small, medium, large)
+print(f'F-statistic: {f_stat}, p-value: {p_val}')
+
+toa_tukey_data = []
+
+for values, group_name in [
+    (smallest, 'smallest'),
+    (small, 'small'),
+    (medium, 'medium'),
+    (large, 'large')
+]:
+    for val in values:
+        toa_tukey_data.append((val, group_name))
+
+toa_tukey_df = pd.DataFrame(toa_tukey_data, columns=['satellite_difference', 'lake_size'])
+model = ols('satellite_difference ~ lake_size', data=toa_tukey_df).fit()
+anova_table = sm.stats.anova_lm(model, typ=2)
+print(anova_table)
+
+tukey = pairwise_tukeyhsd(
+    endog=toa_tukey_df['satellite_difference'],
+    groups=toa_tukey_df['lake_size'],
+    alpha=0.05
+)
+print(tukey)
+
+
 
 # %% 2.0 Define the function to filter and calculate satellite differences
 def filter_data_calc_absolute_differences(
