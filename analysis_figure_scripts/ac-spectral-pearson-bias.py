@@ -6,7 +6,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-import ast
 
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
@@ -47,18 +46,30 @@ combined_clean = combined[cols_to_keep]
 sat = 'Sentinel2' # Landsat8 or Sentinel2
 box_plot_data = combined[combined['satellite'] == sat]
 
+zone_label_map = {
+    'lake': 'Lakes',
+    'lake_plus': 'Buffered Lakes',
+    'land': 'Land',
+    'shoreline': 'Shoreline'
+}
+
+box_plot_data['zone_label'] = box_plot_data['zone'].map(zone_label_map)
+
 plt.figure(figsize=(12, 5))
-sns.boxplot(
+ax = sns.boxplot(
     data=box_plot_data,
-    x='zone',
+    x='zone_label',
     y='above_frac',
     hue='band_name',
-    palette='Set2'
+    palette='Set2',
+    legend=False
 )
-plt.xlabel('Lake Position')
+ax.set_xlabel(None)
+ax.set_ylabel('% of TOA pixels higher', fontsize=14)
 plt.ylim(0, 100)
-plt.ylabel('(%) of Image Pixels')
-plt.title(f'{sat} % of pixels with higher SR reflectance')
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=14)
+plt.axhline(y=50, color='red', linestyle='--')
+#plt.title(f'{sat} % of pixels with higher SR reflectance')
 plt.show()
 
 # %% Summary tables
@@ -80,7 +91,7 @@ summary2 = combined.groupby(['satellite', 'band_name', 'zone']).agg(
 
 
 # %% Plot the RMA lines
-sat = 'Landsat8' # Landsat8 or Sentinel2
+sat = 'Sentinel2' # Landsat8 or Sentinel2
 b = 'NDWI' # Green, NIR, or NDWI
 
 
@@ -151,8 +162,8 @@ y_eq = x_eq  # 1:1 line means slope = 1, intercept = 0
 ax.plot(x_eq, y_eq, color='black', linestyle='--', linewidth=4, label='1:1 line')
 ax.set_xlim(plot_min, plot_max)
 ax.set_ylim(plot_min, plot_max)
-ax.set_xlabel(f'TOA Reflectance')
-ax.set_ylabel(f'SR Reflectance')
-ax.set_title(f'{sat} {b} AC RMA over Buffered Lakes')
+ax.set_xlabel(f'TOA Reflectance', size=12)
+ax.set_ylabel(f'SR Reflectance', size=12)
+#ax.set_title(f'{sat} {b} AC RMA over Buffered Lakes')
 
 # %%

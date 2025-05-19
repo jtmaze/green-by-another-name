@@ -11,9 +11,8 @@ import numpy as np
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-resample_methods = ['bilinear30', 'noresample', 'bilinear60', 'lanczos30']
-resample_methods = ['bilinear30', 'noresample', 'cubic30']
-resample_methods = ['bilinear30', 'noresample']
+resample_methods = ['bilinear30', 'noresample', 'lanczos30']
+
 temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
@@ -396,6 +395,13 @@ print(f'Shoreline toa sd relative: {np.sqrt(toa_shoreline_mean_bilinear30["var_d
 print(f'Shoreline sr sd relative: {np.sqrt(sr_shoreline_mean_bilinear30["var_diff_rel"].values[0])}')
 
 test_results_df.head(10)
+
+# %%
+
+print_table = test_results_df[
+    ['level', 'resample_method', 'zone', 'p_value_rel', 'p_value_abs', 
+     'mean_diff_abs', 'mean_diff_rel', 'iqr_abs', 'iqr_rel']
+].copy()
 
 # %% Make plot of t-statisitics for each zone and resampling method
 

@@ -12,7 +12,7 @@ import numpy as np
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-resample_methods = ['bilinear30']
+resample_methods = ['bilinear30', 'noresample', 'lanczos30']
 temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
@@ -547,4 +547,12 @@ full_results = pd.DataFrame(test_results)
 
 print(full_results.head(10))
 
+# %%
+
+print_table = full_results[
+    ['satellite', 'resample_method', 'zone', 'p_val_abs', 
+     'p_val_rel', 'mean_abs', 'mean_rel', 'iqr_abs', 'iqr_rel']
+].copy()
+
+print(print_table)
 # %%

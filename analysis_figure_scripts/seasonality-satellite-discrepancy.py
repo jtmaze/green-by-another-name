@@ -63,6 +63,7 @@ print(gswo_over_20)
 
 
 # %%
+
 plot_data = merged_df.copy()
 plot_data = plot_data[['roi', 'gswo_seasonal_frac', 'glad_seasonal_frac', 'rel_sat_diff']]
 plot_data['rel_sat_diff'] = plot_data['rel_sat_diff'] * -1
@@ -85,6 +86,7 @@ g = sns.lmplot(
     x='rel_sat_diff',
     y='seasonal_frac',
     hue='source',
+    palette=['#003f5c', '#ffa600'],
     height=6,
     aspect=1.5,
     legend=False,
@@ -98,12 +100,12 @@ for source, group in melted_data.groupby('source'):
     slope, intercept, r_value, p_value, std_err = linregress(group['rel_sat_diff'], group['seasonal_frac'])
     print(f"{source}: r²={r_value**2:.4f}, p={p_value:.4f}, slope={slope:.4f}")
 
-plt.xlabel('Relative Satellite Difference (%)')
-plt.ylabel('Seasonal Fraction (%)')
-plt.title('Buffered Lakes Satellite Difference vs Seasonal Fraction')
-
+plt.xlabel('Relative Sensor Difference (%)', size=14)
+plt.ylabel('Seasonal Fraction (%)', size=14)
+plt.xticks(fontsize=12)
+plt.yticks(fontsize=12)
 # Move legend outside the plot
-plt.legend(title='Source', bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+plt.legend(title='Source', title_fontsize=16, fontsize=14, bbox_to_anchor=(.22, .95), loc='upper right')
 
 plt.tight_layout()
 plt.show()
