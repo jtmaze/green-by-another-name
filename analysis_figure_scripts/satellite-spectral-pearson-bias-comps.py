@@ -57,29 +57,42 @@ zone_label_map = {
 
 plot_data['zone_label'] = plot_data['zone'].map(zone_label_map)
 
-plt.figure(figsize=(12, 5))
+plt.figure(figsize=(12, 10))
 ax = sns.boxplot(
     data=plot_data,
     x='zone_label',
-    y='above_frac',
+    y='r_squared',
     hue='band_name',
     palette='Set2',
     legend=False
 )
 
-plt.axhline(y=50, color='red', linestyle='--')
 plt.xlabel(None)
-plt.ylim(0, 100)
-ax.set_ylabel('Sentinel-2 % higher', fontsize=14)
+plt.ylim(0, 1)
+ax.set_ylabel('r-squared', fontsize=20)
 ax.set_xlabel(None)
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=14)
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=18)
+ax.set_yticklabels(ax.get_yticklabels(), fontsize=18)
 
 #plt.title(f'{lvl} (%) of pixels with higher Sentinel-2 Reflectance')
 plt.show()
 
+# %% Count bad correlation images for buffered lakes 
+
+lvl = 'toa'
+bad_corr = combined_clean[
+    (combined_clean['level'] == lvl) &
+    (combined_clean['r_squared'] < 0.75) &
+    (combined_clean['zone'] == 'shoreline')
+]
+
+bad_corr_counts = bad_corr.groupby('band_name').size().reset_index(name='count')
+print(bad_corr_counts)
+
+
 # %% SR plot the r-squared values
 
-lvl = 'sr'
+lvl = 'toa'
 plot_data = combined_clean[combined_clean['level'] == lvl]
 
 zone_label_map = {
@@ -91,7 +104,7 @@ zone_label_map = {
 
 plot_data['zone_label'] = plot_data['zone'].map(zone_label_map)
 
-plt.figure(figsize=(12, 5))
+plt.figure(figsize=(12, 10))
 ax = sns.boxplot(
     data=plot_data,
     x='zone_label',
@@ -102,12 +115,13 @@ ax = sns.boxplot(
     # Remove the legend=False to allow legend creation
 )
 
-plt.axhline(y=50, color='red', linestyle='--')
+plt.axhline(y=50, color='red', linestyle='--', linewidth=4)
 plt.xlabel(None)
 plt.ylim(0, 100)
-ax.set_ylabel('Sentinel-2 % higher', fontsize=14)
+ax.set_ylabel('Sentinel-2 % higher', fontsize=20)
 ax.set_xlabel(None)
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=14)
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=18)
+ax.set_yticklabels(ax.get_yticklabels(), fontsize=18)
 
 # Move the legend below the plot and increase font size
 # handles, labels = ax.get_legend_handles_labels()

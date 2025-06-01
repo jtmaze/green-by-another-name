@@ -8,6 +8,7 @@ import numpy as np
 import rasterio as rio
 from rasterio.plot import show
 from rasterio.windows import from_bounds
+from scipy.ndimage import zoom
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
@@ -68,10 +69,10 @@ with rio.open(rgb_paths[0]) as src:
     center_y = (full_bounds.bottom + full_bounds.top) / 2
     print(center_x, center_y)
 
-    chosen_x = center_x - 1_300
-    chosen_y = center_y + 1_200
+    chosen_x = center_x - 1300
+    chosen_y = center_y + 1200
 
-spread = 400  # 1km in each direction
+spread = 500  
 utm_bounds = (chosen_x - spread, chosen_y - spread, chosen_x + spread, chosen_y + spread)
 print("Testing with bounds:", utm_bounds)
 
@@ -83,6 +84,11 @@ x = -670
 y = +400
 Panel B
 spread = 800
+
+Panel B
+x = -1300
+y = +1200
+spread = 400
 """
 
 # %% functions
@@ -243,13 +249,15 @@ def plot_rgb_panels_with_pld(ax, rgb_path: str, pld_path: str):
     y = np.linspace(top,   bottom, ny)
 
     ax.contour(x, y, lake_bool,   levels=[0.5], colors=PLD_EDGE_COLOR,
-               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+               linewidths=4, alpha=MASK_ALPHA, origin='image')
     ax.contour(x, y, buffer_bool, levels=[0.5], colors=PLD_BUFFER_COLOR,
-               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+               linewidths=4, alpha=MASK_ALPHA, origin='image')
     ax.contour(x, y, inner_bool,  levels=[0.5], colors=PLD_INNER_COLOR,
-               linewidths=2.5, alpha=MASK_ALPHA, origin='image')
+               linewidths=4, alpha=MASK_ALPHA, origin='image')
 
     ax.set_axis_off()
+
+
 
 
 # %% Make the plots
@@ -260,21 +268,23 @@ fig, axes = plt.subplots(2, 4, figsize=(16, 8), constrained_layout=False)
 for i, (label, rgb_path, wtr_mask_path) in enumerate(zip(plot_labels, rgb_paths, wtr_mask_paths)):
     ax = axes[0, i]
     plot_rgb_panels(ax, rgb_path, wtr_mask_path)
-    ax.set_title(f"{label} RGB", fontsize=12)
+    #ax.set_title(f"{label} RGB", fontsize=12)
 
 ndwi_images = []
 for i, (label, ndwi_path, pld_path) in enumerate(zip(plot_labels, ndwi_paths, [pld_path]*4)): # PLD path is the same for all
     ax = axes[1, i]
     im = plot_ndwi_panels(ax, ndwi_path, pld_path)
     ndwi_images.append(im)
-    ax.set_title(f"{label} NDWI", fontsize=12)
+    
+    #ax.set_title(f"{label} NDWI", fontsize=12)
 
 cbar_ax = fig.add_axes([0.15, 0.08, 0.7, 0.02])  # [x, y, width, height]
 cbar = fig.colorbar(ndwi_images[0], cax=cbar_ax, orientation='horizontal')
-cbar.set_label('NDWI Values', labelpad=15)
+cbar.set_label('NDWI Values', labelpad=15, fontsize=20)
+cbar.ax.tick_params(labelsize=16)
 
-fig.suptitle(f"Image comparison for {roi_name} on {date} resampled {resample_method}", 
-             fontsize=16, fontweight='bold')
+# fig.suptitle(f"Image comparison for {roi_name} on {date} resampled {resample_method}", 
+#              fontsize=16, fontweight='bold')
 
 plt.tight_layout()
 plt.subplots_adjust(bottom=0.15)
@@ -283,11 +293,11 @@ plt.show()
     
 # %% Make one map with unresampled Sentinel-2 image and PLD zones
 
-roi_name = "AKCP_sub1"
-date = '2020-07-03'
-PLD_EDGE_COLOR = 'blue'
-PLD_BUFFER_COLOR = 'orange'
-PLD_INNER_COLOR = 'red'
+roi_name = "YKF_sub1"
+date = '2021-07-01'
+PLD_EDGE_COLOR = 'red'
+PLD_BUFFER_COLOR = 'violet'
+PLD_INNER_COLOR = 'orange'
 
 img_path = f'./data/sr_images/roi_{roi_name}_noresample/Landsat8_sr_date_{date}_roi_{roi_name}.tif'
 pld_path = f'./data/pld_rasterized/{roi_name}_lake_masks_res{30}.tif'
@@ -299,10 +309,10 @@ with rio.open(img_path) as src:
     center_y = (full_bounds.bottom + full_bounds.top) / 2
     print(center_x, center_y)
 
-    chosen_x = center_x + 5500
-    chosen_y = center_y - 3000
+    chosen_x = center_x + 1600
+    chosen_y = center_y + 1200
 
-spread = 1_200  # 1km in each direction
+spread = 1900  # 1km in each direction
 utm_bounds = (chosen_x - spread, chosen_y - spread, chosen_x + spread, chosen_y + spread)
 
 fig, ax = plt.subplots(figsize=(8, 8))
@@ -314,7 +324,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 scalebar = ScaleBar(1.0, 
                     units='m',
                     length_fraction=0.25,
-                    location='upper left',
+                    location='lower left',
                     box_alpha=1,
                     color='black',
                     frameon=True,

@@ -43,7 +43,7 @@ combined = pd.concat([lake_data, lake_plus_data, land_data, shoreline_data], ign
 cols_to_keep = ['satellite', 'roi', 'date', 'zone', 'band_name', 'r_squared', 'slope', 'intercept', 'above_frac']
 combined_clean = combined[cols_to_keep]
 
-sat = 'Sentinel2' # Landsat8 or Sentinel2
+sat = 'Landsat8' # Landsat8 or Sentinel2
 box_plot_data = combined[combined['satellite'] == sat]
 
 zone_label_map = {
@@ -55,7 +55,7 @@ zone_label_map = {
 
 box_plot_data['zone_label'] = box_plot_data['zone'].map(zone_label_map)
 
-plt.figure(figsize=(12, 5))
+plt.figure(figsize=(12, 10))
 ax = sns.boxplot(
     data=box_plot_data,
     x='zone_label',
@@ -65,10 +65,12 @@ ax = sns.boxplot(
     legend=False
 )
 ax.set_xlabel(None)
-ax.set_ylabel('% of TOA pixels higher', fontsize=14)
+ax.set_ylabel('% SR pixels higher', fontsize=20)
 plt.ylim(0, 100)
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=14)
-plt.axhline(y=50, color='red', linestyle='--')
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=18)
+yticks = ax.get_yticks()
+ax.set_yticklabels([f"{y:.0f}" for y in yticks], fontsize=18)
+plt.axhline(y=50, color='red', linestyle='--', linewidth=4)
 #plt.title(f'{sat} % of pixels with higher SR reflectance')
 plt.show()
 

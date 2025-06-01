@@ -23,7 +23,7 @@ rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 
 # Specify the level and resample method
-level = 'toa'
+level = 'sr'
 levels = [level]
 resample_method = 'bilinear30'
 

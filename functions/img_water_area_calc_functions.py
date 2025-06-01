@@ -231,20 +231,24 @@ def find_adaptive_thresholds(
         if i < 0 or water_counts[i] < water_h_val:
             water_ndwi = water_bins[i+1] if i < len(water_bins) - 1 else water_bins[-1]
             break
+
+    # Just for plotting purposes, put 75% Adaptive Threshold on plot
+    adaptive_thresh = land_ndwi + (water_ndwi - land_ndwi) * 0.75
     
     if show_hist:
         plt.figure(figsize=(8,6))
         plt.bar(bin_centers, counts, width=(bin_edges[1] - bin_edges[0]), edgecolor='black')
         plt.axvline(x=otsu_threshold, color='green', linestyle='--', lw=4, label='Otsu Threshold')
+        plt.axvline(x=adaptive_thresh, color='purple', linestyle='--', lw=4, label='Adaptive Threshold (75%)')
         plt.axvline(x=water_peak_val, color='blue', linestyle='-', lw=4, label=f'Water Peak: {water_peak_val:.2f}')
         plt.axvline(x=land_peak_val, color='brown', linestyle='-', lw=4, label=f'Land Peak: {land_peak_val:.2f}')
         #plt.axhline(y=otsu_height, color='green', linestyle='--', label='Otsu Height')
         #plt.axhline(y=water_prominence, color='blue', linestyle='-', label=f'Water Prominence: {water_prominence:.2f}')
         #plt.axhline(y=land_prominence, color='brown', linestyle='-', label=f'Land Prominence: {land_prominence:.2f}')
-        plt.axvline(x=land_ndwi, color='brown', linestyle=':', lw=4, label=f'Land NDWI: {land_ndwi:.2f}')
-        plt.axvline(x=water_ndwi, color='blue', linestyle=':', lw=4, label=f'Water NDWI: {water_ndwi:.2f}')
+        plt.axvline(x=land_ndwi, color='brown', linestyle=':', lw=4, label=f'Land Limit: {land_ndwi:.2f}')
+        plt.axvline(x=water_ndwi, color='blue', linestyle=':', lw=4, label=f'Water Limit: {water_ndwi:.2f}')
         plt.xlim(-1, 1)
-        plt.legend()
+        plt.legend(framealpha=1)
         plt.xlabel('NDWI values')
         plt.show()
 

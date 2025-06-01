@@ -8,11 +8,11 @@ import seaborn as sns
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_cubic30_area_summaries_batch3.csv')
 print(len(toa_bilinear30))
 valids = toa_bilinear30[['roi', 'date']].agg('_'.join, axis=1).unique()
 
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch3.csv')
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_cubic30_area_summaries_batch3.csv')
 sr_bilinear30 = sr_bilinear30[sr_bilinear30[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch3.csv')
@@ -91,8 +91,8 @@ def area_boxplot_maker(
     fig, ax = plt.subplots(figsize=(9, 7))
     
     # Define the groups and colors
-    order = ['toa_bilinear30', 'toa_noresample', 'sr_bilinear30', 'sr_noresample']
-    new_labels = ['TOA Bilinear 30m', 'TOA Unresampled', 'SR Bilinear 30m', 'SR Unresampled']
+    order = ['toa_cubic30', 'toa_noresample', 'sr_cubic30', 'sr_noresample']
+    new_labels = ['TOA cubic 30m', 'TOA Unresampled', 'SR cubic 30m', 'SR Unresampled']
     satellite_colors = {'Landsat 8': '#ff9933', 'Sentinel-2': '#9370DB'}
     
     # Calculate positions for the boxes
@@ -188,7 +188,7 @@ def area_boxplot_maker(
 Compare bilinear 30m area boxplots
 """
 temp = combined[
-    (combined['resample_method'] == 'bilinear30') |
+    (combined['resample_method'] == 'cubic30') |
     (combined['resample_method'] == 'noresample')
 ]
 cols_to_plot = [
