@@ -9,6 +9,7 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
@@ -160,19 +161,29 @@ plot_data['lake_size'] = plot_data['lake_size'].map(size_labels)
 
 # Create the boxplot
 plt.figure(figsize=(12, 5))
-sns.boxplot(
+ax = sns.boxplot(
     data=plot_data,
     x='lake_size',
     y='relative_difference',
     hue='satellite',
+    #alpha=0.6,
     palette={'Landsat 8': '#ff9933', 'Sentinel-2': '#9370DB'},
-    width=0.7
+    width=0.7,
+    showfliers=False
 )
-plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
-plt.title(f'AC Differences by Lake Size for {resample_method}', fontsize=14)
-plt.xlabel('Lake Size Category', fontsize=12)
-plt.ylabel('Relative AC Difference (%)', fontsize=12)
-plt.ylim(-100, 210)
+
+for patch in ax.patches:
+    fc = patch.get_facecolor()
+    patch.set_facecolor(mpl.colors.to_rgba(fc, alpha=0.6))
+
+
+plt.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=2.5)
+# plt.title(f'AC Differences by Lake Size for {resample_method}', fontsize=14)
+plt.xlabel("")
+plt.ylabel('Relative Difference (%)', fontsize=18)
+plt.xticks(fontsize=14)
+plt.yticks(fontsize=14)
+plt.legend(title="Sensor", title_fontsize=18, fontsize=14)
 plt.tight_layout()
 plt.show()
 

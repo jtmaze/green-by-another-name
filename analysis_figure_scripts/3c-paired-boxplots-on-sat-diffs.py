@@ -29,8 +29,8 @@ cols_to_keep = [
 
 for r in resample_methods:
     for l in levels:
-
-        fp = f'./data/lake_area_results/{l}_resampled_{r}_area_summaries_batch3.csv'
+        n = 6 if r == 'noresample' else 3
+        fp = f'./data/lake_area_results/{l}_resampled_{r}_area_summaries_batch{n}.csv'
         temp = pd.read_csv(fp)
         temp = temp[temp[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
         temp = temp[cols_to_keep]
@@ -57,7 +57,7 @@ for z in zone_prefixes:
 
 # %% Plot the TOA absolute lake fraction differences
 
-plot_df = combined[combined['level'] == 'toa']
+plot_df = combined[combined['level'] == 'sr']
 
 plot_long = pd.melt(
     plot_df, 
@@ -171,7 +171,7 @@ plt.show()
 
 # %%
 
-plot_df = combined[combined['level'] == 'toa']
+plot_df = combined[combined['level'] == 'sr']
 
 plot_long = pd.melt(
     plot_df, 

@@ -22,7 +22,7 @@ image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
 resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'  # 'nearest', 'bilinear30', 'cubic30'
-levels = ['sr']
+levels = ['sr', 'toa']
 
 image_info = {
     'level': None,

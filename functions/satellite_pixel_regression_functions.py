@@ -177,17 +177,25 @@ def regress_sat_pairs(
             # For regression plots, we bound NDWI at [-1, 1]
             ls_sample = np.clip(ls_sample, -1, 1)
             s2_sample = np.clip(s2_sample, -1, 1)
+            ls_marginal_percent = np.sum((ls_sample > -0.25) & (ls_sample < 0.25)) / len(ls_sample) * 100
+            s2_marginal_percent = np.sum((s2_sample > -0.25) & (s2_sample < 0.25)) / len(s2_sample) * 100
         # Get the single band (G or NIR) samples
         else:
             ls_sample, s2_sample, valid_pix_cnt = get_band_sat_pixel_samples(
                 ls8_fp, s2_fp, pld_fp, band_name=band_name, **sample_params
             )
+            ls_marginal_percent = np.sum(ls_sample < 0.1) / len(ls_sample) * 100
+            s2_marginal_percent = np.sum(s2_sample < 0.1) / len(s2_sample) * 100
 
         # Run regression function
         print(f'{level} {resample_method} regression for {band_name} for date {date} in the {roi} region with PLD {zone} {buffer_delim}m')
         regression_output = regress_reflectance(ls_sample, s2_sample, outlier_frac, hist_return, comparison='Satellite')
     else: # Return "No Image Data" if matching image pairs not found
-        valid_pix_cnt = regression_output = "No Image Data"
+        ls_marginal_percent = s2_marginal_percent = valid_pix_cnt = regression_output = "No Image Data"
+
+    if not isinstance(ls_marginal_percent, str):
+        print(f'LS8 marginal percent: {ls_marginal_percent:.2f}% for {band_name} band')
+        print(f'S2 marginal percent: {s2_marginal_percent:.2f}% for {band_name} band')
 
     return {
         'level': level,
@@ -201,7 +209,9 @@ def regress_sat_pairs(
         'sample_size': sample_size,
         'outlier_frac': outlier_frac,
         'valid_pix_cnt': valid_pix_cnt,
-        'regression_output': regression_output
+        'regression_output': regression_output, 
+        'ls_marginal_percent': ls_marginal_percent,  
+        's2_marginal_percent': s2_marginal_percent,  
     }
 
 def make_satellite_reflectance_summaries(
@@ -261,6 +271,8 @@ def make_satellite_reflectance_summaries(
                     model = slope = intercept = r_squared = "No Image Data"
                     above_frac = below_frac = model_domain = "No Image Data"
                     ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "No Image Data"
+                    ls_marginal_percent = "No Image Data"
+                    s2_marginal_percent = "No Image Data"
                 else: 
                     # Convert string representation to dict if needed
                     if isinstance(regression_items_str, str):
@@ -281,7 +293,9 @@ def make_satellite_reflectance_summaries(
                         above_frac = regression_items['above_frac']  # % pixels above 45° line
                         below_frac = regression_items['below_frac']  # % pixels below 45° line
                         model_domain = regression_items['model_domain']
-                        
+                        ls_marginal_percent = regression_result['ls_marginal_percent']
+                        s2_marginal_percent = regression_result['s2_marginal_percent']
+
                         # Handle histogram data if requested
                         if hist_return:
                             ls_hist_counts = numpy_to_list(regression_items.get('arr1_histogram')[0])
@@ -296,6 +310,7 @@ def make_satellite_reflectance_summaries(
                         model_domain = "Poor Quality Image Data"
                         above_frac = below_frac = "Poor Quality Image Data"
                         ls_hist_counts = ls_hist_bins = s2_hist_counts = s2_hist_bins = "Poor Quality Image Data"
+                        ls_marginal_percent = s2_marginal_percent = "Poor Quality Image Data"
 
                 # Create summary dictionary for this image pair
                 summary = {
@@ -317,6 +332,8 @@ def make_satellite_reflectance_summaries(
                     'above_frac': above_frac,
                     'below_frac': below_frac,
                     'model_domain': model_domain,
+                    'ls_marginal_percent': ls_marginal_percent,
+                    's2_marginal_percent': s2_marginal_percent,
                     # Data histograms
                     'ls_hist_counts': ls_hist_counts,
                     'ls_hist_bins': ls_hist_bins,
