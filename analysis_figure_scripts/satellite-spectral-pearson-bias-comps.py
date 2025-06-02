@@ -157,8 +157,10 @@ summary_zones = combined.groupby(['level', 'band_name', 'zone']).agg(
     mean_intercept=('intercept', 'mean'),
     sd_intercept=('intercept', 'std'),
     above_frac_50=('above_frac', lambda x: (x > 50).sum()),
+    mean_ls_marginal_percent=('ls_marginal_percent', 'mean'),
+    mean_s2_marginal_percent=('s2_marginal_percent', 'mean'),
 ).reset_index()
-print(summary_zones)
+
 
 # %% Plot all of the RMA lines
 

@@ -10,6 +10,7 @@ from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
@@ -103,20 +104,34 @@ plot_data['lake_size'] = plot_data['lake_size'].map({
     'rel_large_sat_diff': 'Large (> 1 km²)'
 })
 
+plot_data['level'] = plot_data['level'].map({
+    'toa': 'TOA',
+    'sr': 'SR'
+})
+
 plt.figure(figsize=(12, 5))
-sns.boxplot(
+ax = sns.boxplot(
     data=plot_data,
     x='lake_size',
     y='satellite_difference',
     hue='level',
-    palette={'sr': '#88c999', 'toa': '#6a9ecf'},  
-    width=0.7
+    palette={'SR': '#88c999', 'TOA': '#6a9ecf'},  
+    width=0.7,
+    showfliers=False  # Hide outliers for clarity
 )
-plt.axhline(y=0, color='red', linestyle='--', alpha=0.7)
-plt.title(f'Satellite Differences by Lake Size for {resample_method}', fontsize=14)
-plt.xlabel('Lake Size Category', fontsize=12)
-plt.ylabel('Relative Satellite Difference (%)', fontsize=12)
-plt.ylim(-150, 175) # NOTE: Adjust this, because the plot is a little messy
+
+for patch in ax.patches:
+    fc = patch.get_facecolor()
+    patch.set_facecolor(mpl.colors.to_rgba(fc, alpha=0.7))  # Set transparency for the box colors
+
+
+plt.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=2.5)
+# plt.title(f'Satellite Differences by Lake Size for {resample_method}', fontsize=14)
+plt.xlabel("")
+plt.xticks(fontsize=14)
+plt.ylabel('Relative Difference (%)', fontsize=18)
+plt.yticks(fontsize=14)
+plt.legend(title='AC Level', title_fontsize=18, fontsize=14)
 
 plt.tight_layout()
 plt.show()

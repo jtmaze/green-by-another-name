@@ -137,7 +137,7 @@ def find_otsu_threshold(
     out_of_bounds_count = non_nan_ndwi_count - in_bounds_count
     # Calculate percentage of pixels outside [-1, 1] bounds
     unbounded_fraction = (out_of_bounds_count / non_nan_ndwi_count) * 100
-    print(f"[-1, 1] unbounded % NDWI pixels: {unbounded_fraction:.2f}")
+    #print(f"[-1, 1] unbounded % NDWI pixels: {unbounded_fraction:.2f}")
 
     n_bins = 500
     hist, bin_edges = np.histogram(bounded_ndwi, bins=n_bins, range=(bounded_ndwi.min(), bounded_ndwi.max()))
@@ -381,34 +381,47 @@ def calc_shoreline_wtr_frac_native_tile(
     with rio.open(img_fp) as tgt, rio.open(pld_fp) as src:
         src_lakes_outer = src.read(6) # NOTE: Hard-coded the band index 
         src_lakes_inner = src.read(3) 
-        pld_outer_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
-        pld_inner_reproj = np.zeros((tgt.height, tgt.width), dtype=src.dtypes[0])
+
+        src_lakes_outer_float = src_lakes_outer.astype(np.float32)
+        src_lakes_inner_float = src_lakes_inner.astype(np.float32)
+        pld_outer_reproj = np.zeros((tgt.height, tgt.width), dtype=np.float32)
+        pld_inner_reproj = np.zeros((tgt.height, tgt.width), dtype=np.float32)
         # Reproject the shoreline's outer band
         reproject(
-            source=src_lakes_outer,
+            source=src_lakes_outer_float,
             destination=pld_outer_reproj,
             src_transform=src.transform,
             src_crs=src.crs,
             dst_transform=tgt.transform,
             dst_crs=tgt.crs,
-            resampling=Resampling.nearest
+            resampling=Resampling.bilinear
         )
         # Reproject the shoreline's inner band
         reproject(
-            source=src_lakes_inner,
+            source=src_lakes_inner_float,
             destination=pld_inner_reproj,
             src_transform=src.transform,
             src_crs=src.crs,
             dst_transform=tgt.transform,
             dst_crs=tgt.crs,
-            resampling=Resampling.nearest
+            resampling=Resampling.bilinear
         )
+    # NOTE: Used bilinear resampling instead of nearest to avoid
+    #  discontinous shoreline masks, edge effects, and pixel misalignment
+    
+    pld_outer_reproj = (pld_outer_reproj > 0.90).astype(np.uint8)
+    pld_inner_reproj = (pld_inner_reproj > 0.99).astype(np.uint8)
+
     # Shoreline mask is the outer band - inner band
-    pld_shoreline_reproj = (pld_outer_reproj == 1) & (pld_inner_reproj != 1)
+    pld_shoreline_reproj = (pld_outer_reproj == 1) & (pld_inner_reproj != 1)  
     
     shoreline_water_pixels = np.sum((water_mask == 1) & (pld_shoreline_reproj == 1))
     valid_pixels = np.sum((~np.isnan(ndwi)) & (pld_shoreline_reproj == 1))
     water_frac = shoreline_water_pixels / valid_pixels * 100
+
+    print('$$$$$$$$$$$$$$$$$$$$$$$$$')
+    print(f'Shoreline water fraction: {water_frac:.2f}%')
+    print('$$$$$$$$$$$$$$$$$$$$$$$$$')
 
     return water_frac
 
@@ -745,8 +758,8 @@ def image_wtr_area(
 
         ls_pld_plus_valid_frac = np.sum(~np.isnan(ls_ndwi_lakes)) / pld_plus_pix_cnt_ls * 100
         s2_pld_plus_valid_frac = np.sum(~np.isnan(s2_ndwi_lakes)) / pld_plus_pix_cnt_s2 * 100
-        print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
-        print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
+        #print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
+        #print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
         pld_plus_valid_frac = max(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
         
     # Noresample requires bringing PLD into the Landsat8 and Sentinel-2 tiles grid.
@@ -768,8 +781,8 @@ def image_wtr_area(
         ls_pld_plus_valid_frac = np.sum(~np.isnan(ls_ndwi_lakes)) / pld_plus_pix_cnt_ls * 100
         s2_pld_plus_valid_frac = np.sum(~np.isnan(s2_ndwi_lakes)) / pld_plus_pix_cnt_s2 * 100
 
-        print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
-        print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
+        #print(f'LS8 PLD + 60m NaN fraction: {ls_pld_plus_valid_frac}')
+        #print(f'S2 PLD + 60m NaN fraction: {s2_pld_plus_valid_frac}')
         pld_plus_valid_frac = min(ls_pld_plus_valid_frac, s2_pld_plus_valid_frac)
 
     print(f"Working {level} for {date} over the {roi} region")
@@ -787,10 +800,10 @@ def image_wtr_area(
         # Find otsu and adaptive thresholds
         print("----- LandSat Histogram --------------")
         ls_otsu_threshold, ls_hist = find_otsu_threshold(ls_ndwi_lakes, show_hist=False)
-        ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=True)
+        ls_adaptive_land, ls_adaptive_water = find_adaptive_thresholds(ls_hist, ls_otsu_threshold, show_hist=False)
         print("----- Sentinel-2 Histogram --------------")
         s2_otsu_threshold, s2_hist = find_otsu_threshold(s2_ndwi_lakes, show_hist=False)
-        s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=True)
+        s2_adaptive_land, s2_adaptive_water = find_adaptive_thresholds(s2_hist, s2_otsu_threshold, show_hist=False)
 
         # Make binary water masks using the thresholds
         ls_water_otsu = (ls_ndwi > ls_otsu_threshold).astype(int)
@@ -914,8 +927,8 @@ def make_area_thresholding_summaries(
                     s2_hist_bins = numpy_to_list(area_items.get('s2_hist')[1])
 
                 # Print the total water fractions for each image
-                print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive'):.2f}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive'):.2f}')
-                print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive'):.2f}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive'):.2f}')
+                #print(f'LS8 Adaptive Total = {area_items.get('total_ls_water_frac_adaptive'):.2f}, S2 adaptive Total = {area_items.get('total_s2_water_frac_adaptive'):.2f}')
+                #print(f'LS8 Adaptive Lake = {area_items.get('lake_ls_water_frac_adaptive'):.2f}, S2 adaptive Lake = {area_items.get('lake_s2_water_frac_adaptive'):.2f}')
 
                 summary = {
                     'date': date,

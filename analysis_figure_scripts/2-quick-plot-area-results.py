@@ -15,10 +15,10 @@ valids = toa_bilinear30[['roi', 'date']].agg('_'.join, axis=1).unique()
 sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_cubic30_area_summaries_batch3.csv')
 sr_bilinear30 = sr_bilinear30[sr_bilinear30[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
-sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch3.csv')
+sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch6.csv')
 sr_noresample = sr_noresample[sr_noresample[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
-toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch3.csv')
+toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch6.csv')
 toa_noresample = toa_noresample[toa_noresample[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 combined = pd.concat(
@@ -152,19 +152,19 @@ def area_boxplot_maker(
     # After all boxplot plotting, add a vertical divider between TOA and SR
     ax.axvline(x=1.5, color='gray', linestyle=':', alpha=0.9, linewidth=2.5)
 
-    ax.legend(handles=legend_elements,
-              loc='upper center',
-              bbox_to_anchor=(0.5, -0.15),
-              ncol=2,
-              frameon=True,
-              fontsize=12)
+    # ax.legend(handles=legend_elements,
+    #           loc='upper center',
+    #           bbox_to_anchor=(0.5, -0.15),
+    #           ncol=2,
+    #           frameon=True,
+    #           fontsize=12)
 
     # Set x-axis ticks and labels
     ax.set_xticks([0.45, 2.6])
     ax.set_xticklabels(['TOA', 'SR'], fontsize=16)
     
     # Set y-axis label
-    ax.set_ylabel("Water Fraction %", fontsize=16)
+    ax.set_ylabel(f"{zone_label} Water Fraction %", fontsize=16)
     
     # Clean up the plot
     ax.tick_params(axis='y', labelsize=14)
