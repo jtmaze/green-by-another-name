@@ -56,7 +56,18 @@ main_rois = gpd.GeoDataFrame(
 )
 
 footprints = pd.merge(valid_roi_dates, overlap_footprints, on=['date', 'roi'], how='left')
-footprints['roi_img_count'] = footprints.groupby('roi')['date'].transform('count')
+# Group by ROI and get the count of dates plus the first geometry
+footprints_grouped = footprints.groupby('roi').agg({
+    'date': 'count',  # Count dates per ROI
+    'geometry': 'first'  # Get the first geometry for each ROI
+}).reset_index()
+
+# Rename the date column to roi_img_count
+footprints_grouped = footprints_grouped.rename(columns={'date': 'roi_img_count'})
+
+# Use the grouped data
+footprints = footprints_grouped
+
 max_img_count = footprints['roi_img_count'].max()
 footprints['rel_img_count'] = footprints['roi_img_count'] / max_img_count
 
@@ -89,7 +100,7 @@ from scipy import ndimage
 
 # Apply Gaussian smoothing to the lake density array
 # sigma controls the amount of blur (higher = more blur)
-sigma = 1  # Adjust this value to control blur intensity
+sigma = 2  # Adjust this value to control blur intensity
 smoothed_lake_density = ndimage.gaussian_filter(lake_density.astype(float), sigma)
 
 # %%
@@ -110,16 +121,22 @@ ax.add_feature(cfeature.COASTLINE, linewidth=0.5)
 # 4.3 Create and apply custom colormap for lake density visualization
 
 colors = [
-    (1, 1, 1, 0),          # Transparent
-    (0.94, 0.97, 1, 0.3),  # Pale sky blue
-    (0.75, 0.85, 0.95, 0.5), # Light sky blue  
-    (0.5, 0.7, 0.9, 0.7),  # Sky blue
-    (0.3, 0.5, 0.8, 0.8),  # Deep sky blue
-    (0.3, 0.5, 0.8, 0.8),  # Deep sky blue
-    (0.3, 0.5, 0.8, 0.8),  # Deep sky blue
-    (0.3, 0.5, 0.8, 0.8)   # Deep sky blue
+    '#FFFFFF00',  # Transparent white
+    '#F7FBFF',    # Very light blue
+    '#DEEBF7',    # Light blue
+    '#C6DBEF',    # Light-medium blue
+    '#9ECAE1',    # Medium blue
+
+    '#6BAED6',    # Medium-dark blue
+    '#4292C6',    # Dark blue
+    '#2171B5',    # Darker blue
+    '#08519C',    # Very dark blue
+    '#08519C',    # Very dark blue (consistent above 0.5)
 ]
-positions = [0, 0.05, 0.15, 0.3, 0.4, 0.5, 0.6, 1]  # Adjusted to emphasize mid-range
+positions = [
+    0, 0.02, 0.03, 0.08, 0.12, 
+    0.17, 0.25, 0.4, 0.5, 1
+]
 
 custom_cmap = LinearSegmentedColormap.from_list('custom_blues', list(zip(positions, colors)))
 # Display lake density raster
@@ -160,16 +177,22 @@ for roi, col in color_map.items():
 
 # 4.7 Plot image footprints with color indicating count
 cmap = mpl.colors.LinearSegmentedColormap.from_list('Warm', 
-    ['#FFE4B5', '#FF7F50'])
+    ['#FFE4B5', '#FF7F50', '#8B0000'])
 
-footprints.plot(
+# Convert footprints to centroids for point representation
+footprints_centroids = footprints.copy()
+footprints_centroids.geometry = footprints_centroids.geometry.centroid
+
+footprints_centroids.plot(
     ax=ax,
     column='roi_img_count',
     cmap=cmap,
     alpha=1,
     edgecolor='black',
-    linewidth=0,
-    legend=False
+    linewidth=0.5,
+    markersize=142,
+    legend=False,
+    zorder=8
 )
 
 # 4.8 Create colorbar with custom styling
@@ -192,8 +215,8 @@ cax_img_area = inset_axes(ax,
 cax_img_area.patch.set_visible(False)
 rounded_rect = FancyBboxPatch(
     (0, 0), 1, 1,
-    facecolor='white',
-    alpha=0.8,
+    facecolor='whitesmoke',  # Much lighter than lightgrey
+    alpha=1,
     edgecolor='black',
     linewidth=5.5,
     transform=cax_img_area.transAxes,
@@ -267,7 +290,6 @@ ax.imshow(
     extent=(xmin, xmax, ymin, ymax),
     transform=ccrs.PlateCarree(),
     cmap=custom_cmap,
-    zorder=1
 )
 
 roi_mapping = {
@@ -283,24 +305,54 @@ main_rois['roi'] = main_rois['roi'].map(roi_mapping)
 
 # 3. Prepare a custom color list and map it to your ROI names
 unique_rois = main_rois['roi'].unique()
+# Option 1: High contrast with distinct hues
 custom_colors = [
-    '#87CEEB',  # Light Blue
-    '#FFE4B5',  # Soft Orange
-    '#20B2AA',  # Teal
-    '#FF6961',  # Tomato
-    '#E6E6FA',  # Soft Purple
-    '#DAA520',  # Goldenrod
+    '#D62728',  # Subdued Red
+    '#2CA02C',  # Subdued Green  
+    '#E69F00',  # Subdued Orange
+    '#CC79A7',  # Subdued Magenta/Pink
+    '#DBDB8D',  # Subdued Yellow
+    '#A461FF',  # Brighter Purple
 ]
+
+# # Option 2: Dark saturated colors
+# custom_colors2 = [
+#     '#8B0000',  # Dark Red
+#     '#006400',  # Dark Green
+#     '#000080',  # Navy Blue
+#     '#800080',  # Purple
+#     '#FF8C00',  # Dark Orange
+#     '#008B8B',  # Dark Cyan
+# ]
+
+# # Option 3: Professional color palette
+# custom_colors3 = [
+#     '#1f77b4',  # Blue
+#     '#ff7f0e',  # Orange
+#     '#2ca02c',  # Green
+#     '#d62728',  # Red
+#     '#9467bd',  # Purple
+#     '#8c564b',  # Brown
+# ]
+
+# # Option 4: Maximum contrast palette
+# custom_colors = [
+#     '#000000',  # Black
+#     '#FF0000',  # Red
+#     '#00FF00',  # Lime
+#     '#0000FF',  # Blue
+#     '#FFFF00',  # Yellow
+#     '#FF00FF',  # Magenta
+#]
 color_map = dict(zip(unique_rois, custom_colors))
 
-# 4. Plot the main ROIs with colors and add them to the legend
+# 4. Plot the main ROIs with colored outlines only (no fill)
 for roi, col in color_map.items():
     subset = main_rois[main_rois['roi'] == roi]
-    subset.plot(
+    subset.boundary.plot(
         ax=ax,
-        facecolor=col,  # Fill the polygons with the color
-        edgecolor='maroon',  # Keep the boundary color
-        linewidth=1,
+        edgecolor=col,  # Use the color for the outline
+        linewidth=3.5,    # Make the outline a bit thicker for visibility
         label=str(roi)  # Add label for legend
     )
 
@@ -308,22 +360,23 @@ for roi, col in color_map.items():
 
 # Create a font dictionary with bold weight
 title_font = fm.FontProperties(weight='bold', size=18)
-handles = [mpatches.Patch(facecolor=col, edgecolor='navy', label=roi) for roi, col in color_map.items()]
+# Create patches with both fill color and border color
+handles = [mpatches.Patch(facecolor=col, alpha=1, edgecolor=col, linewidth=3, label=roi) for roi, col in color_map.items()]
 legend = ax.legend(
     handles=handles,
     loc='lower right',
     title='Hydrographic Regions',
     fontsize=12,
     title_fontproperties=title_font,
-    facecolor='white',
+    facecolor='whitesmoke',
     frameon=True,                # Enable the bounding box
     handlelength=3.0,
     handleheight=1.5,
     labelspacing=1.2,
     borderpad=1.0,
-    handletextpad=1.0
+    handletextpad=1.0, 
 )
-legend.get_frame().set_alpha(0.8)  
+legend.get_frame().set_alpha(1)  
 legend.get_frame().set_edgecolor('white')  # Set the border color to white
 
 
