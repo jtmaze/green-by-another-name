@@ -11,7 +11,7 @@ import numpy as np
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-resample_methods = ['bilinear30', 'noresample', 'lanczos30']
+resample_methods = ['bilinear30', 'noresample']
 
 temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()

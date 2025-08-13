@@ -125,8 +125,8 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Absolute Difference (%)', fontsize=16)
+ax.set_xticklabels(x_labels, fontsize=18)
+ax.set_ylabel('Absolute % Difference (Landsat 8 - Sentinel-2)', fontsize=16)
 ax.tick_params(axis='y', labelsize=14)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 
@@ -203,8 +203,8 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Relative Difference (%)', fontsize=16)
+ax.set_xticklabels(x_labels, fontsize=18)
+ax.set_ylabel('Relative % Difference (Landsat 8 - Sentinel-2)', fontsize=16)
 ax.tick_params(axis='y', labelsize=14)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 plt.ylim(rel_y_lim)
@@ -215,13 +215,13 @@ sr_patch = mpatches.Patch(facecolor=level_colors['sr'], label='SR', alpha=0.7, e
 bilinear_patch = mpatches.Patch(facecolor='lightgrey', label='Bilinear 30 meters', edgecolor='black')
 noresample_patch = mpatches.Patch(facecolor='lightgrey', hatch='//', label='No Resample', edgecolor='black')
 
-ax.legend(
-    handles=[toa_patch, sr_patch, bilinear_patch, noresample_patch],
-    loc='upper center',
-    bbox_to_anchor=(0.5, -0.08),
-    ncol=2,
-    fontsize=18
-)
+# ax.legend(
+#     handles=[toa_patch, sr_patch, bilinear_patch, noresample_patch],
+#     loc='upper center',
+#     bbox_to_anchor=(0.5, -0.08),
+#     ncol=2,
+#     fontsize=18
+# )
 
 plt.tight_layout()
 plt.show()

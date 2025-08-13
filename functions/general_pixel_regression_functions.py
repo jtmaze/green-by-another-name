@@ -145,7 +145,7 @@ def regress_reflectance(
             np.max([arr1_modeled.max(), arr2_modeled.max()])
         )
 
-        #regression_vis(arr1_modeled, arr2_modeled, model, comparison)
+        regression_vis(arr1_modeled, arr2_modeled, model, comparison)
 
         if hist_return == True:
             arr1_histogram = np.histogram(arr1_modeled, bins=100)

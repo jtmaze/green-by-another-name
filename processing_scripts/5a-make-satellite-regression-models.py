@@ -20,6 +20,8 @@ resample_pattern = r'/reprojected_(.*?)_'
 
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
+rois = ['TUK_sub1']
+image_dates = ['2020-08-23']
 resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'  # 'nearest', 'bilinear30', 'cubic30'
 levels = ['sr', 'toa']
@@ -98,10 +100,10 @@ out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
 print(len(out_df))
 
-out_df.to_csv(
-    f'./data/regression_summaries/sat_regression_summaries_60m_lake_{resample_method}_batch3.csv',
-    index=False
-)
+# out_df.to_csv(
+#     f'./data/regression_summaries/sat_regression_summaries_60m_lake_{resample_method}_batch3.csv',
+#     index=False
+# )
 
 image_info = {
     'level': None,
@@ -163,10 +165,10 @@ ndwi_df = make_satellite_reflectance_summaries(
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv(
-    f'./data/regression_summaries/sat_regression_summaries_0m_lake_{resample_method}_batch3.csv',
-    index=False
-)
+# out_df.to_csv(
+#     f'./data/regression_summaries/sat_regression_summaries_0m_lake_{resample_method}_batch3.csv',
+#     index=False
+# )
 # %%
 
 image_info = {
@@ -230,10 +232,10 @@ ndwi_df = make_satellite_reflectance_summaries(
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv(
-    f'./data/regression_summaries/sat_regression_summaries_shoreline_neg60-60_{resample_method}_batch3.csv',
-    index=False
-)
+# out_df.to_csv(
+#     f'./data/regression_summaries/sat_regression_summaries_shoreline_neg60-60_{resample_method}_batch3.csv',
+#     index=False
+# )
 
 """
 Land outside of the 60m buffer
@@ -300,10 +302,10 @@ ndwi_df = make_satellite_reflectance_summaries(
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv(
-    f'./data/regression_summaries/sat_regression_summaries_60m_land_{resample_method}_batch3.csv',
-    index=False
-)
+# out_df.to_csv(
+#     f'./data/regression_summaries/sat_regression_summaries_60m_land_{resample_method}_batch3.csv',
+#     index=False
+# )
 
 # %%
 
@@ -369,9 +371,9 @@ ndwi_df = make_satellite_reflectance_summaries(
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']
-out_df.to_csv(
-    f'./data/regression_summaries/sat_regression_summaries_shoreline_neg30-30_{resample_method}_batch3.csv',
-    index=False
-)
+# out_df.to_csv(
+#     f'./data/regression_summaries/sat_regression_summaries_shoreline_neg30-30_{resample_method}_batch3.csv',
+#     index=False
+# )
 
 # %%

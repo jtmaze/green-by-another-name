@@ -150,8 +150,8 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Absolute Difference (%)', fontsize=16)
+ax.set_xticklabels(x_labels, fontsize=18)
+ax.set_ylabel('Absolute % Difference (TOA - SR)', fontsize=18)
 ax.tick_params(axis='y', labelsize=14)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 
@@ -210,8 +210,8 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Relative Difference (%)', fontsize=16)
+ax.set_xticklabels(x_labels, fontsize=18)
+ax.set_ylabel('Relative % Difference (TOA - SR)', fontsize=18)
 ax.tick_params(axis='y', labelsize=14)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 plt.ylim((-45, 210))
