@@ -17,14 +17,11 @@ valids = pd.read_csv(f'{area_dir}/toa_resampled_bilinear30_area_summaries_batch3
 valids = valids[['roi', 'date']].agg('_'.join, axis=1).unique()
 # %%
 
-lake_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_0m_lake_{resample_method}_batch3.csv')
+lake_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_60m_lake_{resample_method}_batch3.csv')
 lake_data['zone'] = 'lake'
 lake_data = lake_data[lake_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 print(len(lake_data))
-lake_plus_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_60m_lake_{resample_method}_batch3.csv')
-lake_plus_data['zone'] = 'lake_plus'
-lake_plus_data = lake_plus_data[lake_plus_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
-print(len(lake_plus_data))
+# NOTE removed lake_plus data
 land_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summaries_60m_land_{resample_method}_batch3.csv')
 land_data['zone'] = 'land'
 land_data = land_data[land_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
@@ -38,13 +35,13 @@ shoreline_tight_data = pd.read_csv(f'{reflectance_comp_dir}/sat_regression_summa
 # shoreline_tight_data = shoreline_tight_data[shoreline_tight_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 # print(len(shoreline_tight_data))
 
-combined = pd.concat([lake_data, lake_plus_data, land_data, shoreline_data])
+combined = pd.concat([lake_data, land_data, shoreline_data])
 
 cols_to_keep = ['level', 'roi', 'date', 'zone', 'band_name', 'r_squared', 'slope', 'intercept', 'above_frac']
 
 combined_clean = combined[cols_to_keep]
 
-# %% TOA plot the r-squared values
+# %% Plot r-squared values
 lvl = 'toa'
 plot_data = combined_clean[combined_clean['level'] == lvl]
 
@@ -90,54 +87,46 @@ bad_corr_counts = bad_corr.groupby('band_name').size().reset_index(name='count')
 print(bad_corr_counts)
 
 
-# %% SR plot the r-squared values
+# %% Plot percent bias
 
-lvl = 'toa'
-plot_data = combined_clean[combined_clean['level'] == lvl]
+plot_data = combined_clean.copy()
 
 zone_label_map = {
     'lake': 'Lakes',
-    'lake_plus': 'Buffered Lakes',
     'land': 'Land',
     'shoreline': 'Shoreline'
 }
 
-plot_data['zone_label'] = plot_data['zone'].map(zone_label_map)
+level_label_map = {
+    'sr': 'SR',
+    'toa': 'TOA'
+}
 
-plt.figure(figsize=(12, 10))
+plot_data['zone_label'] = plot_data['zone'].map(zone_label_map)
+plot_data['level_label'] = plot_data['level'].map(level_label_map)
+plot_data = plot_data[plot_data['band_name'] == 'NDWI']
+
+plt.figure(figsize=(10, 10))
 ax = sns.boxplot(
     data=plot_data,
     x='zone_label',
     y='above_frac',
-    hue='band_name',
-    palette='Set2',
-    legend=False
-    # Remove the legend=False to allow legend creation
+    hue='level_label',
+    palette={'SR': '#88c999', 'TOA': '#6a9ecf'},
+    width=0.7
 )
 
-plt.axhline(y=50, color='red', linestyle='--', linewidth=4)
-plt.xlabel(None)
-plt.ylim(0, 100)
-ax.set_ylabel('Sentinel-2 % higher', fontsize=20)
 ax.set_xlabel(None)
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=18)
-ax.set_yticklabels(ax.get_yticklabels(), fontsize=18)
+ax.set_ylabel('Sentinel-2 % pixels higher', fontsize=20)
+plt.ylim(0, 100)
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=22)
+yticks = ax.get_yticks()
+ax.set_yticklabels([f"{y:.0f}" for y in yticks], fontsize=18)
+plt.axhline(y=50, color='red', linestyle='--', linewidth=4)
 
-# Move the legend below the plot and increase font size
-# handles, labels = ax.get_legend_handles_labels()
-# ax.legend(
-#     handles=handles, 
-#     labels=labels,
-#     loc='upper center',          # Position at upper center
-#     bbox_to_anchor=(0.5, -0.15), # Move below plot (x=0.5 centers it, y=-0.15 places it below)
-#     ncol=3,                      # Spread legend items horizontally in 3 columns
-#     fontsize=12,                 # Increase font size
-#     frameon=True,                # Add a frame around the legend
-#     title=None                   # No legend title
-# )
-
-# # Add padding at the bottom to make room for the legend
-# plt.subplots_adjust(bottom=0.2)
+# Make legend larger to match ac-spectral-pearson-bias
+legend = ax.legend(fontsize=22, loc='best', frameon=True)
+legend.set_title('')  # Remove title if you don't need it
 
 plt.show()
 
@@ -146,6 +135,10 @@ plt.show()
 summary = combined.groupby(['level', 'band_name']).agg(
     mean_r_squared=('r_squared', 'mean'),
     mean_above_frac=('above_frac', 'mean'),
+    sd_above_frac=('above_frac', 'std'),
+    q1_above_frac=('above_frac', lambda x: x.quantile(0.25)),
+    q3_above_frac=('above_frac', lambda x: x.quantile(0.75)),
+    iqr_above_frac=('above_frac', lambda x: x.quantile(0.75) - x.quantile(0.25))
 ).reset_index()
 
 

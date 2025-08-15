@@ -40,7 +40,6 @@ for i in resample_methods:
 
     cols_to_make_float = [
         'total_ls_water_frac_otsu', 'total_ls_water_frac_adaptive', 'total_s2_water_frac_otsu', 'total_s2_water_frac_adaptive',
-        'lake_ls_water_frac_otsu', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_otsu', 'lake_s2_water_frac_adaptive',
         'shoreline_ls_water_frac_otsu', 'shoreline_ls_water_frac_adaptive', 'shoreline_s2_water_frac_otsu', 'shoreline_s2_water_frac_adaptive',
     ]
 
@@ -54,11 +53,6 @@ for i in resample_methods:
     sr['relative_total_diff_sr'] = (
         sr['total_diff_sr'] / ((sr['total_ls_water_frac_adaptive'] + sr['total_s2_water_frac_adaptive']) * 0.5) * 100
     )
-    # Lake Difference
-    sr['lake_diff_sr'] = sr['lake_ls_water_frac_adaptive'] - sr['lake_s2_water_frac_adaptive']
-    sr['relative_lake_diff_sr'] = (
-        sr['lake_diff_sr'] / ((sr['lake_ls_water_frac_adaptive'] + sr['lake_s2_water_frac_adaptive']) * 0.5) * 100
-    )
     # Shoreline Difference
     sr['shoreline_diff_sr'] = sr['shoreline_ls_water_frac_adaptive'] - sr['shoreline_s2_water_frac_adaptive']
 
@@ -71,8 +65,8 @@ for i in resample_methods:
         sr['lake_shoreline_diff_sr'] / ((sr['buff_lake_ls_water_frac_adaptive'] + sr['buff_lake_s2_water_frac_adaptive']) * 0.5) * 100
     )
 
-    abs_plot_data = sr[['total_diff_sr', 'lake_diff_sr', 'shoreline_diff_sr', 'lake_shoreline_diff_sr']].copy()
-    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
+    abs_plot_data = sr[['total_diff_sr', 'shoreline_diff_sr', 'lake_shoreline_diff_sr']].copy()
+    abs_plot_data.columns = ['Total Landscape', 'Shoreline', 'Lake + Shoreline']  # Rename columns
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
     plt.axhline(0, color='red', linestyle='--')
@@ -81,8 +75,8 @@ for i in resample_methods:
     plt.ylabel(None)
     plt.xlabel(None)
 
-    rel_plot_data = sr[['relative_total_diff_sr', 'relative_lake_diff_sr', 'relative_shoreline_diff_sr', 'relative_lake_shoreline_diff_sr']].copy()
-    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
+    rel_plot_data = sr[['relative_total_diff_sr', 'relative_shoreline_diff_sr', 'relative_lake_shoreline_diff_sr']].copy()
+    rel_plot_data.columns = ['Total Landscape', 'Shoreline', 'Lake + Shoreline']  # Rename columns
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
     plt.axhline(0, color='red', linestyle='--')
@@ -112,28 +106,6 @@ for i in resample_methods:
         '25th_percentile_rel': np.percentile(sr['relative_total_diff_sr'], 25),
         'iqr_abs': np.percentile(sr['total_diff_sr'], 75) - np.percentile(sr['total_diff_sr'], 25),
         'iqr_rel': np.percentile(sr['relative_total_diff_sr'], 75) - np.percentile(sr['relative_total_diff_sr'], 25)
-    }
-    
-    lake_ttest = stats.ttest_1samp(sr['relative_lake_diff_sr'].dropna(), 0)
-    lake_ttest_absolute = stats.ttest_1samp(sr['lake_diff_sr'].dropna(), 0)
-    lake_result = {
-        'level': 'sr',
-        'resample_method': i,
-        'zone': 'lake',
-        't_statistic_rel': lake_ttest.statistic,
-        'p_value_rel': lake_ttest.pvalue,
-        't_statistic_abs': lake_ttest_absolute.statistic,
-        'p_value_abs': lake_ttest_absolute.pvalue,
-        'mean_diff_rel': np.mean(sr['relative_lake_diff_sr']),
-        'mean_diff_abs': np.mean(sr['lake_diff_sr']),
-        'var_diff_rel': np.var(sr['relative_lake_diff_sr']),
-        'var_diff_abs': np.var(sr['lake_diff_sr']),
-        '75th_percentile_abs': np.percentile(sr['lake_diff_sr'], 75),
-        '25th_percentile_abs': np.percentile(sr['lake_diff_sr'], 25),
-        '75th_percentile_rel': np.percentile(sr['relative_lake_diff_sr'], 75),
-        '25th_percentile_rel': np.percentile(sr['relative_lake_diff_sr'], 25),
-        'iqr_abs': np.percentile(sr['lake_diff_sr'], 75) - np.percentile(sr['lake_diff_sr'], 25),
-        'iqr_rel': np.percentile(sr['relative_lake_diff_sr'], 75) - np.percentile(sr['relative_lake_diff_sr'], 25)
     }
     
     shoreline_ttest = stats.ttest_1samp(sr['relative_shoreline_diff_sr'].dropna(), 0)
@@ -181,23 +153,17 @@ for i in resample_methods:
     }
 
     test_results.append(total_result)
-    test_results.append(lake_result)
     test_results.append(shoreline_result)
     test_results.append(lake_shoreline_result)
 
     # TOA Boxplot and t-tests
     toa['total_diff_toa'] = toa['total_ls_water_frac_adaptive'] - toa['total_s2_water_frac_adaptive']
-    toa['lake_diff_toa'] = toa['lake_ls_water_frac_adaptive'] - toa['lake_s2_water_frac_adaptive']
     toa['shoreline_diff_toa'] = toa['shoreline_ls_water_frac_adaptive'] - toa['shoreline_s2_water_frac_adaptive']
     # Lake plus shoreline difference
     toa['lake_shoreline_diff_toa'] = toa['buff_lake_ls_water_frac_adaptive'] - toa['buff_lake_s2_water_frac_adaptive']
     
     toa['relative_total_diff_toa'] = (
         toa['total_diff_toa'] / ((toa['total_ls_water_frac_adaptive'] + toa['total_s2_water_frac_adaptive']) * 0.5) * 100
-    )
-
-    toa['relative_lake_diff_toa'] = (
-        toa['lake_diff_toa'] / ((toa['lake_ls_water_frac_adaptive'] + toa['lake_s2_water_frac_adaptive']) * 0.5) * 100
     )
 
     toa['relative_shoreline_diff_toa'] = (
@@ -208,8 +174,8 @@ for i in resample_methods:
     )
 
     # TOA Boxplot with renamed columns for absolute differences
-    abs_plot_data = toa[['total_diff_toa', 'lake_diff_toa', 'shoreline_diff_toa', 'lake_shoreline_diff_toa']].copy()
-    abs_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
+    abs_plot_data = toa[['total_diff_toa', 'shoreline_diff_toa', 'lake_shoreline_diff_toa']].copy()
+    abs_plot_data.columns = ['Total Landscape', 'Shoreline', 'Lake + Shoreline']  # Rename columns
 
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=abs_plot_data)
@@ -220,8 +186,8 @@ for i in resample_methods:
     plt.xlabel(None)
 
     # TOA Boxplot with renamed columns for relative differences
-    rel_plot_data = toa[['relative_total_diff_toa', 'relative_lake_diff_toa', 'relative_shoreline_diff_toa', 'relative_lake_shoreline_diff_toa']].copy()
-    rel_plot_data.columns = ['Total Landscape', 'Lake', 'Shoreline', 'Lake + Shoreline']  # Rename columns
+    rel_plot_data = toa[['relative_total_diff_toa', 'relative_shoreline_diff_toa', 'relative_lake_shoreline_diff_toa']].copy()
+    rel_plot_data.columns = ['Total Landscape', 'Shoreline', 'Lake + Shoreline']  # Rename columns
 
     plt.figure(figsize=(8, 6))
     sns.boxplot(data=rel_plot_data)
@@ -252,28 +218,6 @@ for i in resample_methods:
         '25th_percentile_rel': np.percentile(toa['relative_total_diff_toa'], 25),
         'iqr_abs': np.percentile(toa['total_diff_toa'], 75) - np.percentile(toa['total_diff_toa'], 25),
         'iqr_rel': np.percentile(toa['relative_total_diff_toa'], 75) - np.percentile(toa['relative_total_diff_toa'], 25)
-    }
-    
-    lake_ttest = stats.ttest_1samp(toa['relative_lake_diff_toa'].dropna(), 0)
-    lake_ttest_absolute = stats.ttest_1samp(toa['lake_diff_toa'].dropna(), 0)
-    lake_result = {
-        'level': 'toa',
-        'resample_method': i,
-        'zone': 'lake',
-        't_statistic_rel': lake_ttest.statistic,
-        'p_value_rel': lake_ttest.pvalue,
-        't_statistic_abs': lake_ttest_absolute.statistic,
-        'p_value_abs': lake_ttest_absolute.pvalue,
-        'mean_diff_rel': np.mean(toa['relative_lake_diff_toa']),
-        'mean_diff_abs': np.mean(toa['lake_diff_toa']),
-        'var_diff_rel': np.var(toa['relative_lake_diff_toa']),
-        'var_diff_abs': np.var(toa['lake_diff_toa']),
-        '75th_percentile_abs': np.percentile(toa['lake_diff_toa'], 75),
-        '25th_percentile_abs': np.percentile(toa['lake_diff_toa'], 25),
-        '75th_percentile_rel': np.percentile(toa['relative_lake_diff_toa'], 75),
-        '25th_percentile_rel': np.percentile(toa['relative_lake_diff_toa'], 25),
-        'iqr_abs': np.percentile(toa['lake_diff_toa'], 75) - np.percentile(toa['lake_diff_toa'], 25),
-        'iqr_rel': np.percentile(toa['relative_lake_diff_toa'], 75) - np.percentile(toa['relative_lake_diff_toa'], 25)
     }
     
     shoreline_ttest = stats.ttest_1samp(toa['relative_shoreline_diff_toa'].dropna(), 0)
@@ -321,7 +265,6 @@ for i in resample_methods:
     }
     
     test_results.append(total_result)
-    test_results.append(lake_result)
     test_results.append(shoreline_result)
     test_results.append(lake_shoreline_result)
 
@@ -330,22 +273,18 @@ for i in resample_methods:
     """
 
     landscape_series = toa['relative_total_diff_toa']
-    lake_series = toa['relative_lake_diff_toa']
     shoreline_series = toa['relative_shoreline_diff_toa']
     lake_shoreline_series = toa['relative_lake_shoreline_diff_toa']
 
     f_statistic, p_value = stats.f_oneway(
         landscape_series,
-        lake_series,
         shoreline_series,
         lake_shoreline_series
     )
     print(f'ANOVA F-statistic: {f_statistic}, p-value: {p_value}')
-    # Double check the series lengths
 
     tukey_df = pd.DataFrame({
         'landscape': landscape_series,
-        'lake': lake_series,
         'shoreline': shoreline_series,
         'lake_shoreline': lake_shoreline_series
     })

@@ -20,8 +20,7 @@ resample_pattern = r'/reprojected_(.*?)_'
 
 image_dates = extract_unique(full_files, date_pattern)
 rois = extract_unique(full_files, roi_pattern)
-rois = ['TUK_sub1']
-image_dates = ['2020-08-23']
+
 resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'  # 'nearest', 'bilinear30', 'cubic30'
 levels = ['sr', 'toa']
@@ -75,6 +74,7 @@ nir_df = make_satellite_reflectance_summaries(
     hist_return=False,
 )
 print("Done")
+# %% 
 
 # NDWI Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'NDWI'

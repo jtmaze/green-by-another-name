@@ -111,3 +111,16 @@ plt.tight_layout()
 plt.show()
 
 # %%
+
+plot_data['roi_main'] = plot_data['roi'].str.split('_').str[0]
+# Group the data by roi_main and calculate means for seasonal fractions and relative satellite difference
+main_region_summary = plot_data.groupby('roi_main')[['gswo_seasonal_frac', 'glad_seasonal_frac', 'rel_sat_diff']].mean()
+
+# Add count of lakes per region
+
+print("Summary by main region:")
+print(main_region_summary)
+
+
+
+

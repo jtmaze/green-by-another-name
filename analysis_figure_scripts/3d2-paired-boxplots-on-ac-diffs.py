@@ -18,7 +18,7 @@ valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
 cols_to_keep = [
     'date', 'roi', 'level', 'resample_method', 'total_ls_water_frac_adaptive',
-    'total_s2_water_frac_adaptive', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive',
+    'total_s2_water_frac_adaptive', #'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive',
     'buff_lake_ls_water_frac_adaptive', 'buff_lake_s2_water_frac_adaptive', 'shoreline_ls_water_frac_adaptive',
     'shoreline_s2_water_frac_adaptive'
 ]
@@ -37,7 +37,7 @@ for r in resample_methods:
 
     level_df = pd.concat(level_list)
 
-    zone_prefixes = ['total_', 'lake_', 'buff_lake_', 'shoreline_']
+    zone_prefixes = ['total_', 'buff_lake_', 'shoreline_']
 
     for z in zone_prefixes:
 
@@ -94,8 +94,8 @@ plot_long['satellite'] = plot_long['satellite'].str.replace('_abs_diff', '')
 
 zone_names = {
     'total': 'Scene Total',
-    'lake': 'Lakes',
-    'buff': 'Buffered Lakes',
+    #'lake': 'Lakes',
+    'buff': 'Lakes',
     'shoreline': 'Shoreline'
 }
 
@@ -106,7 +106,7 @@ satellite_colors = {
 
 fig, ax = plt.subplots(figsize=(12, 8))
 
-zones = ['total', 'lake', 'buff', 'shoreline']
+zones = ['total', 'buff', 'shoreline']
 resample_methods_ordered = ['bilinear30', 'noresample']
 satellites_ordered = ['ls', 's2']
 
@@ -150,9 +150,9 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=18)
-ax.set_ylabel('Absolute % Difference (TOA - SR)', fontsize=18)
-ax.tick_params(axis='y', labelsize=14)
+ax.set_xticklabels(x_labels, fontsize=20)
+ax.set_ylabel('Absolute % Difference (TOA - SR)', fontsize=20)
+ax.tick_params(axis='y', labelsize=16)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 
 plt.ylim((-10, 55))
@@ -210,9 +210,9 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=18)
-ax.set_ylabel('Relative % Difference (TOA - SR)', fontsize=18)
-ax.tick_params(axis='y', labelsize=14)
+ax.set_xticklabels(x_labels, fontsize=20)
+ax.set_ylabel('Relative % Difference (TOA - SR)', fontsize=20)
+ax.tick_params(axis='y', labelsize=16)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 plt.ylim((-45, 210))
 
