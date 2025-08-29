@@ -1,11 +1,11 @@
 """
 This script iterates through the potential overlapping dates for a image targe area. The high-level steps are:
 1. Spatially and temporally filter the Sentinel-2 and Landsat 8 image collections by the overlap footprint and date
-2. Becuase the overlap footprint was generated using mosaics, we need to find the best image pair for each date.
+2. Becuase the overlap footprint was generated using mosaics (i.e., multiple image tiles), we need to find the best image pair for each date.
    - The main criteria are lowest masked fraction and highest overlap area
    - First, we find the best Sentinel-2 image and its mask
    - Then, we find the Landsat 8 image with high overlap that also meets the masked fraction threshold.
-3. We gernerate a common LS8 and S2 mask, which is seived (to remove noise) and dilated (for conservative masking)
+3. We gernerate a common LS8 and S2 mask, which is seived (to remove noise) and dilated (for conservative masking of clouds, snow/ice, and cloud shaddows)
 4. We export the images and common mask to Google Drive
 5. We also save each images metadata (sun angle, cloud percetage, etc.) to a CSV file
 """
@@ -31,7 +31,7 @@ roi_prefix = roi_name.split('_')[0]
 #region_shapes = gpd.read_file(f'./data/roi_shapes/rois/{roi_prefix}_sub_rois.shp')
 #full_roi_shape = region_shapes[region_shapes['sub_name'] == roi_name].iloc[0]
 
-# 2.0 Functions
+# 2.0 Functions for Earth Engine API
 
 def convert_gpd_geom_to_ee(geom, est_utm):
     """
@@ -53,6 +53,9 @@ def get_mask_frac(
     polygon: ee.Geometry,
     scale: int
 ):
+    """
+    Finds the proportion of masked pixels in an image. 
+    """
     stats = mask.reduceRegion(
         reducer=ee.Reducer.mean(),
         geometry=polygon,
@@ -67,6 +70,7 @@ def get_mask_frac(
 
 def add_scl_join_key(img):
     """
+    For joining Sentinel-2's Scene Classification Layer (SCL) to the Cloud Probability dataset
     Turns the SCL collection's PRODUCT_ID attribute into key that can be joined 
     with the cloud collection's system:index attribute
     """
@@ -78,6 +82,7 @@ def add_scl_join_key(img):
 
 def add_cloud_join_key(img):
     """
+    For joining Sentinel-2's Cloud Probability dataset to the Scene Classifacation Layer
     Turns the cloud collection's system:index attribute into a key that can be joined
     with the SCL collection's PRODUCT_ID attribute
     """
@@ -88,7 +93,10 @@ def add_cloud_join_key(img):
     return img.set('join_key', join_key)
 
 def mask_full_s2_mask(feature):
-
+    """
+    Produces a comprehensive Sentinel-2 data mask removing clouds, ice, etc. 
+    Requires joining the Cloud Probability Dataset to the Scene classifacation layer. 
+    """
     scl_img = ee.Image(feature.get('primary'))
     cloud_img = ee.Image(feature.get('secondary'))
     
@@ -116,18 +124,18 @@ def calc_s2_mask_stats(
     s2_clouds: ee.ImageCollection,
     polygon: ee.Geometry,
 ):
-
+    """
+    Calculates the proportion of masked Sentinel-2 pixels for each criteria. For
+    example, X % snow & ice, and Y % cirrus clouds.
+    """
     mask_attrs_list = []
     col_size = s2_scl.size().getInfo()
     s2_scl_list = s2_scl.toList(col_size)
     cloud_col_size = s2_clouds.size().getInfo()
     s2_cloud_list = s2_clouds.toList(col_size)
-    # Commented out this sanity check on join keys
-    # print("***************************")
-    # print("Checking Sentinel-2 SCL and Cloud Probability join keys")
-    # print(f"Sizes are scl={col_size} and clouds={cloud_col_size}")
+
     for i in range(col_size):
-        # print('---------------------')
+
         # print('CHECKING JOIN KEYS FOR S2 MASK...')
         scl_img = ee.Image(s2_scl_list.get(i))
         scl_key = scl_img.get('join_key').getInfo()  # get join_key as a client-side string
@@ -143,8 +151,7 @@ def calc_s2_mask_stats(
         cloud_binary = cloud_img.gte(70).rename('s2_opaque_clouds')
         cloud_frac = get_mask_frac(cloud_binary, 's2_opaque_clouds', polygon, 10)
         cloud_key = cloud_img.get('join_key').getInfo()
-        # print("Cloud join_key:", cloud_key)
-        # print('----------------------')
+
         attrs = {
             's2_shaddows': shaddow_frac,
             's2_cirrus': cirrus_frac,
@@ -152,7 +159,6 @@ def calc_s2_mask_stats(
             's2_clouds': cloud_frac
         }
         mask_attrs_list.append(attrs)
-    #print("****************************")
 
     return mask_attrs_list
 
@@ -162,7 +168,7 @@ def make_s2_mask_col(
     date_plus1d: str,
 ):
     """
-    Uses Sentinel-2 SCL and Cloud Probability Bands to produce a collection of cloud masks.
+    Uses Sentinel-2 SCL band and Cloud Probability dataset to produce a collection of pixel masks.
     Eliminates: Clouds, Cloud Shaddows, Snow/Ice, cirrus clouds
     Returns: A collection of images for each tile's combined mask
 
@@ -199,6 +205,9 @@ def calc_ls8_mask_stats(
     ls8_qa: ee.ImageCollection,
     polygon: ee.Geometry
 ):
+    """
+    Generates a full data mask for Landsat 8 with all of the masked attributes (snow/ice, shaddows, etc.)
+    """
     mask_attrs_list = []
     cloud_bit_mask = 1 << 3
     shaddow_bit_mask = 1 << 4
@@ -238,7 +247,8 @@ def make_ls8_mask_col(
     level: str
 ): 
     """
-    Generates the LS8 data mask from the QA_PIXEL band
+    Generates the LS8 data mask from the QA_PIXEL band applies the mask conditions across the
+    whole collection (snow/ice, shaddows, ect.)
     """
     if level == 'sr':
         asset_string = "LANDSAT/LC08/C02/T1_L2"
@@ -271,8 +281,6 @@ def make_ls8_mask_col(
     ls8_mask_col = ls8_qa.map(apply_bitmask)
 
     return ls8_mask_col, ls8_attrs_list
-
-
 
 def compute_valid_pixel_coverage(
     mask_image: ee.Image, 

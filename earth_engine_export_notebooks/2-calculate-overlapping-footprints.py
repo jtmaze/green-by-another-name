@@ -4,9 +4,9 @@ Calculate Overlapping Footprint Area Between Landsat 8 and Sentinel-2 Imagery
 This script processes previously exported satellite footprints from Google Earth Engine
 to identify areas where both Landsat 8 and Sentinel-2 imagery overlap for the same date.
 The script:
-1. Loads and processes shapefiles containing image footprints for each sensor
+1. Loads shapefiles containing image footprints for each sensor (Landsat 8 and Sentinel-2)
 2. Calculates intersection areas between the two sensors for each date
-3. Computes coverage percentages relative to region of interest (ROI)
+3. Computes coverage percentages (comon to both sensors) relative to region of interest (ROI)
 4. Exports the results as shapefiles indexed by date for further analysis
 
 Input: Shapefile exports from GEE containing satellite footprints
@@ -89,8 +89,3 @@ for r in unique_rois:
     # Filtering out non-Polygon geometries (e.g., LINESTRING) that may result from intersection operations
     top_dates = top_dates[top_dates.geometry.type == 'Polygon']
     top_dates.to_file(f'./data/overlap_dates_for_roi/{r}_overlap_dates.shp')
-
-
-
-
-# %%
