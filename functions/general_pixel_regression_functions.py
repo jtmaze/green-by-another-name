@@ -79,7 +79,7 @@ def regression_vis(
     min_modeled = model['slope'] * xmin_val + model['intercept']
     max_modeled = model['slope'] * xmax_val + model['intercept']
 
-    plt.figure(figsize=(8,6))
+    plt.figure(figsize=(8,8))
     plt.scatter(arr1_modeled, arr2_modeled, s=1, marker='.', alpha=0.4)
     plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='RMA Fit')
     # Add a 45 degree line for comparison
@@ -93,11 +93,11 @@ def regression_vis(
     plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
             verticalalignment='top', bbox=box_props)
     if comparison == 'AC':
-        xlab = 'TOA Reflectance'
-        ylab = 'SR Reflectance'
+        xlab = 'TOA NDWI Reflectance'
+        ylab = 'SR NDWI Reflectance'
     elif comparison == 'Satellite':
-        xlab = 'Landsat Reflectance'
-        ylab = 'Sentinel-2 Reflectance'
+        xlab = 'Landsat NDWI Reflectance'
+        ylab = 'Sentinel-2 NDWI Reflectance'
         
     plt.xlabel(xlab)
     plt.ylabel(ylab)
@@ -145,7 +145,7 @@ def regress_reflectance(
             np.max([arr1_modeled.max(), arr2_modeled.max()])
         )
 
-        #regression_vis(arr1_modeled, arr2_modeled, model, comparison)
+        regression_vis(arr1_modeled, arr2_modeled, model, comparison)
 
         if hist_return == True:
             arr1_histogram = np.histogram(arr1_modeled, bins=100)

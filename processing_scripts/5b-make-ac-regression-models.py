@@ -45,7 +45,7 @@ regression_params = {
     'outlier_frac': 0,
 }
 
-# SECTION 2.1: Green Band - Lake Zone (60m buffer)
+# %% SECTION 2.1: Green Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'Green'
 image_info['resample_method'] = resample_method
 
@@ -59,7 +59,7 @@ green_df = make_ac_reflectance_summaries(
     hist_return=False
 )
 
-# SECTION 2.2: NIR Band - Lake Zone (60m buffer)
+# %% SECTION 2.2: NIR Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'NIR'
 image_info['resample_method'] = resample_method
 
@@ -73,7 +73,7 @@ nir_df = make_ac_reflectance_summaries(
     hist_return=False
 )
 
-# SECTION 2.3: NDWI Band - Lake Zone (60m buffer)
+# %% SECTION 2.3: NDWI Band - Lake Zone (60m buffer)
 image_info['band_name'] = 'NDWI'
 image_info['resample_method'] = resample_method
 regression_params['outlier_frac'] = 0  # Don't omit any ndwi outliers, because they are not way off scale.
@@ -88,7 +88,7 @@ ndwi_df = make_ac_reflectance_summaries(
     hist_return=False
 )
 
-# SECTION 2.4: Save the 60m Lake regression summaries to a CSV
+# %% SECTION 2.4: Save the 60m Lake regression summaries to a CSV
 out_df = pd.concat([green_df, nir_df, ndwi_df])
 out_df = out_df[out_df['slope'] != 'No Image Data']
 out_df = out_df[out_df['slope'] != 'Poor Quality Image Data']

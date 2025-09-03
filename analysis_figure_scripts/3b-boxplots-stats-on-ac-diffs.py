@@ -12,7 +12,7 @@ import numpy as np
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-resample_methods = ['bilinear30', 'noresample', 'lanczos30']
+resample_methods = ['bilinear30', 'noresample']
 temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
@@ -72,6 +72,7 @@ for i in resample_methods:
     Reformat the lake data
     """
 
+    """
     lake_sr_data = sr[['date', 'roi', 'level', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']]
     lake_toa_data = toa[['date', 'roi', 'level', 'lake_ls_water_frac_adaptive', 'lake_s2_water_frac_adaptive']]
     lake = pd.concat([lake_sr_data, lake_toa_data])
@@ -103,6 +104,7 @@ for i in resample_methods:
     )
     lake_wide = lake_wide[['date', 'roi', 'ls_ac_abs_diff', 's2_ac_abs_diff', 'ls_ac_rel_diff', 's2_ac_rel_diff']]
     lake_wide['zone'] = 'lake'
+    """
 
     """
     Reformat the shoreline data
@@ -177,7 +179,7 @@ for i in resample_methods:
     Combine the data
     """
 
-    combined = pd.concat([total_wide, lake_wide, shoreline_wide, buffer_wide], ignore_index=True)
+    combined = pd.concat([total_wide, shoreline_wide, buffer_wide], ignore_index=True)
 
     """
     Generate boxplots and stats
@@ -187,7 +189,7 @@ for i in resample_methods:
 
     custom_palette = {
         'total': '#1f77b4',       # blue
-        'lake': '#ff7f0e',        # orange
+       # 'lake': '#ff7f0e',        # orange
         'shoreline': '#2ca02c',   # green
         'Lake + Shoreline': '#d62728'  # red
     }
@@ -295,30 +297,30 @@ for i in resample_methods:
     test_results.append(total_ls_results)
 
     # For lakes
-    temp = combined[combined['zone'] == 'lake']
+    # temp = combined[combined['zone'] == 'lake']
 
-    lake_ttest_abs = stats.ttest_1samp(temp['ls_ac_abs_diff'].dropna(), 0)
-    lake_ttest_rel = stats.ttest_1samp(temp['ls_ac_rel_diff'].dropna(), 0)
-    lake_ls_results = {
-        'satellite': 'Landsat8',
-        'resample_method': i,
-        'zone': 'lake',
-        't_stat_abs': lake_ttest_abs.statistic,
-        'p_val_abs': lake_ttest_abs.pvalue,
-        't_stat_rel': lake_ttest_rel.statistic,
-        'p_val_rel': lake_ttest_rel.pvalue,
-        'mean_abs': temp['ls_ac_abs_diff'].mean(),
-        'mean_rel': temp['ls_ac_rel_diff'].mean(),
-        'var_abs': temp['ls_ac_abs_diff'].var(),
-        'var_rel': temp['ls_ac_rel_diff'].var(),
-        '75_percentile_abs': temp['ls_ac_abs_diff'].quantile(0.75),
-        '25_percentile_abs': temp['ls_ac_abs_diff'].quantile(0.25),
-        '75_percentile_rel': temp['ls_ac_rel_diff'].quantile(0.75),
-        '25_percentile_rel': temp['ls_ac_rel_diff'].quantile(0.25),
-        'iqr_abs': temp['ls_ac_abs_diff'].quantile(0.75) - temp['ls_ac_abs_diff'].quantile(0.25),
-        'iqr_rel': temp['ls_ac_rel_diff'].quantile(0.75) - temp['ls_ac_rel_diff'].quantile(0.25),
-    }
-    test_results.append(lake_ls_results)
+    # lake_ttest_abs = stats.ttest_1samp(temp['ls_ac_abs_diff'].dropna(), 0)
+    # lake_ttest_rel = stats.ttest_1samp(temp['ls_ac_rel_diff'].dropna(), 0)
+    # lake_ls_results = {
+    #     'satellite': 'Landsat8',
+    #     'resample_method': i,
+    #     'zone': 'lake',
+    #     't_stat_abs': lake_ttest_abs.statistic,
+    #     'p_val_abs': lake_ttest_abs.pvalue,
+    #     't_stat_rel': lake_ttest_rel.statistic,
+    #     'p_val_rel': lake_ttest_rel.pvalue,
+    #     'mean_abs': temp['ls_ac_abs_diff'].mean(),
+    #     'mean_rel': temp['ls_ac_rel_diff'].mean(),
+    #     'var_abs': temp['ls_ac_abs_diff'].var(),
+    #     'var_rel': temp['ls_ac_rel_diff'].var(),
+    #     '75_percentile_abs': temp['ls_ac_abs_diff'].quantile(0.75),
+    #     '25_percentile_abs': temp['ls_ac_abs_diff'].quantile(0.25),
+    #     '75_percentile_rel': temp['ls_ac_rel_diff'].quantile(0.75),
+    #     '25_percentile_rel': temp['ls_ac_rel_diff'].quantile(0.25),
+    #     'iqr_abs': temp['ls_ac_abs_diff'].quantile(0.75) - temp['ls_ac_abs_diff'].quantile(0.25),
+    #     'iqr_rel': temp['ls_ac_rel_diff'].quantile(0.75) - temp['ls_ac_rel_diff'].quantile(0.25),
+    # }
+    # test_results.append(lake_ls_results)
 
     # For shorelines
     temp = combined[combined['zone'] == 'shoreline']
@@ -400,29 +402,29 @@ for i in resample_methods:
     test_results.append(total_s2_results)
 
     # For lakes
-    temp = combined[combined['zone'] == 'lake']
-    lake_ttest_abs = stats.ttest_1samp(temp['s2_ac_abs_diff'].dropna(), 0)
-    lake_ttest_rel = stats.ttest_1samp(temp['s2_ac_rel_diff'].dropna(), 0)  
-    lake_s2_results = {
-        'satellite': 'Sentinel2',
-        'resample_method': i,
-        'zone': 'lake',
-        't_stat_abs': lake_ttest_abs.statistic,
-        'p_val_abs': lake_ttest_abs.pvalue,
-        't_stat_rel': lake_ttest_rel.statistic,
-        'p_val_rel': lake_ttest_rel.pvalue,
-        'mean_abs': temp['s2_ac_abs_diff'].mean(),
-        'mean_rel': temp['s2_ac_rel_diff'].mean(),
-        'var_abs': temp['s2_ac_abs_diff'].var(),
-        'var_rel': temp['s2_ac_rel_diff'].var(),
-        '75_percentile_abs': temp['s2_ac_abs_diff'].quantile(0.75),
-        '25_percentile_abs': temp['s2_ac_abs_diff'].quantile(0.25),
-        '75_percentile_rel': temp['s2_ac_rel_diff'].quantile(0.75),
-        '25_percentile_rel': temp['s2_ac_rel_diff'].quantile(0.25),
-        'iqr_abs': temp['s2_ac_abs_diff'].quantile(0.75) - temp['s2_ac_abs_diff'].quantile(0.25),
-        'iqr_rel': temp['s2_ac_rel_diff'].quantile(0.75) - temp['s2_ac_rel_diff'].quantile(0.25),
-    }
-    test_results.append(lake_s2_results)
+    # temp = combined[combined['zone'] == 'lake']
+    # lake_ttest_abs = stats.ttest_1samp(temp['s2_ac_abs_diff'].dropna(), 0)
+    # lake_ttest_rel = stats.ttest_1samp(temp['s2_ac_rel_diff'].dropna(), 0)  
+    # lake_s2_results = {
+    #     'satellite': 'Sentinel2',
+    #     'resample_method': i,
+    #     'zone': 'lake',
+    #     't_stat_abs': lake_ttest_abs.statistic,
+    #     'p_val_abs': lake_ttest_abs.pvalue,
+    #     't_stat_rel': lake_ttest_rel.statistic,
+    #     'p_val_rel': lake_ttest_rel.pvalue,
+    #     'mean_abs': temp['s2_ac_abs_diff'].mean(),
+    #     'mean_rel': temp['s2_ac_rel_diff'].mean(),
+    #     'var_abs': temp['s2_ac_abs_diff'].var(),
+    #     'var_rel': temp['s2_ac_rel_diff'].var(),
+    #     '75_percentile_abs': temp['s2_ac_abs_diff'].quantile(0.75),
+    #     '25_percentile_abs': temp['s2_ac_abs_diff'].quantile(0.25),
+    #     '75_percentile_rel': temp['s2_ac_rel_diff'].quantile(0.75),
+    #     '25_percentile_rel': temp['s2_ac_rel_diff'].quantile(0.25),
+    #     'iqr_abs': temp['s2_ac_abs_diff'].quantile(0.75) - temp['s2_ac_abs_diff'].quantile(0.25),
+    #     'iqr_rel': temp['s2_ac_rel_diff'].quantile(0.75) - temp['s2_ac_rel_diff'].quantile(0.25),
+    # }
+    # test_results.append(lake_s2_results)
 
     # For shorelines
     temp = combined[combined['zone'] == 'shoreline']
@@ -480,18 +482,17 @@ for i in resample_methods:
 
     # For Landsat8
     ls_total = combined[combined['zone'] == 'total']['ls_ac_rel_diff'].dropna()
-    ls_lake = combined[combined['zone'] == 'lake']['ls_ac_rel_diff'].dropna()
+    #ls_lake = combined[combined['zone'] == 'lake']['ls_ac_rel_diff'].dropna()
     ls_shoreline = combined[combined['zone'] == 'shoreline']['ls_ac_rel_diff'].dropna()
     ls_buffer = combined[combined['zone'] == 'Lake + Shoreline']['ls_ac_rel_diff'].dropna()
 
-    f_stat, p_val = stats.f_oneway(ls_total, ls_lake, ls_shoreline, ls_buffer)
+    f_stat, p_val = stats.f_oneway(ls_total, ls_shoreline, ls_buffer)
     print(f"Landsat8... F-statistic: {f_stat}, p-value: {p_val}")
 
     ls_tukey_data = []
     # Add each observation with its proper group label
     for values, group_name in [
         (ls_total, 'total'), 
-        (ls_lake, 'lake'),
         (ls_shoreline, 'shoreline'), 
         (ls_buffer, 'Lake + Shoreline')
     ]:
@@ -510,18 +511,18 @@ for i in resample_methods:
 
     # Tukey's HSD for Sentinel2 AC
     s2_total = combined[combined['zone'] == 'total']['s2_ac_rel_diff'].dropna()
-    s2_lake = combined[combined['zone'] == 'lake']['s2_ac_rel_diff'].dropna()
+    #s2_lake = combined[combined['zone'] == 'lake']['s2_ac_rel_diff'].dropna()
     s2_shoreline = combined[combined['zone'] == 'shoreline']['s2_ac_rel_diff'].dropna()
     s2_buffer = combined[combined['zone'] == 'Lake + Shoreline']['s2_ac_rel_diff'].dropna()
 
-    f_stat, p_val = stats.f_oneway(s2_total, s2_lake, s2_shoreline, s2_buffer)
+    f_stat, p_val = stats.f_oneway(s2_total, s2_shoreline, s2_buffer)
     print(f"Sentinel2... F-statistic: {f_stat}, p-value: {p_val}")
 
     s2_tukey_data = []
     # Add each observation with its proper group label
     for values, group_name in [
         (s2_total, 'total'), 
-        (s2_lake, 'lake'),
+       # (s2_lake, 'lake'),
         (s2_shoreline, 'shoreline'), 
         (s2_buffer, 'Lake + Shoreline')
     ]:
@@ -534,7 +535,7 @@ for i in resample_methods:
     anova_table = sm.stats.anova_lm(model, typ=2)
     print(anova_table)
 
-    tukey = pairwise_tukeyhsd(endog=s2_tukey_df['value'], groups=s2_tukey_df['zone'], alpha=0.05)
+    tukey = pairwise_tukeyhsd(endog=s2_tukey_df['value'], groups=s2_tukey_df['zone'], alpha=0.001)
     print("S2 Tukey's HSD results:")
     print(tukey)
 

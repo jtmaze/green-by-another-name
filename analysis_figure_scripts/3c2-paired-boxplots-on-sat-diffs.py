@@ -40,7 +40,7 @@ for r in resample_methods:
 
 combined = pd.concat(combined_list)
 
-zone_prefixes = ['total_', 'lake_', 'buff_lake_', 'shoreline_']
+zone_prefixes = ['total_', 'buff_lake_', 'shoreline_']
 
 for z in zone_prefixes:
 
@@ -61,7 +61,7 @@ plot_df = combined.copy()
 plot_long = pd.melt(
     plot_df, 
     id_vars=['date', 'roi', 'resample_method', 'level'],
-    value_vars=['total_abs_diff', 'lake_abs_diff', 'buff_lake_abs_diff', 'shoreline_abs_diff'],
+    value_vars=['total_abs_diff', 'buff_lake_abs_diff', 'shoreline_abs_diff'],
     var_name='zone',
     value_name='abs_diff'
 )
@@ -69,8 +69,7 @@ plot_long['zone'] = plot_long['zone'].str.replace('_abs_diff', '')
 
 zone_names = {
     'total': 'Scene Total',
-    'lake': 'Lakes',
-    'buff_lake': 'Buffered Lakes',
+    'buff_lake': 'Lakes',
     'shoreline': 'Shoreline'
 }
 
@@ -81,7 +80,7 @@ level_colors = {
 
 fig, ax = plt.subplots(figsize=(12, 8))
 
-zones = ['total', 'lake', 'buff_lake', 'shoreline']
+zones = ['total', 'buff_lake', 'shoreline']
 resample_methods_ordered = ['bilinear30', 'noresample']
 levels_ordered = ['toa', 'sr']
 
@@ -125,9 +124,9 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Absolute Difference (%)', fontsize=16)
-ax.tick_params(axis='y', labelsize=14)
+ax.set_xticklabels(x_labels, fontsize=20)
+ax.set_ylabel('Absolute % Difference (Landsat 8 - Sentinel-2)', fontsize=18)
+ax.tick_params(axis='y', labelsize=16)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 
 plt.ylim(abs_y_lim)
@@ -141,7 +140,7 @@ plot_df = combined.copy()
 plot_long = pd.melt(
     plot_df, 
     id_vars=['date', 'roi', 'resample_method', 'level'],
-    value_vars=['total_rel_diff', 'lake_rel_diff', 'buff_lake_rel_diff', 'shoreline_rel_diff'],
+    value_vars=['total_rel_diff', 'buff_lake_rel_diff', 'shoreline_rel_diff'],
     var_name='zone',
     value_name='rel_diff'
 )
@@ -149,8 +148,7 @@ plot_long['zone'] = plot_long['zone'].str.replace('_rel_diff', '')
 
 zone_names = {
     'total': 'Scene Total',
-    'lake': 'Lakes',
-    'buff_lake': 'Buffered Lakes',
+    'buff_lake': 'Lakes',
     'shoreline': 'Shoreline'
 }
 
@@ -161,7 +159,7 @@ level_colors = {
 
 fig, ax = plt.subplots(figsize=(12, 8))
 
-zones = ['total', 'lake', 'buff_lake', 'shoreline']
+zones = ['total', 'buff_lake', 'shoreline']
 resample_methods_ordered = ['bilinear30', 'noresample']
 levels_ordered = ['toa', 'sr']
 
@@ -203,9 +201,9 @@ for zone in zones:
     position += 0.5
 
 ax.set_xticks(x_positions)
-ax.set_xticklabels(x_labels, fontsize=16)
-ax.set_ylabel('Relative Difference (%)', fontsize=16)
-ax.tick_params(axis='y', labelsize=14)
+ax.set_xticklabels(x_labels, fontsize=20)
+ax.set_ylabel('Relative % Difference (Landsat 8 - Sentinel-2)', fontsize=18)
+ax.tick_params(axis='y', labelsize=16)
 ax.axhline(y=0, color='red', linestyle='--', linewidth=2.5)
 plt.ylim(rel_y_lim)
 
@@ -213,15 +211,15 @@ import matplotlib.patches as mpatches
 toa_patch = mpatches.Patch(facecolor=level_colors['toa'], label='TOA', alpha=0.7, edgecolor='black')
 sr_patch = mpatches.Patch(facecolor=level_colors['sr'], label='SR', alpha=0.7, edgecolor='black')
 bilinear_patch = mpatches.Patch(facecolor='lightgrey', label='Bilinear 30 meters', edgecolor='black')
-noresample_patch = mpatches.Patch(facecolor='lightgrey', hatch='//', label='No Resample', edgecolor='black')
+noresample_patch = mpatches.Patch(facecolor='lightgrey', hatch='//', label='No Resampling', edgecolor='black')
 
-ax.legend(
-    handles=[toa_patch, sr_patch, bilinear_patch, noresample_patch],
-    loc='upper center',
-    bbox_to_anchor=(0.5, -0.08),
-    ncol=2,
-    fontsize=18
-)
+# ax.legend(
+#      handles=[toa_patch, sr_patch, bilinear_patch, noresample_patch],
+#      loc='upper center',
+#      bbox_to_anchor=(0.5, -0.08),
+#      ncol=2,
+#      fontsize=18
+# )
 
 plt.tight_layout()
 plt.show()

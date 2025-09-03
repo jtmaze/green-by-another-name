@@ -8,11 +8,11 @@ import seaborn as sns
 
 os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
 
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_cubic30_area_summaries_batch3.csv')
+toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 print(len(toa_bilinear30))
 valids = toa_bilinear30[['roi', 'date']].agg('_'.join, axis=1).unique()
 
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_cubic30_area_summaries_batch3.csv')
+sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch3.csv')
 sr_bilinear30 = sr_bilinear30[sr_bilinear30[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch6.csv')
@@ -50,17 +50,12 @@ def area_boxplot_maker(
             'total_ls_water_frac_adaptive': 'Landsat 8',
             'total_s2_water_frac_adaptive': 'Sentinel-2'
         }
-    elif zone_label == 'Lake':
-        label_dict = {
-            'lake_ls_water_frac_adaptive': 'Landsat 8',
-            'lake_s2_water_frac_adaptive': 'Sentinel-2'
-        }
     elif zone_label == 'Shoreline':
         label_dict = {
             'shoreline_ls_water_frac_adaptive': 'Landsat 8',
             'shoreline_s2_water_frac_adaptive': 'Sentinel-2'
         }
-    elif zone_label == 'Lake + Shoreline':
+    elif zone_label == 'Lake':
         label_dict = {
             'buff_lake_ls_water_frac_adaptive': 'Landsat 8',
             'buff_lake_s2_water_frac_adaptive': 'Sentinel-2'
@@ -91,8 +86,8 @@ def area_boxplot_maker(
     fig, ax = plt.subplots(figsize=(9, 7))
     
     # Define the groups and colors
-    order = ['toa_cubic30', 'toa_noresample', 'sr_cubic30', 'sr_noresample']
-    new_labels = ['TOA cubic 30m', 'TOA Unresampled', 'SR cubic 30m', 'SR Unresampled']
+    order = ['toa_bilinear30', 'toa_noresample', 'sr_bilinear30', 'sr_noresample']
+    new_labels = ['TOA bilinear 30m', 'TOA No Resampling', 'SR Bilinear 30m', 'SR No Resampling']
     satellite_colors = {'Landsat 8': '#ff9933', 'Sentinel-2': '#9370DB'}
     
     # Calculate positions for the boxes
@@ -143,31 +138,31 @@ def area_boxplot_maker(
                     )
                 
                 legend_elements.append(
-                    plt.Rectangle((0,0), 1, 1, facecolor='lightgray', edgecolor='black', label='bilinear 30 meters')
+                    plt.Rectangle((0,0), 1, 1, facecolor='lightgray', edgecolor='black', label='Bilinear 30 meters')
                 )
                 legend_elements.append(
-                    plt.Rectangle((0,0), 1, 1, facecolor='lightgray', hatch='//', edgecolor='black', label='unresampled')
+                    plt.Rectangle((0,0), 1, 1, facecolor='lightgray', hatch='//', edgecolor='black', label='No Resampling')
                 )
 
     # After all boxplot plotting, add a vertical divider between TOA and SR
     ax.axvline(x=1.5, color='gray', linestyle=':', alpha=0.9, linewidth=2.5)
 
-    # ax.legend(handles=legend_elements,
-    #           loc='upper center',
-    #           bbox_to_anchor=(0.5, -0.15),
-    #           ncol=2,
-    #           frameon=True,
-    #           fontsize=12)
+    ax.legend(handles=legend_elements,
+              loc='upper center',
+              bbox_to_anchor=(0.5, -0.15),
+              ncol=2,
+              frameon=True,
+              fontsize=12)
 
     # Set x-axis ticks and labels
     ax.set_xticks([0.45, 2.6])
-    ax.set_xticklabels(['TOA', 'SR'], fontsize=16)
+    ax.set_xticklabels(['TOA', 'SR'], fontsize=20)
     
     # Set y-axis label
-    ax.set_ylabel(f"{zone_label} Water Fraction %", fontsize=16)
+    ax.set_ylabel(f"{zone_label} Water Fraction %", fontsize=20)
     
     # Clean up the plot
-    ax.tick_params(axis='y', labelsize=14)
+    ax.tick_params(axis='y', labelsize=17)
 
     plt.tight_layout()
     
@@ -188,7 +183,7 @@ def area_boxplot_maker(
 Compare bilinear 30m area boxplots
 """
 temp = combined[
-    (combined['resample_method'] == 'cubic30') |
+    (combined['resample_method'] == 'bilinear30') |
     (combined['resample_method'] == 'noresample')
 ]
 cols_to_plot = [
@@ -202,16 +197,7 @@ area_boxplot_maker(
     zone_label='Total Landscape',
 )
 
-cols_to_plot = [
-    'lake_ls_water_frac_adaptive',
-    'lake_s2_water_frac_adaptive',
-]
 
-area_boxplot_maker(
-    temp=temp,
-    cols_to_plot=cols_to_plot,
-    zone_label='Lake',
-)
 
 cols_to_plot = [
     'shoreline_ls_water_frac_adaptive',
@@ -230,7 +216,7 @@ cols_to_plot = [
 area_boxplot_maker(
     temp=temp,
     cols_to_plot=cols_to_plot,
-    zone_label='Lake + Shoreline',
+    zone_label='Lake',
 )
 
 # %% Scratch function, will delete later

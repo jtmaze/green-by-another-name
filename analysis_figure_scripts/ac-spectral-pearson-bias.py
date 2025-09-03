@@ -20,13 +20,9 @@ valids = valids[['roi', 'date']].agg('_'.join, axis=1).unique()
 
 # %% Read the data
 
-lake_data = pd.read_csv(f'{reflectance_comp_dir}/AC_regression_summaries_0m_lake_{resample_method}_batch3.csv')
+lake_data = pd.read_csv(f'{reflectance_comp_dir}/AC_regression_summaries_60m_lake_{resample_method}_batch3.csv')
 lake_data['zone'] = 'lake'
 lake_data = lake_data[lake_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
-
-lake_plus_data = pd.read_csv(f'{reflectance_comp_dir}/AC_regression_summaries_60m_lake_{resample_method}_batch3.csv')
-lake_plus_data['zone'] = 'lake_plus'
-lake_plus_data = lake_plus_data[lake_plus_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 land_data = pd.read_csv(f'{reflectance_comp_dir}/AC_regression_summaries_60m_land_{resample_method}_batch3.csv')
 land_data['zone'] = 'land'
@@ -36,42 +32,54 @@ shoreline_data = pd.read_csv(f'{reflectance_comp_dir}/AC_regression_summaries_sh
 shoreline_data['zone'] = 'shoreline'
 shoreline_data = shoreline_data[shoreline_data[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
-combined = pd.concat([lake_data, lake_plus_data, land_data, shoreline_data], ignore_index=True)
+combined = pd.concat([lake_data, land_data, shoreline_data], ignore_index=True)
 
 # %% Plot the pearson coefficients
 
 cols_to_keep = ['satellite', 'roi', 'date', 'zone', 'band_name', 'r_squared', 'slope', 'intercept', 'above_frac']
 combined_clean = combined[cols_to_keep]
 
-sat = 'Landsat8' # Landsat8 or Sentinel2
-box_plot_data = combined[combined['satellite'] == sat]
+sat = 'Sentinel2' # Landsat8 or Sentinel2
+box_plot_data = combined.copy()
+box_plot_data = box_plot_data[box_plot_data['band_name'] == 'NDWI']
 
 zone_label_map = {
     'lake': 'Lakes',
-    'lake_plus': 'Buffered Lakes',
     'land': 'Land',
     'shoreline': 'Shoreline'
 }
 
+satellite_label_map = {
+    'Landsat8': 'Landsat 8',
+    'Sentinel2': 'Sentinel-2'
+}
+
+box_plot_data['satellite_label'] = box_plot_data['satellite'].map(satellite_label_map)
 box_plot_data['zone_label'] = box_plot_data['zone'].map(zone_label_map)
 
-plt.figure(figsize=(12, 10))
+plt.figure(figsize=(10, 10))
 ax = sns.boxplot(
     data=box_plot_data,
     x='zone_label',
     y='above_frac',
-    hue='band_name',
-    palette='Set2',
-    legend=False
+    hue='satellite_label',
+    palette={'Landsat 8': '#ff9933', 'Sentinel-2': '#9370DB'},
+    width=0.7
 )
+
 ax.set_xlabel(None)
 ax.set_ylabel('% SR pixels higher', fontsize=20)
 plt.ylim(0, 100)
-ax.set_xticklabels(ax.get_xticklabels(), fontsize=18)
+ax.set_xticklabels(ax.get_xticklabels(), fontsize=22)
 yticks = ax.get_yticks()
 ax.set_yticklabels([f"{y:.0f}" for y in yticks], fontsize=18)
 plt.axhline(y=50, color='red', linestyle='--', linewidth=4)
 #plt.title(f'{sat} % of pixels with higher SR reflectance')
+
+# Make legend larger
+legend = ax.legend(fontsize=22, loc='best', frameon=True)
+legend.set_title('')  # Remove title if you don't need it
+
 plt.show()
 
 # %% Summary tables
