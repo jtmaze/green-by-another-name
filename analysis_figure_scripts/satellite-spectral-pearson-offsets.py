@@ -7,10 +7,8 @@ import seaborn as sns
 from scipy.stats import linregress
 import numpy as np
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
-
-reflectance_comp_dir = './data/regression_summaries'
-area_dir = './data/lake_area_results'
+reflectance_comp_dir = 'D:/thesis_data/regression_summaries'
+area_dir = 'D:/thesis_data/lake_area_results'
 resample_method = 'bilinear30'
 
 valids = pd.read_csv(f'{area_dir}/toa_resampled_bilinear30_area_summaries_batch3.csv')
@@ -145,6 +143,9 @@ summary = combined.groupby(['level', 'band_name']).agg(
 summary_zones = combined.groupby(['level', 'band_name', 'zone']).agg(
     mean_r_squared=('r_squared', 'mean'),
     mean_above_frac=('above_frac', 'mean'),
+    q1_above_frac=('above_frac', lambda x: x.quantile(0.25)),
+    q3_above_frac=('above_frac', lambda x: x.quantile(0.75)),
+    iqr_above_frac=('above_frac', lambda x: x.quantile(0.75) - x.quantile(0.25)),
     mean_slope=('slope', 'mean'),
     sd_slope=('slope', 'std'),
     mean_intercept=('intercept', 'mean'),
@@ -153,6 +154,15 @@ summary_zones = combined.groupby(['level', 'band_name', 'zone']).agg(
     mean_ls_marginal_percent=('ls_marginal_percent', 'mean'),
     mean_s2_marginal_percent=('s2_marginal_percent', 'mean'),
 ).reset_index()
+
+summary_zones = summary_zones.drop(
+    columns = ['q1_above_frac', 'q3_above_frac', 'above_frac_50', 'mean_ls_marginal_percent', 'mean_s2_marginal_percent']
+)
+
+summary_zones = summary_zones.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/satellite_pixel_comparsion_summary_stats.csv', 
+    index=False
+)
 
 
 # %% Plot all of the RMA lines

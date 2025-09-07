@@ -7,16 +7,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
-
-reflectance_comp_dir = './data/regression_summaries'
-area_dir = './data/lake_area_results'
+reflectance_comp_dir = 'D:/thesis_data/regression_summaries'
+area_dir = 'D:/thesis_data/lake_area_results'
 resample_method = 'bilinear30'
 
 valids = pd.read_csv(f'{area_dir}/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = valids[['roi', 'date']].agg('_'.join, axis=1).unique()
-
 
 # %% Read the data
 
@@ -96,10 +92,12 @@ summary2 = combined.groupby(['satellite', 'band_name', 'zone']).agg(
     sd_slope=('slope', 'std'),
     mean_intercept=('intercept', 'mean'),
     sd_intercept=('intercept', 'std'),
-    above_frac_50 =('above_frac', lambda x: (x > 50).sum()),
 ).reset_index()
 
-
+summary2 = summary2.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/AC_pixel_comparsion_summary_stats.csv', 
+    index=False
+)
 # %% Plot the RMA lines
 sat = 'Sentinel2' # Landsat8 or Sentinel2
 b = 'NDWI' # Green, NIR, or NDWI

@@ -154,10 +154,10 @@ def regress_sat_pairs(
     )
     
     # Make file paths from image_info
-    s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
-    ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
+    s2_fp = f'./{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+    ls8_fp = f'./{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
     res = re.search(r"(\d{2}$)", resample_method).group(1)
-    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
+    pld_fp = f'./pld_rasterized/{roi}_lake_masks_res{res}.tif'
 
     # Check if images exist
     if check_match_imgs(ls8_fp, s2_fp):

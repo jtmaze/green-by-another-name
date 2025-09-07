@@ -9,10 +9,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from functions.img_data_fetching_functions import extract_unique
 from functions.satellite_pixel_regression_functions import make_satellite_reflectance_summaries
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
-
-toa_files = glob.glob('./data/toa_images/**/*tif')
-sr_files = glob.glob('./data/sr_images/**/*.tif')
+os.chdir('D:/thesis_data/')
+toa_files = glob.glob('D:/thesis_data/toa_images/**/*tif')
+sr_files = glob.glob('D:/thesis_data/sr_images/**/*.tif')
 full_files = toa_files + sr_files
 date_pattern = r'_date_(.*?)_roi'
 roi_pattern = r'_roi_(.*?).tif'
@@ -23,7 +22,7 @@ rois = extract_unique(full_files, roi_pattern)
 
 resample_methods = extract_unique(full_files, resample_pattern)
 resample_method = 'bilinear30'  # 'nearest', 'bilinear30', 'cubic30'
-levels = ['sr', 'toa']
+levels = ['toa']
 
 image_info = {
     'level': None,

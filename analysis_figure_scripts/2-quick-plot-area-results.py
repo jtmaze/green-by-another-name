@@ -1,24 +1,22 @@
 # %% 1.0 Import libraries and data
-import os
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
-
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+area_dir = 'D:/thesis_data/lake_area_results'
+toa_bilinear30 = pd.read_csv(f'{area_dir}/toa_resampled_bilinear30_area_summaries_batch3.csv')
 print(len(toa_bilinear30))
 valids = toa_bilinear30[['roi', 'date']].agg('_'.join, axis=1).unique()
 
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch3.csv')
+sr_bilinear30 = pd.read_csv(f'{area_dir}/sr_resampled_bilinear30_area_summaries_batch3.csv')
 sr_bilinear30 = sr_bilinear30[sr_bilinear30[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
-sr_noresample = pd.read_csv('./data/lake_area_results/toa_resampled_noresample_area_summaries_batch6.csv')
+sr_noresample = pd.read_csv(f'{area_dir}/sr_resampled_noresample_area_summaries_batch6.csv')
 sr_noresample = sr_noresample[sr_noresample[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
-toa_noresample = pd.read_csv('./data/lake_area_results/sr_resampled_noresample_area_summaries_batch6.csv')
+toa_noresample = pd.read_csv(f'{area_dir}/toa_resampled_noresample_area_summaries_batch6.csv')
 toa_noresample = toa_noresample[toa_noresample[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 
 combined = pd.concat(
@@ -32,7 +30,6 @@ combined = pd.concat(
 )
 
 print(len(combined))
-
 # %% Function for lake area boxplots by resampling method and zone ("Total", "Lake", "Shoreline")
 
 def area_boxplot_maker(
@@ -196,8 +193,6 @@ area_boxplot_maker(
     cols_to_plot=cols_to_plot,
     zone_label='Total Landscape',
 )
-
-
 
 cols_to_plot = [
     'shoreline_ls_water_frac_adaptive',

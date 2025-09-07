@@ -1,5 +1,5 @@
 # %% 1.0 Libraries and filepaths
-import os
+
 import pandas as pd
 import numpy as np
 
@@ -8,15 +8,14 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 
-
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
 
+data_dir = 'D:/thesis_data/'
 resample_method = 'bilinear30'
-lake_areas_dir = './data/lake_area_results/'
+lake_areas_dir = f'{data_dir}/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = toa_data_resamp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
@@ -39,7 +38,6 @@ toa_data = toa[cols_to_keep]
 sr_data = sr[cols_to_keep]
 
 # %% 2.0 Define the function to filter and calculate satellite differences
-
 def filter_data_calc_satellite_differences(
     df: pd.DataFrame,
     water_frac_cols: list
@@ -81,7 +79,6 @@ def filter_data_calc_satellite_differences(
     return out_df
 
 # %% 3.0 Orgaized the data by lake size and satellite differences
-
 toa_plot = filter_data_calc_satellite_differences(toa_data, water_frac_cols)
 sr_plot = filter_data_calc_satellite_differences(sr_data, water_frac_cols)
 
@@ -137,9 +134,9 @@ plt.show()
 # %% Make a summary table
 
 rel_diff_summary = plot_data.groupby(['level', 'lake_size'])['satellite_difference'].agg(
-    mean='mean',
-    var='var',
-    std='std',
+    mean_relative_difference='mean',
+    var_relative_difference='var',
+    std_relative_difference='std',
     p_val=lambda x: stats.ttest_1samp(x.dropna(), 0)[1],
     q25=lambda x: x.quantile(0.25),
     q75=lambda x: x.quantile(0.75),
@@ -147,6 +144,11 @@ rel_diff_summary = plot_data.groupby(['level', 'lake_size'])['satellite_differen
 ).reset_index()
 
 print(rel_diff_summary)
+
+rel_diff_summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/lake_size_sensor_difference_summary.csv', 
+    index=False
+)
 
 # %% Quick Tukey HSD across lake sizes for TOA satellite differences
 
@@ -269,9 +271,9 @@ plt.show()
 # %%
 
 abs_diff_summary = abs_plot_data.groupby(['level', 'lake_size'])['absolute_satellite_difference'].agg(
-    mean='mean',
-    var='var',
-    std='std',
+    mean_abs_difference='mean',
+    var_abs_difference='var',
+    std_abs_difference='std',
     p_val=lambda x: stats.ttest_1samp(x.dropna(), 0)[1],
     q25=lambda x: x.quantile(0.25),
     q75=lambda x: x.quantile(0.75),
@@ -279,6 +281,11 @@ abs_diff_summary = abs_plot_data.groupby(['level', 'lake_size'])['absolute_satel
 ).reset_index()
 
 print(abs_diff_summary)
+
+abs_diff_summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/lake_size_sensor_absolute_difference_summary.csv', 
+    index=False
+)
 
 # %%
 

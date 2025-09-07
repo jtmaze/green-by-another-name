@@ -1,5 +1,4 @@
 # %% 1.0 Libraries and filepaths
-import os
 import pandas as pd
 import numpy as np
 
@@ -12,10 +11,10 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
+data_dir = 'D:/thesis_data/'
 
 resample_method = 'bilinear30'
-lake_areas_dir = './data/lake_area_results/'
+lake_areas_dir = f'{data_dir}/lake_area_results/'
 toa_data_resamp = pd.read_csv(f'{lake_areas_dir}/toa_resampled_{resample_method}_area_summaries_batch3.csv')
 valids = toa_data_resamp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
@@ -190,9 +189,9 @@ plt.show()
 # %% Make a summary table for relative differences
 
 relative_diff_summary = plot_data.groupby(['lake_size', 'satellite'], observed=True)['relative_difference'].agg(
-    mean='mean',
-    var='var',
-    std='std',
+    mean_relative_difference='mean',
+    var_relative_difference='var',
+    std_relative_difference='std',
     pvalue=lambda x: stats.ttest_1samp(x.dropna(), 0)[1],
     q25=lambda x: x.quantile(0.25),
     q50=lambda x: x.quantile(0.5),
@@ -200,6 +199,11 @@ relative_diff_summary = plot_data.groupby(['lake_size', 'satellite'], observed=T
 ).reset_index()
 
 print(relative_diff_summary)
+
+relative_diff_summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/lake_size_relative_ac_difference_summary.csv',
+    index=False
+)
 
 # %% HSD test for Landsat 8 AC differences
 temp = plot_data[plot_data['satellite'] == 'Landsat 8']
@@ -263,8 +267,6 @@ tukey_result = pairwise_tukeyhsd(
 print(tukey_result)
 
 # %% 3.0 Create the boxplot for absolute differences
-
-
 combined = pd.merge(
     sr_plot, 
     toa_plot,
@@ -344,9 +346,9 @@ plt.show()
 # %% 
 
 abs_diff_summary = abs_plot_data.groupby(['lake_size', 'satellite'], observed=True)['absolute_difference'].agg(
-    mean='mean',
-    var='var',
-    std='std',
+    mean_abs_difference='mean',
+    var_abs_difference='var',
+    std_abs_difference='std',
     pvalue=lambda x: stats.ttest_1samp(x.dropna(), 0)[1],
     q25=lambda x: x.quantile(0.25),
     q50=lambda x: x.quantile(0.5),
@@ -354,6 +356,11 @@ abs_diff_summary = abs_plot_data.groupby(['lake_size', 'satellite'], observed=Tr
 ).reset_index()
 
 print(abs_diff_summary)
+
+abs_diff_summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/lake_size_absolute_ac_difference_summary.csv',
+    index=False
+)
 
 # %% Tukey HSD for absolute differences
 

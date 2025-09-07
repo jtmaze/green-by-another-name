@@ -61,8 +61,8 @@ def rma_regression(
     return {'slope': slope, 'intercept': intercept, 'r_squared': r_squared}
 
 def regression_vis(
-    arr1_modeled: np.array, # 1D array
-    arr2_modeled: np.array, # 1D array
+    arr1_for_model: np.array, # 1D array
+    arr2_for_model: np.array, # 1D array
     model: dict, # from the RMA regression
     comparison: str # used for plot title
 ):
@@ -72,36 +72,58 @@ def regression_vis(
 
     # Make a fit-line from the model
     # Becuase Landsat is x-axis use it to make the domain
-    xmin_val = np.nanmin(arr1_modeled)
-    xmax_val = np.nanmax(arr2_modeled)
-    ymin_val = np.nanmin(arr2_modeled)
-    ymax_val = np.nanmax(arr2_modeled)
+    xmin_val = np.nanmin(arr1_for_model)
+    xmax_val = np.nanmax(arr2_for_model)
+    ymin_val = np.nanmin(arr2_for_model)
+    ymax_val = np.nanmax(arr2_for_model)
     min_modeled = model['slope'] * xmin_val + model['intercept']
     max_modeled = model['slope'] * xmax_val + model['intercept']
 
-    plt.figure(figsize=(8,8))
-    plt.scatter(arr1_modeled, arr2_modeled, s=1, marker='.', alpha=0.4)
-    plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='RMA Fit')
-    # Add a 45 degree line for comparison
-    plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
-            [min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
-            color='blue', 
-            linestyle='--', 
-            label='1:1 Line')
-    textstr = f'$R^2 = {model['r_squared']:.4f}$\nSlope = {model['slope']:.4f}'
-    box_props = dict(boxstyle='round', facecolor='white', alpha=0.8)
-    plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
-            verticalalignment='top', bbox=box_props)
+    above_45line = arr1_for_model < arr2_for_model
+    below_45line = arr1_for_model > arr2_for_model
+    on_45line = arr1_for_model == arr2_for_model
+
     if comparison == 'AC':
         xlab = 'TOA NDWI Reflectance'
         ylab = 'SR NDWI Reflectance'
+        above_lab = 'SR > TOA'
+        below_lab = 'TOA > SR'
+        above_color = 'green'
+        below_color = 'blue'
     elif comparison == 'Satellite':
         xlab = 'Landsat NDWI Reflectance'
         ylab = 'Sentinel-2 NDWI Reflectance'
+        above_lab = 'Sentinel-2 > Landsat 8'
+        below_lab = 'Landsat 8 > Sentinel-2'
+        above_color = 'purple'
+        below_color = '#D2691E'
+
+
+    plt.figure(figsize=(8,8))
+    plt.scatter(arr1_for_model[above_45line], arr2_for_model[above_45line], 
+               s=1, marker='.', alpha=0.4, color=above_color, label=above_lab)
+    plt.scatter(arr1_for_model[below_45line], arr2_for_model[below_45line], 
+               s=1, marker='.', alpha=0.4, color=below_color, label=below_lab)
+    if np.any(on_45line):
+        plt.scatter(arr1_for_model[on_45line], arr2_for_model[on_45line], 
+                   s=1, marker='.', alpha=0.4, color='gray', label='On 1:1 line')
+    #plt.plot([xmin_val, xmax_val], [min_modeled, max_modeled], color = 'red', linestyle='-', label='RMA Fit')
+    # Add a 45 degree line for comparison
+    plt.plot([min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
+            [min(xmin_val, ymin_val), max(xmax_val, ymax_val)], 
+            color='black', 
+            linestyle='--', 
+            label='1:1 Line')
+    #textstr = f'$R^2 = {model['r_squared']:.4f}$ \nSlope = {model['slope']:.4f}'
+    # box_props = dict(boxstyle='round', facecolor='white', alpha=0.8)
+    # plt.text(0.05, 0.95, textstr, transform=plt.gca().transAxes, fontsize=10,
+    #         verticalalignment='top', bbox=box_props)
         
-    plt.xlabel(xlab)
-    plt.ylabel(ylab)
-    plt.legend(loc='lower right')
+    plt.xlabel(xlab, fontsize=16)
+    plt.ylabel(ylab, fontsize=16)
+    plt.legend(loc='lower right', fontsize=16, markerscale=10)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.show()
 
 
@@ -135,25 +157,25 @@ def regress_reflectance(
         
         # Triple chech that both arrays are using same mask
         nan_mask = ~np.isnan(arr1_filtered) & ~np.isnan(arr2_filtered)
-        arr1_modeled = arr1_sample[nan_mask]
-        arr2_modeled = arr2_sample[nan_mask]
+        arr1_for_model = arr1_sample[nan_mask]
+        arr2_for_model = arr2_sample[nan_mask]
 
         # Run the RMA regression
-        model = rma_regression(arr1_modeled, arr2_modeled)
+        model = rma_regression(arr1_for_model, arr2_for_model)
         model_domain = (
-            np.min([arr1_modeled.min(), arr2_modeled.min()]), 
-            np.max([arr1_modeled.max(), arr2_modeled.max()])
+            np.min([arr1_for_model.min(), arr2_for_model.min()]), 
+            np.max([arr1_for_model.max(), arr2_for_model.max()])
         )
 
-        regression_vis(arr1_modeled, arr2_modeled, model, comparison)
+        regression_vis(arr1_for_model, arr2_for_model, model, comparison)
 
         if hist_return == True:
-            arr1_histogram = np.histogram(arr1_modeled, bins=100)
-            arr2_histogram = np.histogram(arr2_modeled, bins=100)
+            arr1_histogram = np.histogram(arr1_for_model, bins=100)
+            arr2_histogram = np.histogram(arr2_for_model, bins=100)
 
-        # Find the portion of pixels above/below the 45 degree line   
-        below_frac = np.mean(arr1_modeled > arr2_modeled) * 100  # The mean of boolean array gives proportion
-        above_frac = np.mean(arr1_modeled < arr2_modeled) * 100
+        # Find the portion of pixels above/below the 45 degree line
+        below_frac = np.mean(arr1_for_model > arr2_for_model) * 100  # The mean of boolean array gives proportion
+        above_frac = np.mean(arr1_for_model < arr2_for_model) * 100
 
         print(f'Pixels above 45 degree line: {above_frac:.2f}%')
         print(f'Pixels below 45 degree line: {below_frac:.2f}%')

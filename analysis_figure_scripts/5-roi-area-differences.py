@@ -1,15 +1,14 @@
 # %% 1.0 Libraries and directories
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name')
+data_dir = 'D:/thesis_data/lake_area_results/'
 
-toa_bilinear30 = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+toa_bilinear30 = pd.read_csv(f'{data_dir}/toa_resampled_bilinear30_area_summaries_batch3.csv')
 
 valids = toa_bilinear30[['roi', 'date']].agg('_'.join, axis=1).unique()
-sr_bilinear30 = pd.read_csv('./data/lake_area_results/sr_resampled_bilinear30_area_summaries_batch3.csv')
+sr_bilinear30 = pd.read_csv(f'{data_dir}/sr_resampled_bilinear30_area_summaries_batch3.csv')
 sr_bilinear30 = sr_bilinear30[sr_bilinear30[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
 combined = pd.concat([sr_bilinear30, toa_bilinear30], ignore_index=True)
 
@@ -153,8 +152,8 @@ plt.tight_layout()
 # %% Summary DataFrame
 
 summary = melted_df.groupby(['main_roi', 'satellite_type'])['relative_difference'].agg(
-    mean='mean',
-    var='var',
+    mean_relative_difference='mean',
+    var_relative_difference='var',
     q25=lambda x: x.quantile(0.25),
     q75=lambda x: x.quantile(0.75),
     IQR=lambda x: x.quantile(0.75) - x.quantile(0.25),
@@ -164,6 +163,11 @@ for col in summary.columns[2:]:
     summary[col] = summary[col].round(2)
 
 print(summary)
+
+summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/AC_differences_by_region.csv',
+    index=False
+)
 
 # %% 3.1 Satellite's impact on Lake (PLD + 60m) Water Fractions by ROI
 
@@ -286,8 +290,8 @@ plt.tight_layout()
 # %% Make a summary DataFrame
 
 summary = melted_df.groupby(['main_roi', 'ac_level'])['relative_difference'].agg(
-    mean='mean',
-    var='var',
+    mean_relative_difference='mean',
+    var_relative_difference='var',
     q25= lambda x: x.quantile(0.25),
     q75= lambda x: x.quantile(0.75),
     IQR= lambda x: x.quantile(0.75) - x.quantile(0.25),
@@ -296,5 +300,10 @@ summary = melted_df.groupby(['main_roi', 'ac_level'])['relative_difference'].agg
 for col in summary.columns[2:]:
     summary[col] = summary[col].round(2)
 
-print(summary)
+summary.to_csv(
+    f'D:/thesis_data/summary_data_for_SC/sensor_differences_by_region.csv',
+    index=False
+)
 
+
+# %%

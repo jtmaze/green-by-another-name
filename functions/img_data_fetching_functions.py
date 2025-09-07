@@ -357,8 +357,8 @@ def make_sat_ndwi_images(
     )
 
     if resample_method != 'noresample':
-        s2_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
-        ls8_fp = f'./data/{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
+        s2_fp = f'./{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+        ls8_fp = f'./{level}_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_LandSat8_{level}_date_{date}_roi_{roi}.tif'
 
         ls_green, s2_green, image_window_params = rio_get_data_arrays_with_common_trans(
             ls8_fp, s2_fp, 'Green'
@@ -377,8 +377,8 @@ def make_sat_ndwi_images(
 
     elif resample_method == 'noresample': 
         image_window_params = None # Don't need image window params, becuase PLD mask needs to be reprojected to image's native tile
-        s2_fp = f'./data/{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
-        ls8_fp = f'./data/{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
+        s2_fp = f'./{level}_images/roi_{roi}_noresample/Sentinel2_{level}_date_{date}_roi_{roi}.tif'
+        ls8_fp = f'./{level}_images/roi_{roi}_noresample/Landsat8_{level}_date_{date}_roi_{roi}.tif'
 
         ls_green, s2_green = rio_get_data_arrays_native_trans(
             ls_fp=ls8_fp, s2_fp=s2_fp, band_name='Green'
@@ -408,8 +408,8 @@ def make_ac_ndwi_images(
         image_info['resample_method']
     )
 
-    toa_fp = f'./data/toa_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_toa_date_{date}_roi_{roi}.tif'
-    sr_fp = f'./data/sr_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_sr_date_{date}_roi_{roi}.tif'
+    toa_fp = f'./toa_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_toa_date_{date}_roi_{roi}.tif'
+    sr_fp = f'./sr_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_sr_date_{date}_roi_{roi}.tif'
 
     toa_green, sr_green, image_window_params = rio_get_ac_arrays(toa_fp, sr_fp, band_name='Green')
     toa_nir, sr_nir, _ = rio_get_ac_arrays(toa_fp, sr_fp, band_name='NIR')

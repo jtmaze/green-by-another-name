@@ -9,11 +9,11 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import numpy as np
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
+os.chdir('D:/thesis_data/')
 
 resample_methods = ['bilinear30', 'noresample']
 
-temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+temp = pd.read_csv('./lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
 rel_y_lim = (-150, 125)
@@ -29,11 +29,11 @@ creates boxplots to visualize them, and performs t-tests to assess statistical s
 test_results = []
 for i in resample_methods:
 
-    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch3.csv')
+    sr = pd.read_csv(f'./lake_area_results/sr_resampled_{i}_area_summaries_batch3.csv')
     print(f'{len(sr)} SR observations')
     sr = sr[sr[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
     print(f'{len(sr)} SR observations QA/QC')
-    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch3.csv')
+    toa = pd.read_csv(f'./lake_area_results/toa_resampled_{i}_area_summaries_batch3.csv')
     print(f'{len(toa)} TOA observations')
     toa = toa[toa[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
     print(f'{len(toa)} quality TOA observations')
@@ -341,6 +341,10 @@ print_table = test_results_df[
     ['level', 'resample_method', 'zone', 'p_value_rel', 'p_value_abs', 
      'mean_diff_abs', 'mean_diff_rel', 'iqr_abs', 'iqr_rel']
 ].copy()
+
+print_table.to_csv(
+    f'./summary_data_for_SC/sensor_water_difference_stats.csv', index=False
+)
 
 # %% Make plot of t-statisitics for each zone and resampling method
 

@@ -10,10 +10,10 @@ from statsmodels.formula.api import ols
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 import numpy as np
 
-os.chdir('/Users/jmaze/Documents/projects/green-by-another-name/')
+os.chdir('D:/thesis_data/')
 
 resample_methods = ['bilinear30', 'noresample']
-temp = pd.read_csv('./data/lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
+temp = pd.read_csv('./lake_area_results/toa_resampled_bilinear30_area_summaries_batch3.csv')
 valids = temp[['roi', 'date']].agg('_'.join, axis=1).unique()
 
 # %%
@@ -22,10 +22,10 @@ test_results = []
 
 for i in resample_methods:
 
-    sr = pd.read_csv(f'./data/lake_area_results/sr_resampled_{i}_area_summaries_batch3.csv')
+    sr = pd.read_csv(f'./lake_area_results/sr_resampled_{i}_area_summaries_batch3.csv')
     sr = sr[sr[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
     print(len(sr))
-    toa = pd.read_csv(f'./data/lake_area_results/toa_resampled_{i}_area_summaries_batch3.csv')
+    toa = pd.read_csv(f'./lake_area_results/toa_resampled_{i}_area_summaries_batch3.csv')
     toa = toa[toa[['roi', 'date']].agg('_'.join, axis=1).isin(valids)]
     print(len(toa))
 
@@ -556,4 +556,8 @@ print_table = full_results[
 ].copy()
 
 print(print_table)
+
+print_table.to_csv(
+    './summary_data_for_SC/ac_water_difference_stats.csv', index=False
+)
 # %%

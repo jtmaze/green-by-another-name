@@ -128,11 +128,11 @@ def regress_ac_pairs(
     )
 
     # Find the file paths
-    toa_fp = f'./data/toa_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_toa_date_{date}_roi_{roi}.tif'
-    sr_fp = f'./data/sr_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_sr_date_{date}_roi_{roi}.tif'
+    toa_fp = f'./toa_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_toa_date_{date}_roi_{roi}.tif'
+    sr_fp = f'./sr_images/roi_{roi}_resampled_{resample_method}/reprojected_{resample_method}_{sat}_sr_date_{date}_roi_{roi}.tif'
 
     res = re.search(r"(\d{2}$)", resample_method).group(1)
-    pld_fp = f'./data/pld_rasterized/{roi}_lake_masks_res{res}.tif'
+    pld_fp = f'./pld_rasterized/{roi}_lake_masks_res{res}.tif'
 
     if check_match_imgs(toa_fp, sr_fp) == False:
         valid_pix_cnt = regression_output = "No Image Data"
